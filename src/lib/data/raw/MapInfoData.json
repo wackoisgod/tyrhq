@@ -1,0 +1,50 @@
+[
+  {
+    "Name": "Map_Divide",
+    "DisplayName": "Divide",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_Divide.T_Minimap_Divide",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_Divide.T_UI_Splashart_Map_Divide"
+  },
+  {
+    "Name": "Map_Fields",
+    "DisplayName": "Fields",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_Fields.T_Minimap_Fields",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_Fields.T_UI_Splashart_Map_Fields"
+  },
+  {
+    "Name": "Map_Ravine",
+    "DisplayName": "Ravine",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_Ravine.T_Minimap_Ravine",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_Ravine.T_UI_Splashart_Map_Ravine"
+  },
+  {
+    "Name": "Map_Scorch",
+    "DisplayName": "Scorch",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_Scorch.T_Minimap_Scorch",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_Scorch.T_UI_Splashart_Map_Scorch"
+  },
+  {
+    "Name": "Map_Ruins",
+    "DisplayName": "Prototype: Ruins",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_Ruins.T_Minimap_Ruins",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_Ruins.T_UI_Splashart_Map_Ruins"
+  },
+  {
+    "Name": "Map_WindValley",
+    "DisplayName": "Wind Valley",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_WindValley.T_Minimap_WindValley",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_WindValley.T_UI_Splashart_Map_WindValley"
+  },
+  {
+    "Name": "Map_IkarusOnly",
+    "DisplayName": "Prototype: Ikarus Only",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_IkarusOnly.T_Minimap_IkarusOnly",
+    "LobbyTexture": "/Game/UI/Loading/Textures/T_UI_Splashart_Map_IkarusOnly.T_UI_Splashart_Map_IkarusOnly"
+  },
+  {
+    "Name": "Map_SandboxRevamp",
+    "DisplayName": "Sandbox",
+    "MinimapTexture": "/Game/UI/_Shared/Textures/Minimap/T_Minimap_SandboxRevamped.T_Minimap_SandboxRevamped",
+    "LobbyTexture": "/Game/UI/Menus/Textures/T_UI_GameMode_Sandbox.T_UI_GameMode_Sandbox"
+  }
+]

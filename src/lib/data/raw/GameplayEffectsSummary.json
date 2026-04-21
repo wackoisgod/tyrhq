@@ -1,0 +1,1561 @@
+{
+  "generated_at_utc": "2026-04-13T18:27:55.413522+00:00",
+  "effects": [
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ActiveReloadTime.GE_Components_ActiveReloadTime_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": [
+          "Ability.MainWeapon.CooldownReduction"
+        ]
+      },
+      "modifiers": [
+        {
+          "attribute": "ActiveReloadReductionTime",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_AdaptiveHardeningPeriodicApplier.GE_Components_AdaptiveHardeningPeriodicApplier_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_AdvancedRepairGearEnergyGain.GE_Components_AdvancedRepairGearEnergyGain_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CurrentAbilityResource",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=5.000000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_BonusEnergyGainFlat.GE_Components_BonusEnergyGainFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "GlobalBonusResourceFlat",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorActiveBuff.GE_Components_CalibrationAgitatorActiveBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DispersionReductionSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=1.200000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        },
+        {
+          "attribute": "BaseDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=0.800000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorBuffRemover.GE_Components_CalibrationAgitatorBuffRemover_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorPassiveBuff.GE_Components_CalibrationAgitatorPassiveBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DispersionReductionSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "BaseDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=0.900000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CamouflageFlat.GE_Components_CamouflageFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CamoPercentage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CamouflagePercent.GE_Components_CamouflagePercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CamoPercentage",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CatalyticReservoirInitial.GE_Components_CatalyticReservoirInitial_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpBuff.GE_Components_CoreAmpBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpBuffRemover.GE_Components_CoreAmpBuffRemover_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpHitTrigger.GE_Components_CoreAmpHitTrigger_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DamageReductionFlat.GE_Components_DamageReductionFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "FlatDamageReduction",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DriftSparkerTracker.GE_Components_DriftSparkerTracker_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DuplicatorShellDamage.GE_Components_DuplicatorShellDamage_C",
+      "stack_limit_count": 50,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=5.000000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_EnergyCostPercent.GE_Components_EnergyCostPercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCost",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ExtendedGearing.GE_Components_ExtendedGearing_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_Fabricator.GE_Components_Fabricator_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_FrictionCapacitorAirborneTracker.GE_Components_FrictionCapacitorAirborneTracker_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_HealForAbilityCost.GE_Components_HealForAbilityCost_C",
+      "stack_limit_count": 999,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CurrentHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=AttributeBased | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=(AttributeName=\"AbilityCost\",Attribute=/Script/Tyr.TyrAttributeSetVehicleStats:AbilityCost,AttributeOwner=\"/Script/CoreUObject.Class'/Script/Tyr.TyrAttributeSetVehicleStats'\")),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "AttributeBased"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_HullTraverse.GE_Components_HullTraverse_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "HullTraverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxAndStartingEnergyMultiply.GE_Components_MaxAndStartingEnergyMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxAbilityResource",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "InitialAbilityResource",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxHealthFlat.GE_Components_MaxHealthFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxHealthPercent.GE_Components_MaxHealthPercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxSpeedFlat.GE_Components_MaxSpeedFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ModuleDamagePercent.GE_Components_ModuleDamagePercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ExtraDamageToModulesPercent",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ModuleSurger.GE_Components_ModuleSurger_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PhaseGear.GE_Components_PhaseGear_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PowerConverterAbilityCooldownReduction.GE_Components_PowerConverterAbilityCooldownReduction_C",
+      "stack_limit_count": 999,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCooldownTwo",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PropagationDrive.GE_Components_PropagationDrive_C",
+      "stack_limit_count": 999,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=2.000000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuff.GE_Components_ReactiveModulesBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DamageReductionPercent",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_RelentlessAdapterMaxHP.GE_Components_RelentlessAdapterMaxHP_C",
+      "stack_limit_count": 999,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReloadTimePercentTimed.GE_Components_ReloadTimePercentTimed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ReloadTime",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_RepairTimeMultiplier.GE_Components_RepairTimeMultiplier_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ModuleRepairTimeMultiplier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SenseOverdrive.GE_Components_SenseOverdrive_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "MaxReverseSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SensitiveSights.GE_Components_SensitiveSights_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DispersionReductionSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "ReloadTime",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=0.850000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellChargerBuff.GE_Components_ShellChargerBuff_C",
+      "stack_limit_count": 3,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellChargerBuffRemover.GE_Components_ShellChargerBuffRemover_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellDamageFlat.GE_Components_ShellDamageFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellDamagePercentTimed_2secs.GE_Components_ShellDamagePercentTimed_2secs_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellGainPercent.GE_Components_ShellGainPercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CaptureZoneShellsGainedMultiplier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "StartingSecondaryShellsCount",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "StartingTertiaryShellsCount",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_StableRangefinder_PhaseOne.GE_Components_StableRangefinder_PhaseOne_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SynchronizerBuff.GE_Components_SynchronizerBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SpottingAssistModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "DamageBlockedAssistModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "TrackModuleDamagedAssistModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SynchronizerStartingEnergy.GE_Components_SynchronizerStartingEnergy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "InitialAbilityResource",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=7.500000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_TimeSpotted.GE_Components_TimeSpotted_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SpottedTime",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrComponentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_VulnBreakerRampingBuff.GE_Components_VulnBreakerRampingBuff_C",
+      "stack_limit_count": 14,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ExtraDamageToModulesPercent",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=0.025000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_AbilityCooldownFlat.GE_AbilityCooldownFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCooldownTwo",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_AbilityCost.GE_AbilityCost_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCost",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ActiveReloadTimeInstantWithCopy.GE_ActiveReloadTimeInstantWithCopy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": [
+          "Ability.MainWeapon.CooldownReduction"
+        ]
+      },
+      "modifiers": [
+        {
+          "attribute": "ActiveReloadReductionTime",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ActiveReloadTimeWithCopy.GE_ActiveReloadTimeWithCopy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": [
+          "Ability.MainWeapon.CooldownReduction"
+        ]
+      },
+      "modifiers": [
+        {
+          "attribute": "ActiveReloadReductionTime",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_AimSpeed.GE_AimSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DispersionReductionSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_BaseAimingDispersion.GE_BaseAimingDispersion_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "BaseDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_BounceEnergyPercentMultiply.GE_BounceEnergyPercentMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DamageBlockedModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_Camouflage_Additive.GE_Camouflage_Additive_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CamoPercentage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_DamageDealtEnergyPercentMultiply.GE_DamageDealtEnergyPercentMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DamageDealtModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_DamageTakenEnergyPercentMultiply.GE_DamageTakenEnergyPercentMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DamageTakenModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_DronePlacementRange.GE_DronePlacementRange_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DronePlacementRange",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_DroneScanDuration.GE_DroneScanDuration_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "DroneDuration",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_FiringDispersion.GE_FiringDispersion_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "FiringDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_GrantEnergy.GE_GrantEnergy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CurrentAbilityResource",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_GunDepression.GE_GunDepression_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "GunMaxDepression",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_HealFlat.GE_HealFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CurrentHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_HullTraverseDispersion.GE_HullTraverseDispersion_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "HullTraverseDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_HullTraverseSpeed.GE_HullTraverseSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "HullTraverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_IntraclipReload.GE_IntraclipReload_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "IntraClipReloadTime",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxEnergy.GE_MaxEnergy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxAbilityResource",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxHealth.GE_MaxHealth_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxHealth2.GE_MaxHealth2_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxHealth",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxHoverTilt.GE_MaxHoverTilt_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "GunMaxHoverTilt",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxReverseSpeed.GE_MaxReverseSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxReverseSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxSpeedAndMaxReverseSpeedPercentTimed.GE_MaxSpeedAndMaxReverseSpeedPercentTimed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "MaxReverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxSpeedFlat.GE_MaxSpeedFlat_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxSpeedPercent.GE_MaxSpeedPercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MaxStrafingSpeed.GE_MaxStrafingSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxStrafingSpeed",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ModuleDamagePercent.GE_ModuleDamagePercent_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ExtraDamageToModulesPercent",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_MovementDispersion.GE_MovementDispersion_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MovementDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_PreciseDispersionTime.GE_PreciseDispersionTime_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "PreciseDispersionTime",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_RamDamageBonus.GE_RamDamageBonus_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "RamRammingDamageBonus",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_RangerKeystoneRegenerativeSuspensionTracker.GE_RangerKeystoneRegenerativeSuspensionTracker_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": []
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_RecallCopilotKeystoneScaleBuff.GE_RecallCopilotKeystoneScaleBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "RecallZoneScale",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_RecallKeyStoneSpeedBoost.GE_RecallKeyStoneSpeedBoost_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AccelerationTime",
+          "op": "DivideAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "MaxSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "DownforceMultiplier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=2.500000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ReloadTime.GE_ReloadTime_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ReloadTime",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_RepairSpeed.GE_RepairSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ModuleRepairTimeMultiplier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_Sentinel_CamoGrantAmount.GE_Sentinel_CamoGrantAmount_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "CamoGrantAmount",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_Sentinel_HasteAmount.GE_Sentinel_HasteAmount_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "HasteMagnitude",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ShellDamage.GE_ShellDamage_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ShellSwapTime.GE_ShellSwapTime_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellSwapTime",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_ShellVelocity.GE_ShellVelocity_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellVelocity",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_SlowZoneDuration.GE_SlowZoneDuration_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SlowZoneDuration",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_SlowZoneSize.GE_SlowZoneSize_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SlowZoneAbilitySize",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_SonarKeystoneAbilityCostCooldownReduction.GE_SonarKeystoneAbilityCostCooldownReduction_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCooldownTwo",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "AbilityCost",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_SpottingAssistEnergyPercentageMultiply.GE_SpottingAssistEnergyPercentageMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SpottingAssistModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_SpottingEnergy.GE_SpottingEnergy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "SpottingModifier",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_StartingEnergy.GE_StartingEnergy_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "InitialAbilityResource",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_StartingSecondaryShells.GE_StartingSecondaryShells_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "StartingSecondaryShellsCount",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_StartingTertiaryShells.GE_StartingTertiaryShells_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "StartingTertiaryShellsCount",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_TrackingAssistEnergyPercentageMultiply.GE_TrackingAssistEnergyPercentageMultiply_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "TrackModuleDamagedAssistModifier",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_TurretTraverseDispersion.GE_TurretTraverseDispersion_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "TurretTraverseDispersionPenalty",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_TurretTraverseSpeed.GE_TurretTraverseSpeed_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "TurretTraverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    },
+    {
+      "effect_path": "/Game/Blueprints/Abilities/Effects/Talents/GE_WallPhaseInTime.GE_WallPhaseInTime_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "AbilityCooldownTwo",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=0.250000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        },
+        {
+          "attribute": "WallPhaseInTime",
+          "op": "Override",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=2.500000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/TyrVehicleBush/Ability/GE_ElusiveGrowthShellDamageBuff.GE_ElusiveGrowthShellDamageBuff_C",
+      "stack_limit_count": 999,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "ShellDamage",
+          "op": "AddBase",
+          "magnitude": "MagnitudeCalculationType=ScalableFloat | ScalableFloatMagnitude=(Value=5.000000,Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "ScalableFloat"
+        }
+      ]
+    },
+    {
+      "effect_path": "/TyrVehicleBush/Ability/GE_ThicketHasteSpeedBuff.GE_ThicketHasteSpeedBuff_C",
+      "stack_limit_count": 1,
+      "tags": {
+        "gameplay_effect": []
+      },
+      "modifiers": [
+        {
+          "attribute": "MaxSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "HullTraverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        },
+        {
+          "attribute": "MaxReverseSpeed",
+          "op": "MultiplyAdditive",
+          "magnitude": "MagnitudeCalculationType=CustomCalculationClass | ScalableFloatMagnitude=(Curve=(),RegistryType=\"None\") | AttributeBasedMagnitude=(Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),BackingAttribute=(AttributeToCapture=()),AttributeCurve=(),SourceTagFilter=(),TargetTagFilter=()) | CustomMagnitude=(CalculationClassMagnitude=\"/Script/CoreUObject.Class'/Script/Tyr.TyrTalentMagCalculation'\",Coefficient=(Value=1.000000,Curve=(),RegistryType=\"None\"),PreMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),PostMultiplyAdditiveValue=(Curve=(),RegistryType=\"None\"),FinalLookupCurve=()) | SetByCallerMagnitude=(DataTag=())",
+          "magnitude_type": "CustomCalculationClass"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "tech_nodes": [
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent001",
+      "max_points": 5,
+      "row": 0,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent005",
+      "max_points": 5,
+      "row": 0,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent009",
+      "max_points": 3,
+      "row": 0,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent017",
+      "max_points": 2,
+      "row": 0,
+      "tier": 4,
+      "prerequisites": [
+        "Gameplay.TalentTree.Drone.Talent018"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent002",
+      "max_points": 5,
+      "row": 1,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent006",
+      "max_points": 3,
+      "row": 1,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent010",
+      "max_points": 2,
+      "row": 1,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.Drone.Talent006"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent014",
+      "max_points": 3,
+      "row": 1,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent018",
+      "max_points": 3,
+      "row": 1,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent022",
+      "max_points": 2,
+      "row": 1,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent026",
+      "max_points": 1,
+      "row": 1,
+      "tier": 6,
+      "prerequisites": [
+        "Gameplay.TalentTree.Drone.Talent022"
+      ],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent003",
+      "max_points": 5,
+      "row": 2,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent007",
+      "max_points": 5,
+      "row": 2,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent011",
+      "max_points": 3,
+      "row": 2,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent015",
+      "max_points": 2,
+      "row": 2,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent019",
+      "max_points": 2,
+      "row": 2,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent023",
+      "max_points": 5,
+      "row": 2,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent027",
+      "max_points": 1,
+      "row": 2,
+      "tier": 6,
+      "prerequisites": [
+        "Gameplay.TalentTree.Drone.Talent023"
+      ],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent008",
+      "max_points": 3,
+      "row": 3,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent012",
+      "max_points": 1,
+      "row": 3,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.Drone.Talent008"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent016",
+      "max_points": 5,
+      "row": 3,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Drone.Talent020",
+      "max_points": 5,
+      "row": 3,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    }
+  ],
+  "metadata": {
+    "num_tiers": 7,
+    "points_per_tier_required": 5,
+    "vehicle_tag": "Gameplay.Vehicle.Drone",
+    "version": 19181
+  }
+}

@@ -1,0 +1,50 @@
+{
+	"name": "aggrowebsite",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "vitest run",
+		"prepare": "svelte-kit sync || echo ''",
+		"export:data": "python scripts/export_data.py",
+		"export:data:dry": "python scripts/export_data.py --dry-run --verbose",
+		"sync:data": "python scripts/export_data.py --generated-out GameData/generated --vehicle-images-dir GameData/assets/images/vehicles --map-lobby-dir GameData/assets/images/maps/lobby --map-minimap-dir GameData/assets/images/maps/minimap --ammo-icons-dir GameData/assets/images/ammo --component-icons-dir GameData/assets/images/components --talent-icons-dir GameData/assets/images/talents --ui-icons-dir GameData/assets/images/icons --armor-models-dir GameData/assets/models/vehicles --skip-canonical",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@sveltejs/kit": "^2.56.1",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@tailwindcss/vite": "^4.2.2",
+		"@types/marked": "^5.0.2",
+		"@types/sanitize-html": "^2.16.0",
+		"@types/three": "^0.183.1",
+		"svelte": "^5.51.0",
+		"svelte-check": "^4.4.2",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"vite-plugin-static-copy": "^3.1.4",
+		"vitest": "^3.2.4"
+	},
+	"dependencies": {
+		"@supabase/ssr": "^0.9.0",
+		"@supabase/supabase-js": "^2.99.2",
+		"@sveltejs/adapter-vercel": "^6.3.3",
+		"@threlte/core": "^8.5.2",
+		"@threlte/extras": "^9.13.0",
+		"fast-xml-parser": "^5.5.9",
+		"gray-matter": "^4.0.3",
+		"marked": "^17.0.5",
+		"sanitize-html": "^2.17.0",
+		"swagger-ui-dist": "^5.32.2",
+		"three": "^0.183.2",
+		"zod": "^4.3.6"
+	},
+	"overrides": {
+		"picomatch": "^4.0.4"
+	}
+}

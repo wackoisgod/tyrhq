@@ -1,0 +1,70 @@
+[
+  {
+    "vehicleKey": "Gameplay.Vehicle.Blink",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Brawler",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Bush",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.CanOpener",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Deadeye",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Drone",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Healer",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Ram",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Ranger",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Recall",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Sentinel",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Slow",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Sonar",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Stealth",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Vanguard",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Vtol",
+    "nativeComponents": []
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Wall",
+    "nativeComponents": []
+  }
+]

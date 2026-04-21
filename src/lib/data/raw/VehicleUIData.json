@@ -1,0 +1,155 @@
+[
+  {
+    "Name": "Gameplay.Vehicle.Bush",
+    "VehicleName": "Ark",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Drone",
+    "VehicleName": "Kestrel",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Light"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Ram",
+    "VehicleName": "Maul",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Heavy"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.CanOpener",
+    "VehicleName": "Arbalest",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Recall",
+    "VehicleName": "Tempest",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Sonar",
+    "VehicleName": "Atlas",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Heavy"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Sentinel",
+    "VehicleName": "Tricera",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Heavy"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Slow",
+    "VehicleName": "Helio",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Heavy"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Blink",
+    "VehicleName": "Alecto",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Light"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Deadeye",
+    "VehicleName": "Deadeye",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Healer",
+    "VehicleName": "Valor",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Vtol",
+    "VehicleName": "Ikarus",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Light"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Wall",
+    "VehicleName": "Rook",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Stealth",
+    "VehicleName": "Phantom",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Light"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Ranger",
+    "VehicleName": "Ranger",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Medium"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Brawler",
+    "VehicleName": "Fortis",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Heavy"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  },
+  {
+    "Name": "Gameplay.Vehicle.Vanguard",
+    "VehicleName": "Vanguard",
+    "VehicleClassTag": {
+      "TagName": "Gameplay.VehicleClass.Light"
+    },
+    "bVehicleSelectable_External": true,
+    "bVehicleSelectable_Internal": true
+  }
+]
