@@ -5,8 +5,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, normalizePath, searchForWorkspaceRoot } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
-const gameDataAssetsRoot = path.resolve('GameData', 'assets');
+const gameDataAssetsRoot = path.join('GameData', 'assets');
 const gameDataRoot = path.resolve('GameData');
+const gameDataImagesGlob = normalizePath(path.join(gameDataAssetsRoot, 'images', '**', '*'));
+const gameDataModelsGlob = normalizePath(path.join(gameDataAssetsRoot, 'models', '**', '*'));
+const gameDataAssetBaseSegments = 3;
 
 export default defineConfig({
 	server: {
@@ -19,12 +22,14 @@ export default defineConfig({
 		viteStaticCopy({
 			targets: [
 				{
-					src: normalizePath(path.join(gameDataAssetsRoot, 'images', '**', '*')),
-					dest: 'images'
+					src: gameDataImagesGlob,
+					dest: 'images',
+					rename: { stripBase: gameDataAssetBaseSegments }
 				},
 				{
-					src: normalizePath(path.join(gameDataAssetsRoot, 'models', '**', '*')),
-					dest: 'models'
+					src: gameDataModelsGlob,
+					dest: 'models',
+					rename: { stripBase: gameDataAssetBaseSegments }
 				}
 			]
 		}),
