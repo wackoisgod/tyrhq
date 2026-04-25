@@ -1,3 +1,5 @@
+import { randomInt } from 'node:crypto';
+
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import {
@@ -12,9 +14,14 @@ function generateSlug(): string {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 	let slug = '';
 	for (let i = 0; i < 8; i++) {
-		slug += chars[Math.floor(Math.random() * chars.length)];
+		slug += chars[randomInt(chars.length)];
 	}
 	return slug;
+}
+
+function failBuildsRequest(message: string, cause: unknown) {
+	console.error(`[builds-api] ${message}`, cause);
+	return error(500, 'Builds are unavailable right now');
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -38,7 +45,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		.select()
 		.single();
 
-	if (dbError) return error(500, dbError.message);
+	if (dbError) return failBuildsRequest('Failed to create build', dbError);
 	return json(data, { status: 201 });
 };
 
@@ -52,7 +59,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		.eq('user_id', user.id)
 		.order('updated_at', { ascending: false });
 
-	if (dbError) return error(500, dbError.message);
+	if (dbError) return failBuildsRequest('Failed to list builds', dbError);
 	return json(data);
 };
 
@@ -76,7 +83,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		.select()
 		.single();
 
-	if (dbError) return error(500, dbError.message);
+	if (dbError) return failBuildsRequest('Failed to update build', dbError);
 	return json(data);
 };
 
@@ -92,6 +99,6 @@ export const DELETE: RequestHandler = async ({ request, locals }) => {
 		.eq('id', body.id)
 		.eq('user_id', user.id);
 
-	if (dbError) return error(500, dbError.message);
+	if (dbError) return failBuildsRequest('Failed to delete build', dbError);
 	return json({ success: true });
 };

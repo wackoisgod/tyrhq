@@ -33,9 +33,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const profile = await loadProfile(locals, user.id);
 	const isOnboarding = !profile.display_name;
 	const apiConfigured = isSupabaseAdminConfigured();
-	const apiCredential = apiConfigured
-		? toApiCredentialSummary(await getUserApiCredentialRecord(user.id))
-		: null;
+	let apiCredential = null;
+
+	if (apiConfigured) {
+		try {
+			apiCredential = toApiCredentialSummary(await getUserApiCredentialRecord(user.id));
+		} catch (caught) {
+			console.error('[settings] Failed to load API credential', caught);
+		}
+	}
 
 	return { profile, isOnboarding, apiConfigured, apiCredential };
 };
@@ -65,7 +71,11 @@ export const actions: Actions = {
 			.eq('id', user.id);
 
 		if (error) {
-			return fail(500, { profileError: error.message, displayName });
+			console.error('[settings] Failed to update profile', error);
+			return fail(500, {
+				profileError: 'Unable to update profile right now.',
+				displayName
+			});
 		}
 
 		return { profileSuccess: 'Callsign updated.' };
@@ -95,11 +105,9 @@ export const actions: Actions = {
 				apiCredential: toApiCredentialSummary(result.credential)
 			};
 		} catch (caught) {
+			console.error('[settings] Failed to generate API key', caught);
 			return fail(500, {
-				apiError:
-					caught instanceof Error
-						? caught.message
-						: 'Failed to generate an API key.'
+				apiError: 'Unable to generate an API key right now.'
 			});
 		}
 	},
@@ -118,9 +126,9 @@ export const actions: Actions = {
 				apiCredential
 			};
 		} catch (caught) {
+			console.error('[settings] Failed to revoke API key', caught);
 			return fail(500, {
-				apiError:
-					caught instanceof Error ? caught.message : 'Failed to revoke the API key.'
+				apiError: 'Unable to revoke the API key right now.'
 			});
 		}
 	}

@@ -5,12 +5,32 @@ import { getMapBySlug } from '$lib/data/maps';
 
 const ROOM_TITLE_MAX_LENGTH = 80;
 const ROOM_TOKEN_LENGTH = 10;
+const ROOM_TOKEN_MAX_LENGTH = 64;
 const ACTOR_NAME_MAX_LENGTH = 32;
+const MAP_SLUG_MAX_LENGTH = 80;
+const ID_MAX_LENGTH = 96;
+const COLOR_MAX_LENGTH = 16;
+const VEHICLE_ID_MAX_LENGTH = 80;
+const MAX_STROKE_POINTS = 512;
+const MAX_ROOM_STROKES = 500;
+const MAX_ROOM_STAMPS = 200;
+const MAX_ROOM_SHAPES = 300;
+const MAX_STROKE_WIDTH = 64;
+
+const idSchema = z.string().min(1).max(ID_MAX_LENGTH);
+const colorSchema = z
+	.string()
+	.trim()
+	.min(1)
+	.max(COLOR_MAX_LENGTH)
+	.regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a six-digit hex value');
+const coordinateSchema = z.number().finite().min(0).max(1);
+const strokeWidthSchema = z.number().finite().positive().max(MAX_STROKE_WIDTH);
 
 const pointSchema = z
 	.object({
-		x: z.number().min(0).max(1),
-		y: z.number().min(0).max(1)
+		x: coordinateSchema,
+		y: coordinateSchema
 	})
 	.strict();
 
@@ -19,10 +39,10 @@ const lineEndSchema = z.enum(['none', 'arrow', 'stop']);
 
 const strokeSchema = z
 	.object({
-		id: z.string().min(1),
-		points: z.array(pointSchema).min(2),
-		color: z.string().min(1),
-		width: z.number().positive(),
+		id: idSchema,
+		points: z.array(pointSchema).min(2).max(MAX_STROKE_POINTS),
+		color: colorSchema,
+		width: strokeWidthSchema,
 		tool: z.enum(['pen', 'eraser']),
 		lineStyle: lineStyleSchema,
 		endType: lineEndSchema
@@ -31,34 +51,36 @@ const strokeSchema = z
 
 const stampSchema = z
 	.object({
-		id: z.string().min(1),
+		id: idSchema,
 		pos: pointSchema,
 		stamp: z.enum(['tank', 'zone']),
 		side: z.enum(['friendly', 'enemy']),
-		vehicleId: z.string().min(1).optional(),
+		vehicleId: z.string().min(1).max(VEHICLE_ID_MAX_LENGTH).optional(),
 		showVision: z.boolean().optional()
 	})
 	.strict();
 
 const shapeSchema = z
 	.object({
-		id: z.string().min(1),
+		id: idSchema,
 		kind: z.enum(['line', 'measure', 'circle', 'rectangle', 'ping']),
 		start: pointSchema,
 		end: pointSchema,
-		color: z.string().min(1),
-		width: z.number().positive(),
+		color: colorSchema,
+		width: strokeWidthSchema,
 		lineStyle: lineStyleSchema,
 		endType: lineEndSchema
 	})
 	.strict();
 
+const compactPointSchema = z.tuple([coordinateSchema, coordinateSchema]);
+
 const compactStrokeSchema = z
 	.object({
-		i: z.string().min(1).optional(),
-		p: z.array(z.tuple([z.number(), z.number()])).optional(),
-		c: z.string().min(1).optional(),
-		w: z.number().positive().optional(),
+		i: idSchema.optional(),
+		p: z.array(compactPointSchema).min(2).max(MAX_STROKE_POINTS).optional(),
+		c: colorSchema.optional(),
+		w: strokeWidthSchema.optional(),
 		t: z.enum(['e', 'p']).optional(),
 		l: z.enum(['s', 'd', 'o']).optional(),
 		e: z.enum(['n', 'a', 't', 'b']).optional()
@@ -67,26 +89,26 @@ const compactStrokeSchema = z
 
 const compactStampSchema = z
 	.object({
-		i: z.string().min(1).optional(),
-		x: z.number().min(0).max(1).optional(),
-		y: z.number().min(0).max(1).optional(),
+		i: idSchema.optional(),
+		x: coordinateSchema.optional(),
+		y: coordinateSchema.optional(),
 		s: z.enum(['t', 'z']).optional(),
 		d: z.enum(['f', 'e']).optional(),
-		v: z.string().min(1).optional(),
+		v: z.string().min(1).max(VEHICLE_ID_MAX_LENGTH).optional(),
 		r: z.literal(1).optional()
 	})
 	.strict();
 
 const compactShapeSchema = z
 	.object({
-		i: z.string().min(1).optional(),
+		i: idSchema.optional(),
 		k: z.enum(['a', 'l', 'm', 'c', 'r', 'p']).optional(),
-		x1: z.number().min(0).max(1).optional(),
-		y1: z.number().min(0).max(1).optional(),
-		x2: z.number().min(0).max(1).optional(),
-		y2: z.number().min(0).max(1).optional(),
-		c: z.string().min(1).optional(),
-		w: z.number().positive().optional(),
+		x1: coordinateSchema.optional(),
+		y1: coordinateSchema.optional(),
+		x2: coordinateSchema.optional(),
+		y2: coordinateSchema.optional(),
+		c: colorSchema.optional(),
+		w: strokeWidthSchema.optional(),
 		l: z.enum(['s', 'd', 'o']).optional(),
 		e: z.enum(['n', 'a', 't', 'b']).optional()
 	})
@@ -94,27 +116,27 @@ const compactShapeSchema = z
 
 export const compactStateSchema = z
 	.object({
-		s: z.array(compactStrokeSchema).optional(),
-		t: z.array(compactStampSchema).optional(),
-		h: z.array(compactShapeSchema).optional()
+		s: z.array(compactStrokeSchema).max(MAX_ROOM_STROKES).optional(),
+		t: z.array(compactStampSchema).max(MAX_ROOM_STAMPS).optional(),
+		h: z.array(compactShapeSchema).max(MAX_ROOM_SHAPES).optional()
 	})
 	.strict();
 
 export const plannerOperationSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('add_stroke'), stroke: strokeSchema }).strict(),
-	z.object({ type: z.literal('delete_stroke'), strokeId: z.string().min(1) }).strict(),
+	z.object({ type: z.literal('delete_stroke'), strokeId: idSchema }).strict(),
 	z.object({ type: z.literal('add_shape'), shape: shapeSchema }).strict(),
 	z.object({ type: z.literal('update_shape'), shape: shapeSchema }).strict(),
-	z.object({ type: z.literal('delete_shape'), shapeId: z.string().min(1) }).strict(),
+	z.object({ type: z.literal('delete_shape'), shapeId: idSchema }).strict(),
 	z.object({ type: z.literal('add_stamp'), stamp: stampSchema }).strict(),
 	z.object({ type: z.literal('update_stamp'), stamp: stampSchema }).strict(),
-	z.object({ type: z.literal('delete_stamp'), stampId: z.string().min(1) }).strict(),
+	z.object({ type: z.literal('delete_stamp'), stampId: idSchema }).strict(),
 	z.object({ type: z.literal('clear_room') }).strict()
 ]);
 
 export const createMapRoomBodySchema = z
 	.object({
-		mapSlug: z.string().min(1),
+		mapSlug: z.string().min(1).max(MAP_SLUG_MAX_LENGTH),
 		title: z.string().trim().max(ROOM_TITLE_MAX_LENGTH).optional(),
 		state: compactStateSchema.optional()
 	})
@@ -131,8 +153,8 @@ export const createMapRoomBodySchema = z
 
 export const mapRoomEventBodySchema = z
 	.object({
-		eventId: z.string().min(1),
-		actorId: z.string().min(1),
+		eventId: idSchema,
+		actorId: idSchema,
 		actorName: z.string().trim().min(1).max(ACTOR_NAME_MAX_LENGTH),
 		clientTs: z.string().datetime({ offset: true }),
 		operation: plannerOperationSchema
@@ -142,6 +164,7 @@ export const mapRoomEventBodySchema = z
 export const mapRoomTokenSchema = z
 	.string()
 	.trim()
+	.max(ROOM_TOKEN_MAX_LENGTH)
 	.regex(new RegExp(`^[A-Za-z0-9_-]{${ROOM_TOKEN_LENGTH},}$`), 'Invalid room token');
 
 function formatValidationError(validationError: z.ZodError) {

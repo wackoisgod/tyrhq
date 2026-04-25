@@ -1,5 +1,16 @@
+import { randomInt } from 'node:crypto';
+
 import { buildCompactState, parseCompactState, applyPlannerOperation, type CompactState, type PlannerOperationEnvelope } from '$lib/maps/planner';
 import { getSupabaseAdminClient } from '$lib/server/supabase-admin';
+
+const MAX_ROOM_EVENTS = 2_000;
+
+export class MapRoomEventLimitError extends Error {
+	constructor() {
+		super('Map room event limit reached');
+		this.name = 'MapRoomEventLimitError';
+	}
+}
 
 export type MapRoomRecord = {
 	id: string;
@@ -38,7 +49,7 @@ function createToken(length = 20) {
 	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 	let token = '';
 	for (let index = 0; index < length; index += 1) {
-		token += chars[Math.floor(Math.random() * chars.length)];
+		token += chars[randomInt(chars.length)];
 	}
 	return token;
 }
@@ -118,6 +129,16 @@ export async function appendMapRoomEvent(shareToken: string, envelope: PlannerOp
 	const admin = getAdminClientOrThrow();
 	const room = await getMapRoomByToken(shareToken);
 	if (!room) return { room: null, duplicate: false };
+
+	const { count, error: countError } = await admin
+		.from('map_room_events')
+		.select('id', { count: 'exact', head: true })
+		.eq('room_id', room.id);
+
+	if (countError) throw countError;
+	if ((count ?? 0) >= MAX_ROOM_EVENTS) {
+		throw new MapRoomEventLimitError();
+	}
 
 	const { error } = await admin.from('map_room_events').insert({
 		room_id: room.id,

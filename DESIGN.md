@@ -2,7 +2,7 @@
 
 ## 1. Source Of Truth
 
-TYR HQ must align to the official Tyr branding pack located at `C:\Users\wacko\Downloads\TyrBranding\TyrBranding`.
+TYR HQ must align to the official Tyr branding pack maintained outside this repo.
 
 Imported implementation assets live here:
 

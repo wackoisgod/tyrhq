@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-import { appendMapRoomEvent } from '$lib/server/map-rooms';
+import { MapRoomEventLimitError, appendMapRoomEvent } from '$lib/server/map-rooms';
 import { mapRoomEventBodySchema, parseJsonBody, parseRoomToken } from '$lib/server/map-room-requests';
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -18,6 +18,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			roomId: result.room.id
 		});
 	} catch (cause) {
+		if (cause instanceof MapRoomEventLimitError) {
+			return error(429, 'This live room has reached its event limit');
+		}
+
 		console.error('Failed to append map room event', cause);
 		return error(503, 'Live room sync is unavailable right now');
 	}

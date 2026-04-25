@@ -24,14 +24,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			.eq('user_id', user.id)
 			.eq('build_id', buildId);
 
-		if (delError) return error(500, delError.message);
+		if (delError) {
+			console.error('[build-stars-api] Failed to remove star', delError);
+			return error(500, 'Unable to update this build star right now');
+		}
 	} else {
 		// Star — RLS enforces: public build, not own build
 		const { error: insError } = await locals.supabase
 			.from('build_stars')
 			.insert({ user_id: user.id, build_id: buildId });
 
-		if (insError) return error(403, insError.message);
+		if (insError) {
+			console.error('[build-stars-api] Failed to add star', insError);
+			return error(403, 'Unable to star this build');
+		}
 	}
 
 	// Read back the current star_count

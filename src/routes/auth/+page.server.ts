@@ -20,7 +20,8 @@ export const actions: Actions = {
 
 		const { error } = await locals.supabase.auth.signInWithPassword({ email, password });
 		if (error) {
-			return fail(400, { error: error.message, email });
+			console.error('[auth] Login failed', error);
+			return fail(400, { error: 'Invalid email or password', email });
 		}
 
 		redirect(303, '/');
@@ -41,7 +42,8 @@ export const actions: Actions = {
 
 		const { error } = await locals.supabase.auth.signUp({ email, password });
 		if (error) {
-			return fail(400, { error: error.message, email });
+			console.error('[auth] Signup failed', error);
+			return fail(400, { error: 'Unable to create an account right now', email });
 		}
 
 		return { success: 'Check your email for a confirmation link.' };
@@ -59,7 +61,8 @@ export const actions: Actions = {
 			redirectTo: getAbsoluteUrl('/auth/callback?next=/auth', new URL(request.url).origin)
 		});
 		if (error) {
-			return fail(400, { error: error.message });
+			console.error('[auth] Password reset failed', error);
+			return { success: 'If an account exists for that email, a reset link will be sent.' };
 		}
 
 		return { success: 'Check your email for a password reset link.' };

@@ -76,9 +76,11 @@ function createWindow(limit: number, used: number, resetAt: Date): PublicApiRate
 }
 
 function resolveRequestIp(event: RequestEvent) {
-	const forwardedFor = event.request.headers.get('x-forwarded-for');
-	if (forwardedFor) {
-		return forwardedFor.split(',')[0]?.trim() || null;
+	try {
+		const clientAddress = event.getClientAddress();
+		if (clientAddress) return clientAddress;
+	} catch {
+		// Fall through to trusted proxy headers when the adapter does not expose a client address.
 	}
 
 	const cloudflareIp = event.request.headers.get('cf-connecting-ip');
@@ -86,11 +88,12 @@ function resolveRequestIp(event: RequestEvent) {
 		return cloudflareIp.trim();
 	}
 
-	try {
-		return event.getClientAddress();
-	} catch {
-		return null;
+	const forwardedFor = event.request.headers.get('x-forwarded-for');
+	if (forwardedFor) {
+		return forwardedFor.split(',')[0]?.trim() || null;
 	}
+
+	return null;
 }
 
 async function countRequestsSince(
@@ -200,6 +203,15 @@ async function rejectRequest(
 	return response;
 }
 
+function failPublicApiRequest(caught: unknown) {
+	console.error('[public-api] Failed to authenticate API request', caught);
+	return createPublicApiErrorResponse(
+		500,
+		'internal_error',
+		'The public API could not process this request.'
+	);
+}
+
 export async function withPublicApiAuth(
 	event: RequestEvent,
 	handler: (context: PublicApiRequestContext) => Promise<Response>
@@ -223,7 +235,13 @@ export async function withPublicApiAuth(
 		ipMinute: createWindow(PUBLIC_API_RATE_LIMITS.perIpPerMinute, 0, getMinuteResetAt(now))
 	};
 
-	const ipCount = ip ? await countRequestsSince({ ip }, minuteStartIso) : 0;
+	let ipCount = 0;
+	try {
+		ipCount = ip ? await countRequestsSince({ ip }, minuteStartIso) : 0;
+	} catch (caught) {
+		return failPublicApiRequest(caught);
+	}
+
 	const ipWindow = createWindow(
 		PUBLIC_API_RATE_LIMITS.perIpPerMinute,
 		Math.min(PUBLIC_API_RATE_LIMITS.perIpPerMinute, ipCount + 1),
@@ -261,7 +279,13 @@ export async function withPublicApiAuth(
 		});
 	}
 
-	const credential = await findApiCredentialByKeyHash(hashApiKey(apiKey));
+	let credential: ApiCredentialRecord | null;
+	try {
+		credential = await findApiCredentialByKeyHash(hashApiKey(apiKey));
+	} catch (caught) {
+		return failPublicApiRequest(caught);
+	}
+
 	if (!credential) {
 		return rejectRequest(event, {
 			credential: null,
@@ -292,10 +316,16 @@ export async function withPublicApiAuth(
 		});
 	}
 
-	const [credentialMinuteCount, credentialDayCount] = await Promise.all([
-		countRequestsSince({ apiCredentialId: credential.id }, minuteStartIso),
-		countRequestsSince({ apiCredentialId: credential.id }, dayStartIso)
-	]);
+	let credentialMinuteCount = 0;
+	let credentialDayCount = 0;
+	try {
+		[credentialMinuteCount, credentialDayCount] = await Promise.all([
+			countRequestsSince({ apiCredentialId: credential.id }, minuteStartIso),
+			countRequestsSince({ apiCredentialId: credential.id }, dayStartIso)
+		]);
+	} catch (caught) {
+		return failPublicApiRequest(caught);
+	}
 
 	const rateLimits = {
 		credentialMinute: createWindow(

@@ -1,3 +1,7 @@
+import { env } from '$env/dynamic/public';
+
+const repoUrl = env.PUBLIC_REPO_URL?.trim() ?? '';
+
 export const navigation = [
 	{ href: '/', label: 'Home' },
 	{ href: '/game', label: 'Game' },
@@ -41,7 +45,7 @@ export const footerSections = [
 		title: 'Social',
 		links: [
 			{ href: 'https://discord.com/invite/tyr', label: 'Discord' },
-			{ href: 'https://github.com/wackoisgod/tyrhq', label: 'GitHub' }
+			...(repoUrl ? [{ href: repoUrl, label: 'GitHub' }] : [])
 		]
 	}
 ];
@@ -61,5 +65,5 @@ export const siteCopy = {
 	wishlistUrl: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
 	newsUrl: 'https://store.steampowered.com/news/app/2445260',
 	discordUrl: 'https://discord.com/invite/tyr',
-	repoUrl: 'https://github.com/wackoisgod/tyrhq'
+	repoUrl
 };
