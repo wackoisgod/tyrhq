@@ -9,12 +9,8 @@
 		"preview": "vite preview",
 		"test": "vitest run",
 		"prepare": "svelte-kit sync || echo ''",
-		"export:data": "python scripts/export_data.py",
-		"export:data:dry": "python scripts/export_data.py --dry-run --verbose",
-		"sync:data": "python scripts/export_data.py --generated-out GameData/generated --vehicle-images-dir GameData/assets/images/vehicles --map-lobby-dir GameData/assets/images/maps/lobby --map-minimap-dir GameData/assets/images/maps/minimap --ammo-icons-dir GameData/assets/images/ammo --component-icons-dir GameData/assets/images/components --talent-icons-dir GameData/assets/images/talents --ui-icons-dir GameData/assets/images/icons --armor-models-dir GameData/assets/models/vehicles --skip-canonical",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"migrate:content": "tsx scripts/migrate_content_to_supabase.ts"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
 		"@sveltejs/kit": "^2.58.0",
