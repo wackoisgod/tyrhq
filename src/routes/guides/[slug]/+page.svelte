@@ -1,19 +1,12 @@
 <script lang="ts">
-	import type { Component } from 'svelte';
+	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import ArticleActionsBar from '$lib/contribute/ArticleActionsBar.svelte';
 
 	let { data } = $props();
 
-	type MdModule = { default: Component<Record<string, never>> };
-	const guides = import.meta.glob<MdModule>('/src/content/guides/*.md', { eager: true });
-
-	const Content = $derived.by(() => {
-		const entry = Object.entries(guides).find(([path]) => {
-			const basename = path.split('/').pop()!.replace(/\.md$/, '');
-			const slug = basename.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-			return slug === data.guide.slug;
-		});
-		return entry?.[1]?.default;
-	});
+	function formatDate(iso: string): string {
+		return iso.slice(0, 10);
+	}
 </script>
 
 <svelte:head>
@@ -34,7 +27,7 @@
 	<div class="mt-6">
 		<div class="flex flex-wrap items-center gap-3">
 			<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
-				{data.guide.date}
+				{formatDate(data.guide.publishedAt)}
 			</span>
 			{#if data.guide.tags?.length}
 				{#each data.guide.tags as tag}
@@ -53,8 +46,8 @@
 			{data.guide.title}
 		</h1>
 
-		{#if data.guide.author}
-			<p class="mt-2 text-sm text-[var(--hud-dim)]">By {data.guide.author}</p>
+		{#if data.guide.authorDisplay}
+			<p class="mt-2 text-sm text-[var(--hud-dim)]">By {data.guide.authorDisplay}</p>
 		{/if}
 
 		{#if data.vehicles.length > 0}
@@ -77,8 +70,13 @@
 	</div>
 
 	<div class="mt-8">
-		{#if Content}
-			<Content />
-		{/if}
+		<ArticleBody html={data.guide.bodyHtml} />
 	</div>
+
+	<ArticleActionsBar
+		articleId={data.guide.id}
+		articleType="guide"
+		signedIn={Boolean(data.user)}
+		canModerate={data.role === 'contributor' || data.role === 'admin'}
+	/>
 </article>

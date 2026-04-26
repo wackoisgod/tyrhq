@@ -1,87 +1,9 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { SteamNewsItem, YouTubeVideo } from '$lib/types/content';
 
-type NewsFrontmatter = {
-	title: string;
-	date?: string;
-	author?: string;
-	summary?: string;
-	tags?: string[];
-	draft?: boolean;
-};
-
-type GuideFrontmatter = NewsFrontmatter & {
-	vehicleSlugs?: string[];
-};
-
-export type NewsPost = {
-	slug: string;
-	title: string;
-	date: string;
-	author?: string;
-	summary?: string;
-	tags?: string[];
-	draft?: boolean;
-};
-
-export type Guide = {
-	slug: string;
-	title: string;
-	date: string;
-	author?: string;
-	summary?: string;
-	tags?: string[];
-	vehicleSlugs?: string[];
-	draft?: boolean;
-};
-
-function deriveSlugAndDate(path: string): { slug: string; date: string } {
-	const basename = path.split('/').pop()!.replace(/\.md$/, '');
-	const slug = basename.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-	const date = basename.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? '';
-	return { slug, date };
-}
-
-export function loadAllNewsPosts(
-	modules: Record<string, NewsFrontmatter | undefined>
-): NewsPost[] {
-	return Object.entries(modules)
-		.map(([path, meta]) => {
-			const { slug, date } = deriveSlugAndDate(path);
-			const m = meta ?? ({ title: 'Untitled' } as NewsFrontmatter);
-			return {
-				slug,
-				title: m.title,
-				date: m.date ?? date,
-				author: m.author,
-				summary: m.summary,
-				tags: m.tags,
-				draft: m.draft
-			};
-		})
-		.sort((a, b) => b.date.localeCompare(a.date));
-}
-
-export function loadAllGuides(
-	modules: Record<string, GuideFrontmatter | undefined>
-): Guide[] {
-	return Object.entries(modules)
-		.map(([path, meta]) => {
-			const { slug, date } = deriveSlugAndDate(path);
-			const m = meta ?? ({ title: 'Untitled' } as GuideFrontmatter);
-			return {
-				slug,
-				title: m.title,
-				date: m.date ?? date,
-				author: m.author,
-				summary: m.summary,
-				tags: m.tags,
-				vehicleSlugs: m.vehicleSlugs,
-				draft: m.draft
-			};
-		})
-		.sort((a, b) => b.date.localeCompare(a.date));
-}
+// Article and guide loaders previously lived here; they were superseded by
+// $lib/server/articles.ts when content moved into Supabase. This module now
+// only owns external feed fetchers (Steam, YouTube).
 
 export async function fetchSteamNews(appId: string, maxItems: number = 1): Promise<SteamNewsItem[]> {
 	try {

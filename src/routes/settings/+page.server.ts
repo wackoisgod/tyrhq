@@ -27,7 +27,7 @@ async function loadProfile(locals: App.Locals, userId: string) {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { session, user } = await locals.safeGetSession();
+	const { session, user, role } = await locals.safeGetSession();
 	if (!session || !user) redirect(303, '/auth');
 
 	const profile = await loadProfile(locals, user.id);
@@ -43,7 +43,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	}
 
-	return { profile, isOnboarding, apiConfigured, apiCredential };
+	return { profile, isOnboarding, apiConfigured, apiCredential, role };
 };
 
 export const actions: Actions = {

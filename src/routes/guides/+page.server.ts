@@ -1,15 +1,12 @@
-import { loadAllGuides } from '$lib/server/content';
+import { listPublishedArticles } from '$lib/server/articles';
 import { getGameSnapshot } from '$lib/data/game-data';
 
-const guideMeta = import.meta.glob('/src/content/guides/*.md', {
-	eager: true,
-	import: 'metadata'
-});
+export async function load({ setHeaders }) {
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+	});
 
-export function load() {
-	const guides = loadAllGuides(guideMeta as Parameters<typeof loadAllGuides>[0]).filter(
-		(g) => !g.draft
-	);
+	const guides = await listPublishedArticles('guide');
 
 	const general = guides.filter((g) => !g.vehicleSlugs?.length);
 

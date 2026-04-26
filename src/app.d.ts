@@ -8,11 +8,16 @@ declare global {
 		}
 		interface Locals {
 			supabase: SupabaseClient;
-			safeGetSession: () => Promise<{ session: Session | null; user: User | null }>;
+			safeGetSession: () => Promise<{
+				session: Session | null;
+				user: User | null;
+				role: 'user' | 'contributor' | 'admin';
+			}>;
 		}
 		interface PageData {
 			session: Session | null;
 			user: User | null;
+			role?: 'user' | 'contributor' | 'admin';
 		}
 		// interface PageState {}
 		// interface Platform {}

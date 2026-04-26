@@ -1,17 +1,12 @@
 import { error } from '@sveltejs/kit';
-import { loadAllNewsPosts } from '$lib/server/content';
+import { getPublishedArticle } from '$lib/server/articles';
 import type { PageServerLoad } from './$types';
 
-const articleMeta = import.meta.glob('/src/content/news/*.md', {
-	eager: true,
-	import: 'metadata'
-});
-
-export const load: PageServerLoad = ({ params }) => {
-	const posts = loadAllNewsPosts(articleMeta as Parameters<typeof loadAllNewsPosts>[0]);
-	const post = posts.find((p) => p.slug === params.slug);
-
+export const load: PageServerLoad = async ({ params, setHeaders }) => {
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+	});
+	const post = await getPublishedArticle('article', params.slug);
 	if (!post) throw error(404, 'Post not found');
-
 	return { post };
 };

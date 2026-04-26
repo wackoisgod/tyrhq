@@ -1,5 +1,9 @@
 <script lang="ts">
 	let { data } = $props();
+
+	function formatDate(iso: string): string {
+		return iso.slice(0, 10);
+	}
 </script>
 
 <svelte:head>
@@ -52,7 +56,7 @@
 								<span
 									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 								>
-									{guide.date}
+									{formatDate(guide.publishedAt)}
 								</span>
 								{#if guide.tags?.length}
 									{#each guide.tags as tag}
@@ -72,8 +76,8 @@
 							{#if guide.summary}
 								<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{guide.summary}</p>
 							{/if}
-							{#if guide.author}
-								<p class="mt-3 text-xs text-[var(--hud-dim)]">By {guide.author}</p>
+							{#if guide.authorDisplay}
+								<p class="mt-3 text-xs text-[var(--hud-dim)]">By {guide.authorDisplay}</p>
 							{/if}
 						</a>
 					{/each}
@@ -122,7 +126,7 @@
 											<span
 												class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 											>
-												{guide.date}
+												{formatDate(guide.publishedAt)}
 											</span>
 											{#if guide.tags?.length}
 												{#each guide.tags as tag}

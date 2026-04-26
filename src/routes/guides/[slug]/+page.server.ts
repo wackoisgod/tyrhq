@@ -1,17 +1,14 @@
 import { error } from '@sveltejs/kit';
-import { loadAllGuides } from '$lib/server/content';
+import { getPublishedArticle } from '$lib/server/articles';
 import { getGameSnapshot } from '$lib/data/game-data';
 import type { PageServerLoad } from './$types';
 
-const guideMeta = import.meta.glob('/src/content/guides/*.md', {
-	eager: true,
-	import: 'metadata'
-});
+export const load: PageServerLoad = async ({ params, setHeaders }) => {
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+	});
 
-export const load: PageServerLoad = ({ params }) => {
-	const guides = loadAllGuides(guideMeta as Parameters<typeof loadAllGuides>[0]);
-	const guide = guides.find((g) => g.slug === params.slug);
-
+	const guide = await getPublishedArticle('guide', params.slug);
 	if (!guide) throw error(404, 'Guide not found');
 
 	const tankBySlug = new Map(getGameSnapshot().tanks.map((t) => [t.slug, t]));

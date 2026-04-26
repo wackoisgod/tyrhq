@@ -3,7 +3,7 @@ import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	depends('supabase:auth');
-	const { session, user } = await locals.safeGetSession();
+	const { session, user, role } = await locals.safeGetSession();
 
 	let profile: { display_name: string } | null = null;
 	if (user && locals.supabase) {
@@ -27,5 +27,5 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		redirect(303, '/settings');
 	}
 
-	return { session, user, profile };
+	return { session, user, profile, role };
 };

@@ -30,7 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (!supabaseUrl || !supabaseAnonKey) {
 		event.locals.supabase = null as unknown as SupabaseClient;
-		event.locals.safeGetSession = async () => ({ session: null, user: null });
+		event.locals.safeGetSession = async () => ({ session: null, user: null, role: 'user' });
 		return applySecurityHeaders(await resolve(event), event.url);
 	}
 
@@ -61,13 +61,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 			data: { user },
 			error
 		} = await event.locals.supabase.auth.getUser();
-		if (error || !user) return { session: null, user: null };
+		if (error || !user) return { session: null, user: null, role: 'user' };
 
 		const {
 			data: { session }
 		} = await event.locals.supabase.auth.getSession();
 
-		return { session, user };
+		const { data: profile } = await event.locals.supabase
+			.from('profiles')
+			.select('role')
+			.eq('id', user.id)
+			.maybeSingle<{ role: 'user' | 'contributor' | 'admin' }>();
+
+		return { session, user, role: profile?.role ?? 'user' };
 	};
 
 	return applySecurityHeaders(

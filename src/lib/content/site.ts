@@ -28,6 +28,7 @@ export const footerSections = [
 		links: [
 			{ href: '/auth', label: 'Accounts' },
 			{ href: '/builds', label: 'My Builds' },
+			{ href: '/contribute', label: 'Contribute' },
 			{ href: '/settings', label: 'Settings' }
 		]
 	},

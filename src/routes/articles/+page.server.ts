@@ -1,14 +1,9 @@
-import { loadAllNewsPosts } from '$lib/server/content';
+import { listPublishedArticles } from '$lib/server/articles';
 
-const articleMeta = import.meta.glob('/src/content/news/*.md', {
-	eager: true,
-	import: 'metadata'
-});
-
-export function load() {
-	const posts = loadAllNewsPosts(articleMeta as Parameters<typeof loadAllNewsPosts>[0]).filter(
-		(p) => !p.draft
-	);
-
+export async function load({ setHeaders }) {
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+	});
+	const posts = await listPublishedArticles('article');
 	return { posts };
 }

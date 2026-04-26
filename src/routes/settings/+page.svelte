@@ -309,4 +309,105 @@ curl -H "Authorization: Bearer YOUR_KEY" https://your-domain.example/api/v1/vehi
 			</div>
 		{/if}
 	</div>
+
+	{#if !data.isOnboarding}
+		<div class="mt-6 hud-panel p-8">
+			<div class="flex flex-wrap items-start justify-between gap-4">
+				<div>
+					<p class="hud-eyebrow tracking-[0.3em]">Contributions</p>
+					<h2
+						class="mt-4 font-[var(--font-display)] text-3xl font-bold uppercase text-[var(--hud-text)]"
+					>
+						Write For Tyr HQ
+					</h2>
+					<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
+						Submit guides and news posts directly from the site — no GitHub, no PR. A reviewer
+						will publish your draft or send notes back.
+					</p>
+				</div>
+				<a href="/contribute/new" class="hud-cta px-4 py-2 text-sm">Write a new article</a>
+			</div>
+
+			<div class="mt-6 grid gap-3 sm:grid-cols-2">
+				<a
+					href="/contribute/mine"
+					class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						My contributions
+					</p>
+					<p class="mt-2 text-sm text-[var(--hud-text)]">
+						Drafts, submissions in review, and reviewer notes.
+					</p>
+				</a>
+
+				{#if data.role === 'contributor' || data.role === 'admin'}
+					<a
+						href="/admin/submissions"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Reviewer queue
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								{data.role === 'admin' ? 'ADMIN' : 'REVIEWER'}
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Review pending submissions, request changes, or approve and publish.
+						</p>
+					</a>
+				{/if}
+
+				{#if data.role === 'contributor' || data.role === 'admin'}
+					<a
+						href="/admin/articles"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Article moderation
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								{data.role === 'admin' ? 'ADMIN' : 'REVIEWER'}
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Every guide and article in any status. Withdraw a live row or restore a withdrawn
+							one.
+						</p>
+					</a>
+				{/if}
+
+				{#if data.role === 'admin'}
+					<a
+						href="/admin/users"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							User roles
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								ADMIN
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Promote trusted writers to reviewer or admin. Reviewers can approve and moderate;
+							admins can also manage roles.
+						</p>
+					</a>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </section>
