@@ -221,12 +221,17 @@
 
 				<div class="mt-6 grid gap-4">
 					{#each data.nativeComponents as nc}
-						<div
-							class="rounded-sm bg-[var(--hud-inset)] p-5 shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_var(--hud-ghost)]"
+						<a
+							href={`/tools/components/${nc.slug}`}
+							class="group block rounded-sm bg-[var(--hud-inset)] p-5 shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_var(--hud-ghost)] transition hover:shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(153,247,255,0.32)]"
 						>
 							<div class="flex items-start justify-between gap-4">
 								<div>
-									<div class="font-semibold text-[var(--hud-text)]">{nc.name}</div>
+									<div
+										class="font-semibold text-[var(--hud-text)] transition group-hover:text-[var(--hud-teal)]"
+									>
+										{nc.name}
+									</div>
 									<div class="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--hud-dim)]">
 										{nc.category}
 									</div>
@@ -238,7 +243,7 @@
 									Level {nc.level}
 								</div>
 							</div>
-						</div>
+						</a>
 					{/each}
 				</div>
 			</section>

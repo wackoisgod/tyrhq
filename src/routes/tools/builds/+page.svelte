@@ -19,6 +19,10 @@
 		talentPrerequisitesSatisfied,
 		TALENT_POINTS_REQUIRED_PER_TIER_STEP
 	} from '$lib/game-engine/build';
+	import {
+		formatComponentCategory,
+		plainComponentDescription
+	} from '$lib/game-engine/component-format';
 
 	import { onMount } from 'svelte';
 
@@ -523,14 +527,6 @@
 		selection.ammoIds[slotIndex] = ammoId;
 	}
 
-	function plainComponentDescription(raw: string) {
-		if (!raw) return '';
-		return raw
-			.replace(/<[^>]+>/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim();
-	}
-
 	function formatTalentDescription(description: string, pointValues: number[], currentPoints: number) {
 		const cleaned = plainComponentDescription(description);
 		if (!pointValues.length) return cleaned;
@@ -635,10 +631,6 @@
 
 	function getAmmoSlotTitle(index: number) {
 		return `${getPreviewSlotLabel(index)} Shell`;
-	}
-
-	function formatComponentCategory(category: string) {
-		return category.replace(/^Category\s+/i, '');
 	}
 
 	function resetAllTalentPoints() {

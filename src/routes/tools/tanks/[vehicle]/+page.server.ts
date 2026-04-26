@@ -26,6 +26,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		const comp = componentById.get(nc.componentId);
 		return {
 			id: nc.componentId,
+			slug: comp?.slug ?? nc.componentId,
 			level: nc.level,
 			name: comp?.name ?? nc.componentId,
 			description: comp?.description ?? '',

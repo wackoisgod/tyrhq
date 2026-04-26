@@ -7,6 +7,7 @@ export const navigation = [
 	{ href: '/game', label: 'Game' },
 	{ href: '/articles', label: 'Articles' },
 	{ href: '/tools/tanks', label: 'Tanks' },
+	{ href: '/tools/components', label: 'Components' },
 	{ href: '/maps', label: 'Maps' }
 ];
 
@@ -16,6 +17,7 @@ export const footerSections = [
 		links: [
 			{ href: '/game', label: 'Game Overview' },
 			{ href: '/tools/tanks', label: 'Tank Database' },
+			{ href: '/tools/components', label: 'Component Library' },
 			{ href: '/maps', label: 'Map Atlas' }
 		]
 	},

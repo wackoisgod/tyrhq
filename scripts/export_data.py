@@ -2292,7 +2292,7 @@ def export_native_component_data(
 
     native_components = []
     for level in xp_setting.get("levels", []):
-      rewards = level.get("level_completion_rewards", {}).get("items", {})
+      rewards = level.get("level_up_rewards", {}).get("items", {}) or {}
       for reward_id in rewards:
         if reward_id.startswith("Gameplay-Item-Component-") and reward_id != "Gameplay-Item-Component-Slot":
           # e.g. "Gameplay-Item-Component-CoreAmp" → "Gameplay.Components.CoreAmp"
