@@ -1,13 +1,14 @@
 import { loadAllNewsPosts } from '$lib/server/content';
 
-const articleModules = import.meta.glob('/src/content/news/*.md', {
-	query: '?raw',
+const articleMeta = import.meta.glob('/src/content/news/*.md', {
 	eager: true,
-	import: 'default'
+	import: 'metadata'
 });
 
 export function load() {
-	const posts = loadAllNewsPosts(articleModules as Record<string, string>).filter((p) => !p.draft);
+	const posts = loadAllNewsPosts(articleMeta as Parameters<typeof loadAllNewsPosts>[0]).filter(
+		(p) => !p.draft
+	);
 
 	return { posts };
 }

@@ -6,6 +6,7 @@ export const navigation = [
 	{ href: '/', label: 'Home' },
 	{ href: '/game', label: 'Game' },
 	{ href: '/articles', label: 'Articles' },
+	{ href: '/guides', label: 'Guides' },
 	{ href: '/tools/tanks', label: 'Tanks' },
 	{ href: '/tools/components', label: 'Components' },
 	{ href: '/maps', label: 'Maps' }
@@ -18,7 +19,8 @@ export const footerSections = [
 			{ href: '/game', label: 'Game Overview' },
 			{ href: '/tools/tanks', label: 'Tank Database' },
 			{ href: '/tools/components', label: 'Component Library' },
-			{ href: '/maps', label: 'Map Atlas' }
+			{ href: '/maps', label: 'Map Atlas' },
+			{ href: '/guides', label: 'Guides' }
 		]
 	},
 	{

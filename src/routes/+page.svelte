@@ -1,7 +1,12 @@
 <script lang="ts">
+	import type { Component } from 'svelte';
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
 	import { siteCopy } from '$lib/content/site';
 	import { getGameSnapshot } from '$lib/data/game-data';
+
+	type MdModule = { default: Component<Record<string, never>> };
+	const heroModules = import.meta.glob<MdModule>('/src/content/home/hero.md', { eager: true });
+	const HeroContent = Object.values(heroModules)[0]?.default;
 
 	let { data } = $props();
 
@@ -91,9 +96,9 @@
 
 		<p class="tyr-signal-summary mt-5">{heroSummary}</p>
 
-		{#if !data.latestSteamPost && data.hero.bodyHtml.trim()}
-			<div class="prose-hud mt-4 max-w-3xl">
-				{@html data.hero.bodyHtml}
+		{#if !data.latestSteamPost && HeroContent}
+			<div class="mt-4 max-w-3xl">
+				<HeroContent />
 			</div>
 		{/if}
 

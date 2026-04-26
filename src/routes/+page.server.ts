@@ -1,11 +1,10 @@
 import { getGameSnapshot } from '$lib/data/game-data';
-import { parseContent, fetchSteamNews, fetchYouTubePlaylist } from '$lib/server/content';
+import { fetchSteamNews, fetchYouTubePlaylist } from '$lib/server/content';
 import type { HeroFrontmatter } from '$lib/types/content';
 
-const heroModules = import.meta.glob('/src/content/home/hero.md', {
-	query: '?raw',
+const heroMetaMap = import.meta.glob('/src/content/home/hero.md', {
 	eager: true,
-	import: 'default'
+	import: 'metadata'
 });
 
 import type { PageServerLoad } from './$types';
@@ -14,8 +13,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const snapshot = getGameSnapshot();
 
 	// Hero
-	const heroRaw = Object.values(heroModules)[0] as string;
-	const hero = parseContent<HeroFrontmatter>(heroRaw);
+	const heroMeta = Object.values(heroMetaMap)[0] as HeroFrontmatter | undefined;
+	const hero = heroMeta ?? { headline: '', tagline: '', ctas: [] };
 
 	// Latest public builds from Supabase
 	let latestBuilds: { slug: string; title: string; vehicle_id: string; star_count: number; updated_at: string; selection: { componentIds?: string[]; ammoIds?: string[]; talentPoints?: Record<string, number> } | null; profiles: { display_name: string } | { display_name: string }[] | null }[] = [];
@@ -39,10 +38,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		snapshot,
 		hero: {
-			headline: hero.frontmatter.headline,
-			tagline: hero.frontmatter.tagline,
-			ctas: hero.frontmatter.ctas,
-			bodyHtml: hero.html
+			headline: hero.headline,
+			tagline: hero.tagline,
+			ctas: hero.ctas
 		},
 		latestSteamPost,
 		devVideos,

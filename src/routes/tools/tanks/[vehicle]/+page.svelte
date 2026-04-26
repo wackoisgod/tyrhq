@@ -251,30 +251,47 @@
 
 		<section class="hud-panel p-6">
 			<h2 class="font-[var(--font-display)] text-3xl font-semibold uppercase text-[var(--hud-text)]">
-				Related {data.tank.classLabel}s
+				Guides
 			</h2>
 			<p class="mt-3 text-sm leading-6 text-[var(--hud-muted)]">
-				Jump between similar chassis before committing to a build path.
+				Strategy and tips written specifically for {data.tank.name}.
 			</p>
 
-			<div class="mt-5 grid gap-3">
-				{#each data.relatedVehicles as vehicle}
-					<a
-						href={`/tools/tanks/${vehicle.slug}`}
-						class="hud-panel-muted p-4 transition hover:shadow-[inset_3px_0_0_0_var(--hud-teal)]"
-					>
-						<div class="flex items-center justify-between gap-4">
-							<div>
-								<div class="font-semibold text-[var(--hud-text)]">{vehicle.name}</div>
-								<div class="mt-1 text-sm text-[var(--hud-muted)]">
-									{formatValue(vehicle.stats.damage, '')} damage • {formatValue(vehicle.stats.maxSpeed, 'kph')}
-								</div>
+			{#if data.relatedGuides.length > 0}
+				<div class="mt-5 grid gap-3">
+					{#each data.relatedGuides as guide}
+						<a
+							href={`/guides/${guide.slug}`}
+							class="hud-panel-muted p-4 transition hover:shadow-[inset_3px_0_0_0_var(--hud-teal)]"
+						>
+							<div class="flex flex-wrap items-center gap-2">
+								<span
+									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								>
+									{guide.date}
+								</span>
+								{#if guide.tags?.length}
+									{#each guide.tags as tag}
+										<span
+											class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+										>
+											{tag}
+										</span>
+									{/each}
+								{/if}
 							</div>
-							<div class="hud-eyebrow">Open</div>
-						</div>
-					</a>
-				{/each}
-			</div>
+							<div class="mt-2 font-semibold text-[var(--hud-text)]">{guide.title}</div>
+							{#if guide.summary}
+								<p class="mt-1 text-sm leading-6 text-[var(--hud-muted)]">{guide.summary}</p>
+							{/if}
+						</a>
+					{/each}
+				</div>
+			{:else}
+				<p class="mt-5 text-sm text-[var(--hud-muted)]">
+					No guides for {data.tank.name} yet.
+				</p>
+			{/if}
 		</section>
 	</div>
 </section>

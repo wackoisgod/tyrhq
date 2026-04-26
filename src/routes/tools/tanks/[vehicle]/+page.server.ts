@@ -2,6 +2,12 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getGameDataBundle, getGameSnapshot } from '$lib/data/game-data';
 import { hasVehicleArmorAssets } from '$lib/server/game-assets';
+import { loadAllGuides } from '$lib/server/content';
+
+const guideMeta = import.meta.glob('/src/content/guides/*.md', {
+	eager: true,
+	import: 'metadata'
+});
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const snapshot = getGameSnapshot();
@@ -16,10 +22,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!tank || !vehicle) {
 		throw error(404, 'Vehicle not found');
 	}
-
-	const relatedVehicles = snapshot.tanks
-		.filter((entry) => entry.classId === tank.classId && entry.id !== tank.id)
-		.slice(0, 4);
 
 	const componentById = new Map(bundle.components.map((c) => [c.id, c]));
 	const nativeComponents = vehicle.nativeComponents.map((nc) => {
@@ -75,14 +77,25 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const componentNames = Object.fromEntries(bundle.components.map((c) => [c.id, c.name]));
 	const ammoNames = Object.fromEntries(bundle.ammo.map((a) => [a.id, a.name]));
 
+	const relatedGuides = loadAllGuides(guideMeta as Parameters<typeof loadAllGuides>[0])
+		.filter((g) => !g.draft && g.vehicleSlugs?.includes(tank.slug))
+		.map((g) => ({
+			slug: g.slug,
+			title: g.title,
+			date: g.date,
+			summary: g.summary,
+			tags: g.tags,
+			author: g.author
+		}));
+
 	return {
 		tank,
-		relatedVehicles,
 		nativeComponents,
 		armorAvailable: hasVehicleArmorAssets(vehicle.id),
 		userBuildCount,
 		publicBuilds,
 		componentNames,
-		ammoNames
+		ammoNames,
+		relatedGuides
 	};
 };
