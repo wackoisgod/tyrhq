@@ -1,0 +1,205 @@
+{
+  "tech_nodes": [
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent001",
+      "max_points": 2,
+      "row": 0,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent009",
+      "max_points": 3,
+      "row": 0,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent013",
+      "max_points": 5,
+      "row": 0,
+      "tier": 3,
+      "prerequisites": [
+        "Gameplay.TalentTree.Brawler.Talent009"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent017",
+      "max_points": 3,
+      "row": 0,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent002",
+      "max_points": 3,
+      "row": 1,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent006",
+      "max_points": 5,
+      "row": 1,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent010",
+      "max_points": 4,
+      "row": 1,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent014",
+      "max_points": 5,
+      "row": 1,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent018",
+      "max_points": 5,
+      "row": 1,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent022",
+      "max_points": 5,
+      "row": 1,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent026",
+      "max_points": 1,
+      "row": 1,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent003",
+      "max_points": 5,
+      "row": 2,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent007",
+      "max_points": 5,
+      "row": 2,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent011",
+      "max_points": 1,
+      "row": 2,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.Brawler.Talent007"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent015",
+      "max_points": 5,
+      "row": 2,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent019",
+      "max_points": 3,
+      "row": 2,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent023",
+      "max_points": 5,
+      "row": 2,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent027",
+      "max_points": 1,
+      "row": 2,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent008",
+      "max_points": 2,
+      "row": 3,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent012",
+      "max_points": 5,
+      "row": 3,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Brawler.Talent016",
+      "max_points": 3,
+      "row": 3,
+      "tier": 3,
+      "prerequisites": [
+        "Gameplay.TalentTree.Brawler.Talent015"
+      ],
+      "is_keystone": false,
+      "description": ""
+    }
+  ],
+  "metadata": {
+    "num_tiers": 7,
+    "points_per_tier_required": 5,
+    "vehicle_tag": "Gameplay.Vehicle.Brawler",
+    "version": 19181
+  }
+}

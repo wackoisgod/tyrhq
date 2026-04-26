@@ -1,0 +1,22 @@
+[
+  {
+    "Name": "Gameplay.Components.Categories.Firepower",
+    "CategoryName": "LOCTABLE(\"/Game/Text/ST_Stats.ST_Stats\", \"Category.Firepower\")"
+  },
+  {
+    "Name": "Gameplay.Components.Categories.Durability",
+    "CategoryName": "LOCTABLE(\"/Game/Text/ST_Stats.ST_Stats\", \"Category.Durability\")"
+  },
+  {
+    "Name": "Gameplay.Components.Categories.Mobility",
+    "CategoryName": "LOCTABLE(\"/Game/Text/ST_Stats.ST_Stats\", \"Category.Mobility\")"
+  },
+  {
+    "Name": "Gameplay.Components.Categories.Scouting",
+    "CategoryName": "LOCTABLE(\"/Game/Text/ST_Stats.ST_Stats\", \"Category.Scouting\")"
+  },
+  {
+    "Name": "Gameplay.Components.Categories.Ability",
+    "CategoryName": "LOCTABLE(\"/Game/Text/ST_Abilities.ST_Abilities\", \"Category.Ability\")"
+  }
+]

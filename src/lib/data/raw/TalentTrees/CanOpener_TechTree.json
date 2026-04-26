@@ -1,0 +1,203 @@
+{
+  "tech_nodes": [
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent009",
+      "max_points": 5,
+      "row": 0,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent013",
+      "max_points": 2,
+      "row": 0,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent017",
+      "max_points": 5,
+      "row": 0,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent002",
+      "max_points": 3,
+      "row": 1,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent006",
+      "max_points": 5,
+      "row": 1,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent010",
+      "max_points": 2,
+      "row": 1,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent014",
+      "max_points": 5,
+      "row": 1,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent018",
+      "max_points": 5,
+      "row": 1,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent022",
+      "max_points": 5,
+      "row": 1,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent026",
+      "max_points": 1,
+      "row": 1,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent003",
+      "max_points": 5,
+      "row": 2,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent007",
+      "max_points": 3,
+      "row": 2,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent011",
+      "max_points": 5,
+      "row": 2,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent015",
+      "max_points": 2,
+      "row": 2,
+      "tier": 3,
+      "prerequisites": [
+        "Gameplay.TalentTree.CanOpener.Talent011"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent019",
+      "max_points": 5,
+      "row": 2,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent023",
+      "max_points": 3,
+      "row": 2,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent027",
+      "max_points": 1,
+      "row": 2,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent004",
+      "max_points": 5,
+      "row": 3,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent008",
+      "max_points": 5,
+      "row": 3,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent012",
+      "max_points": 1,
+      "row": 3,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.CanOpener.Talent008"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.CanOpener.Talent016",
+      "max_points": 2,
+      "row": 3,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    }
+  ],
+  "metadata": {
+    "num_tiers": 7,
+    "points_per_tier_required": 5,
+    "vehicle_tag": "Gameplay.Vehicle.CanOpener",
+    "version": 19181
+  }
+}

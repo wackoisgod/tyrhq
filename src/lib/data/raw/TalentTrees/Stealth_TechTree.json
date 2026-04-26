@@ -1,0 +1,209 @@
+{
+  "tech_nodes": [
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent001",
+      "max_points": 2,
+      "row": 0,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent005",
+      "max_points": 3,
+      "row": 0,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent002",
+      "max_points": 5,
+      "row": 1,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent006",
+      "max_points": 5,
+      "row": 1,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent010",
+      "max_points": 5,
+      "row": 1,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent014",
+      "max_points": 5,
+      "row": 1,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent018",
+      "max_points": 2,
+      "row": 1,
+      "tier": 4,
+      "prerequisites": [
+        "Gameplay.TalentTree.Stealth.Talent014"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent022",
+      "max_points": 5,
+      "row": 1,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent026",
+      "max_points": 1,
+      "row": 1,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent003",
+      "max_points": 5,
+      "row": 2,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent007",
+      "max_points": 4,
+      "row": 2,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent011",
+      "max_points": 3,
+      "row": 2,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.Stealth.Talent007"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent015",
+      "max_points": 5,
+      "row": 2,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent019",
+      "max_points": 5,
+      "row": 2,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent023",
+      "max_points": 5,
+      "row": 2,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent027",
+      "max_points": 1,
+      "row": 2,
+      "tier": 6,
+      "prerequisites": [
+        "Gameplay.TalentTree.Stealth.Talent023"
+      ],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent004",
+      "max_points": 2,
+      "row": 3,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent008",
+      "max_points": 1,
+      "row": 3,
+      "tier": 1,
+      "prerequisites": [
+        "Gameplay.TalentTree.Stealth.Talent004"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent012",
+      "max_points": 2,
+      "row": 3,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent016",
+      "max_points": 3,
+      "row": 3,
+      "tier": 3,
+      "prerequisites": [
+        "Gameplay.TalentTree.Stealth.Talent015"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Stealth.Talent020",
+      "max_points": 2,
+      "row": 3,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    }
+  ],
+  "metadata": {
+    "num_tiers": 7,
+    "points_per_tier_required": 5,
+    "vehicle_tag": "Gameplay.Vehicle.Stealth",
+    "version": 19181
+  }
+}

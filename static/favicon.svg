@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tyr HQ">
+	<rect width="64" height="64" rx="10" fill="#0d111a" />
+	<rect x="1.5" y="1.5" width="61" height="61" rx="8.5" fill="none" stroke="#99f7ff" stroke-width="1.5" stroke-opacity="0.7" />
+	<path d="M13 16h38v8H37v25H27V24H13z" fill="#e7e7ff" />
+	<path d="M17 30h30l-6 8H23z" fill="#99f7ff" />
+	<path d="M22 47h20v4H22z" fill="#d5ff01" />
+</svg>

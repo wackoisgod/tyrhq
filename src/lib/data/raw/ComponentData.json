@@ -1,0 +1,1214 @@
+[
+  {
+    "Name": "Gameplay.Components.KineticAbsorber",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"CB64A85141BB0A12F74DAD8870A650A2\", \"KINETIC ABSORBER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"F70D096F4FFBD4D05EE1B79AADD592E7\", \"Bouncing an enemy shot speeds up your active reload by {LevelValueAbs} seconds\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_KineticAbsorber.T_UI_Components_KineticAbsorber",
+    "ComponentPointValues": [
+      -1
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnBounceEnemyShot"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ActiveReloadTime.GE_Components_ActiveReloadTime_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.Fabricator",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"9958018A47222E3D06907EBD375DA157\", \"FABRICATOR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"CBA26B634445F91C4D421A8EBC82E44E\", \"Generates {LevelValue} Secondary and Tertiary Shells every 60 seconds\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_Fabricator.T_UI_Components_Fabricator",
+    "ComponentPointValues": [
+      2
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_Fabricator.GE_Components_Fabricator_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.EnergyExpander",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"68F36B9B4A641BCBCFC17481DE623627\", \"ENERGY EXPANDER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"07DE75EC4DF3164A5AF30CA68C4FCA50\", \"Increases your Max and Starting Energy by {LevelValuePercentMultiplyIncrease}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_EnergyExpander.T_UI_Components_EnergyExpander",
+    "ComponentPointValues": [
+      1.2999999523162842
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxAndStartingEnergyMultiply.GE_Components_MaxAndStartingEnergyMultiply_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.PhaseModule",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"C4A9DE504ADAFDC80CD110AD94897C50\", \"PHASE GEAR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"1B9AA96C458B014FD848BBAE102637BD\", \"Speeds up your active reload by {LevelValueAbs} each second while traveling over 40 kph\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_PhaseModule.T_UI_Components_PhaseModule",
+    "ComponentPointValues": [
+      -0.30000001192092896
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileSpeedOverKph40"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PhaseGear.GE_Components_PhaseGear_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Mobility"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.CamoWeb",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"145CA5A64574E17228C6B1B07F9470E3\", \"CAMO WEB\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"2F13A4AB4C1BE00D72803DAD04F9720D\", \"Amplifies Camouflage by {LevelValuePercentMultiplyIncrease} while you\\'re stationary\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_CamoWeb.T_UI_Components_CamoWeb",
+    "ComponentPointValues": [
+      1.25
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileStationary"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CamouflagePercent.GE_Components_CamouflagePercent_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Scouting"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.RepairMechanism",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"6704A1AF417059C531CE29A60F8070E9\", \"ADVANCED REPAIR GEAR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"B1A65CD7411856E6D93F6D85C0069A63\", \"Increases Module Repair Speed by {LevelValuePercentMultiplyDecrease} and generates <bold>5</> energy whenever a repair completes\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_RepairMechanism.T_UI_Components_RepairMechanism",
+    "ComponentPointValues": [
+      0.6499999761581421
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_RepairTimeMultiplier.GE_Components_RepairTimeMultiplier_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnModuleRepaired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_AdvancedRepairGearEnergyGain.GE_Components_AdvancedRepairGearEnergyGain_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.HotChamber",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"3B336FF3485097F066AF379A97E6A7E0\", \"HOT CHAMBER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"3E39DD5144951CF71CF1AF9A889F7364\", \"Increases base Shell Damage by {LevelValuePercentMultiplyIncrease} when firing soon after a completed reload (2 secs)\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_HotChamber.T_UI_Components_HotChamber",
+    "ComponentPointValues": [
+      1.1200000047683716
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnReloadComplete"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellDamagePercentTimed_2secs.GE_Components_ShellDamagePercentTimed_2secs_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.SenseOverdrive",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"E6542C10475CFBD732E18583F0364371\", \"SENSE OVERDRIVE\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"88EDBFB343317D69047949AE1B3DEBFC\", \"Increases Max Speed and Max Reverse Speed by {LevelValue} kph while you are spotted\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_SenseOverdrive.T_UI_Components_SenseOverdrive",
+    "ComponentPointValues": [
+      4.5
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileSpotted"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SenseOverdrive.GE_Components_SenseOverdrive_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Mobility"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.CoreInjector",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"EAC514BD41B54EB94A0F2E8D03A5AFCC\", \"CORE INJECTOR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"7AF1C6A44E746892E7E654AF2044B059\", \"Reduces Ability Energy Cost by {LevelValuePercentMultiplyDecrease}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_CoreInjector.T_UI_Components_CoreInjector",
+    "ComponentPointValues": [
+      0.8999999761581421
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_EnergyCostPercent.GE_Components_EnergyCostPercent_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.WeaknessAnalyzer",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"586493E6492FF00BA39EC193020F6395\", \"WEAKNESS ANALYZER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"E83DFFF84B2BB3FA97E32D99F17D61DE\", \"Damaging an enemy module speeds up your active reload by {LevelValueAbs} seconds\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_WeaknessAnalyzer.T_UI_Components_WeaknessAnalyzer",
+    "ComponentPointValues": [
+      -1
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHitModule"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ActiveReloadTime.GE_Components_ActiveReloadTime_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.AdaptiveHardening",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"7516CF5B45B9A7ABAA9A29924B330554\", \"ADAPTIVE HARDENING\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"682DE1974183C188B11AE5A24ABBB4CE\", \"Reduces Damage Taken by {LevelValuePercent} each second you are spotted. Maxes out at 12% and resets on going unspotted.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_AdaptiveHardening.T_UI_Components_AdaptiveHardening",
+    "ComponentPointValues": [
+      0.006000000052154064
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileSpotted"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_AdaptiveHardeningPeriodicApplier.GE_Components_AdaptiveHardeningPeriodicApplier_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.CoreAmp",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"32D12F3D4D3F71635E0E8091F0CEEFAE\", \"CORE AMP\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"05B869E1480503BD81D8B8A123D2C8AD\", \"Using your ability empowers your next shot to generate {LevelValue} Energy if it penetrates\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_CoreAmp.T_UI_Components_CoreAmp",
+    "ComponentPointValues": [
+      10
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnCommanderAbilityUse"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpBuff.GE_Components_CoreAmpBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHit"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpHitTrigger.GE_Components_CoreAmpHitTrigger_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHitTerrain"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpBuffRemover.GE_Components_CoreAmpBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnBounce"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CoreAmpBuffRemover.GE_Components_CoreAmpBuffRemover_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ReactiveModules",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"B9D1086849F9A419B6A350BA048CFF56\", \"REACTIVE MODULES\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"6EEBFD624B8E8C242A8337AA163CF53F\", \"Reduces Damage Taken by {LevelValuePercent} when one of your modules is broken. The damage reduction is lost on firing.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ReactiveModules.T_UI_Components_ReactiveModules",
+    "ComponentPointValues": [
+      0.15000000596046448
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnModuleDamaged"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuff.GE_Components_ReactiveModulesBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot0Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot1Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot2Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot3Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot4Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReactiveModulesBuffRemover.GE_Components_ReactiveModulesBuffRemover_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.MicroPlating",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"E445459F41ABFFC270D06099BF5DD4CF\", \"MICRO PLATING\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"12C456D045ABF9C1FE03139805CD6A5B\", \"Reduces all Damage Taken by {LevelValue}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_MicroPlating.T_UI_Components_MicroPlating",
+    "ComponentPointValues": [
+      15
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DamageReductionFlat.GE_Components_DamageReductionFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.SensitiveSights",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"73B7DEAA441258A2015B879375BA4AFF\", \"SENSITIVE SIGHTS\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"F11C5D374CA778AAFB74E28CAE9C5570\", \"Increases Aim Speed and reduces Reload Time by {LevelValuePercentMultiplyIncrease} while you are unspotted\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_SensitiveSights.T_UI_Components_SensitiveSights",
+    "ComponentPointValues": [
+      1.149999976158142
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileUnSpotted"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SensitiveSights.GE_Components_SensitiveSights_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Scouting"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.Duplicator",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"AEA6385B499AC289629D2A808BAAF319\", \"DUPLICATOR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"BBE7F9C0492B282DD3087C8BDB1142F5\", \"Increases base Shell Damage by <bold>5</> and <bold>Doubles</> the number of shells gained from all sources\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_Duplicator.T_UI_Components_Duplicator",
+    "ComponentPointValues": [
+      2
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellGainPercent.GE_Components_ShellGainPercent_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DuplicatorShellDamage.GE_Components_DuplicatorShellDamage_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.QuickSlot",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"6D14B0164770735159D361A342AC010B\", \"QUICK SLOT\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"FDAE78374B81ECA997D9849B7B3B1AFC\", \"Firing alternate shells (secondary and tertiary shells) reduces Reload Time by {LevelValuePercentMultiplyDecrease} \")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_QuickSlot.T_UI_Components_QuickSlot",
+    "ComponentPointValues": [
+      0.8999999761581421
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot1Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReloadTimePercentTimed.GE_Components_ReloadTimePercentTimed_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot2Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReloadTimePercentTimed.GE_Components_ReloadTimePercentTimed_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnSlot4Fired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ReloadTimePercentTimed.GE_Components_ReloadTimePercentTimed_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.Bulkheads",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"922C6744444F00599C22A3A509249ECB\", \"BULKHEADS\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"DAF31561462C3E85A334E69AFE55BBEB\", \"Increases Max Health by {LevelValuePercentMultiplyIncrease}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_Bulkheads.T_UI_Components_Bulkheads",
+    "ComponentPointValues": [
+      1.0850000381469727
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxHealthPercent.GE_Components_MaxHealthPercent_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.RelentlessAdapter",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"D184A6954E7CF44744146E85C0389846\", \"RELENTLESS ADAPTER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"98713E074E6BFB2F300C42919BAE5332\", \"Repairing a module increases Max Health by {LevelValue} and heals for the same amount\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_RelentlessAdapter.T_UI_Components_RelentlessAdapter",
+    "ComponentPointValues": [
+      40
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnModuleRepaired"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_RelentlessAdapterMaxHP.GE_Components_RelentlessAdapterMaxHP_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.Synchronizer",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"5CC7ACF54D6F09273A92FDB03DC88E3D\", \"SYNCHRONIZER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"09308462437DA4B88023339F296A1FDD\", \"Increases Starting Energy by <bold>7.5</> and amplifies the Energy gained from spotting, tracking and bounce assists by {LevelValuePercentMultiplyIncrease}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_Synchronizer.T_UI_Components_Synchronizer",
+    "ComponentPointValues": [
+      1.75
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SynchronizerBuff.GE_Components_SynchronizerBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_SynchronizerStartingEnergy.GE_Components_SynchronizerStartingEnergy_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Scouting"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ShiftCloak",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"6AE14ED741417C26CA52E1A13C88560C\", \"SHIFT CLOAK\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"D4662D134B7DA177905AEBAB9E4738EA\", \"Adds {LevelValue}<bold>%</> Camouflage while unspotted\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ShiftCloak.T_UI_Components_ShiftCloak",
+    "ComponentPointValues": [
+      6
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileUnSpotted"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CamouflageFlat.GE_Components_CamouflageFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Scouting"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.PowerConverter",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"073B39D34D1D3454A25120B03F805F97\", \"POWER CONVERTER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"B311B6CC4A49C4FE6E555583F38C4FC6\", \"Activating your ability heals you for every point of Energy it consumes and your Ability Cooldown is reduced by {LevelValuePercentMultiplyDecrease}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_PowerConverter.T_UI_Components_PowerConverter",
+    "ComponentPointValues": [
+      0.75
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnCommanderAbilityUse"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_HealForAbilityCost.GE_Components_HealForAbilityCost_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PowerConverterAbilityCooldownReduction.GE_Components_PowerConverterAbilityCooldownReduction_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.Agitator",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"96BBFDEB40A6DA84375B7AAFFBFFBDEA\", \"CALIBRATION AGITATOR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"A13646C3439F55675A0BA8B5657590D9\", \"Increases your Aim Speed and lowers your Base Dispersion by {LevelValuePercentMultiplyIncrease}. Bouncing a shot or having your shot bounced will triple this value until your next penetration.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_Agitator.T_UI_Components_Agitator",
+    "ComponentPointValues": [
+      1.100000023841858
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorPassiveBuff.GE_Components_CalibrationAgitatorPassiveBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHit"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorBuffRemover.GE_Components_CalibrationAgitatorBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnBounce"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorActiveBuff.GE_Components_CalibrationAgitatorActiveBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnBounceEnemyShot"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CalibrationAgitatorActiveBuff.GE_Components_CalibrationAgitatorActiveBuff_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.CoreBooster",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"8843581945B83776AE2066BECFBF3340\", \"CORE BOOSTER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"8B02D7B44883EC9E4FE64181FA87A56F\", \"Increases every instance of Energy gain by {LevelValue}\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_CoreBooster.T_UI_Components_CoreBooster",
+    "ComponentPointValues": [
+      0.5
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_BonusEnergyGainFlat.GE_Components_BonusEnergyGainFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ModuleSurger",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"A23B36AB48E9CA02878A0F9E3F02DEAD\", \"MOBILITY SURGER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"F405114F41B1938A633F95BD4820858F\", \"Increases Max Health by {LevelValue}. Instantly repairs track and engine modules on ability use\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ModuleSurger.T_UI_Components_ModuleSurger",
+    "ComponentPointValues": [
+      100
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnCommanderAbilityUse"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ModuleSurger.GE_Components_ModuleSurger_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxHealthFlat.GE_Components_MaxHealthFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ShellStabilizer",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"1484B7B64ED536B0C10283AC03CD8897\", \"SHELL STABILIZER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"A59FA8BB4D6CDA0B3117B39BBEB60415\", \"Increases base Shell Damage By {LevelValue} while you\\'re stationary\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ShellStabilizer.T_UI_Components_ShellStabilizer",
+    "ComponentPointValues": [
+      10
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileStationary"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellDamageFlat.GE_Components_ShellDamageFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.MomentumImparter",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"2642FD2447E50FFD709A9893F2792FBE\", \"MOMENTUM IMPARTER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"2A4052804A41F6CF0E12F3AA62871C79\", \"Increases base Shell Damage by {LevelValue} while traveling over 40 kph\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_MomentumImparter.T_UI_Components_MomentumImparter",
+    "ComponentPointValues": [
+      35
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileSpeedOverKph40"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellDamageFlat.GE_Components_ShellDamageFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ShellCharger",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"B8A15DBC4BED8BCA59AC3E98EB7AA170\", \"SHELL CHARGER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"47FB587B46E4726E7785C683369DCFB5\", \"Increases base Shell Damage by {LevelValue} whenever you penetrate an enemy. This effect can stack up to 3 times but falls off on a non-penetration.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ShellCharger.T_UI_Components_ShellCharger",
+    "ComponentPointValues": [
+      7.5
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHit"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellChargerBuff.GE_Components_ShellChargerBuff_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnBounce"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellChargerBuffRemover.GE_Components_ShellChargerBuffRemover_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHitTerrain"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ShellChargerBuffRemover.GE_Components_ShellChargerBuffRemover_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.StableRangefinder",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"50C925AA4B331F013D595181726E4C7B\", \"STABLE RANGEFINDER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"B74C9ED8435AAAE338EA6EA8305AECD9\", \"Time to enter precision aiming is reduced by {LevelValuePercentMultiplyDecrease} when more than 8 seconds have elapsed since your last reload\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_StableRangefinder.T_UI_Components_StableRangefinder",
+    "ComponentPointValues": [
+      0.15000000596046448
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnReloadComplete"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_StableRangefinder_PhaseOne.GE_Components_StableRangefinder_PhaseOne_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_StableRangefinder_PhaseOne.GE_Components_StableRangefinder_PhaseOne_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.ExtendedGearing",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"04F0CAC04744DC9E2D8422AC30427872\", \"EXTENDED GEARING\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"CB3CDCBB465B71EC304A78883A47F642\", \"Increases Max Speed by {LevelValuePercentMultiplyIncrease} after actively throttling for more than 10 continuous seconds\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_ExtendedGearing.T_UI_Components_ExtendedGearing",
+    "ComponentPointValues": [
+      1.149999976158142
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileNotThrottle"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ExtendedGearing.GE_Components_ExtendedGearing_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Mobility"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.VulnBreaker",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"390CCC1A40AA0463D949508B212640A0\", \"VULN BREAKER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"24793D614CC58CE3B1E67390C6706570\", \"Increases damage against modules by {LevelValuePercent}. Effect increases by <bold>2.5%</> each time you damage an enemy module.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_VulnBreaker.T_UI_Components_VulnBreaker",
+    "ComponentPointValues": [
+      0.15000000596046448
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ModuleDamagePercent.GE_Components_ModuleDamagePercent_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHitModule"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_VulnBreakerRampingBuff.GE_Components_VulnBreakerRampingBuff_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.FrictionCapacitor",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"0D6418F94DF16721F1C75981D5B889A6\", \"FRICTION CAPACITOR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"D650C0B04DAD35E6CB771387C05A71E4\", \"Increases Max Speed by {LevelValue} kph. Effect briefly quintuples on landing after being airborne.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_FrictionCapacitor.T_UI_Components_FrictionCapacitor",
+    "ComponentPointValues": [
+      2
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileAirborne"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_FrictionCapacitorAirborneTracker.GE_Components_FrictionCapacitorAirborneTracker_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_MaxSpeedFlat.GE_Components_MaxSpeedFlat_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Mobility"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.SignatureObscurer",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"53ADE9754A4BB2CB4B98859DB16876C2\", \"SIGNATURE OBSCURER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"8F710626423510A0B6DBAE929EF939E9\", \"Reduces time spotted by {LevelValueAbs} seconds and Speeds up your active reload by {LevelValueAbs} seconds when you become unspotted\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_SignatureObscurer.T_UI_Components_SignatureObscurer",
+    "ComponentPointValues": [
+      -1.5
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_TimeSpotted.GE_Components_TimeSpotted_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnUnSpotted"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_ActiveReloadTime.GE_Components_ActiveReloadTime_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Scouting"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.PropagationDrive",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"7061BBAE47011D80730FB585B9C3C0CE\", \"PROPAGATION DRIVE\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"D53D4A0448EE6ABAEFF108A5B5FD32D8\", \"Increases base Shell Damage by <bold>2</> and Max Health by {LevelValue} on ability use\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_PropagationDrive.T_UI_Components_PropagationDrive",
+    "ComponentPointValues": [
+      20
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnCommanderAbilityUse"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_PropagationDrive.GE_Components_PropagationDrive_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Durability"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Firepower"
+        },
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.CatalyticReservoir",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"2D40458245F12882D496379AE9BF6D94\", \"CATALYTIC RESERVOIR\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"9B4AC6D245C50AF523B1C6850D810E31\", \"Generates {LevelValue} energy when you land a penetration while having above <bold>50</> Energy\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_CatalyticReservoir.T_UI_Components_CatalyticReservoir",
+    "ComponentPointValues": [
+      3
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.OnHit"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_CatalyticReservoirInitial.GE_Components_CatalyticReservoirInitial_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Ability"
+        }
+      ]
+    }
+  },
+  {
+    "Name": "Gameplay.Components.DriftSparker",
+    "ComponentName": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"A4DE34A04F4F929A2BCD84A9C1F926AB\", \"DRIFT SPARKER\")",
+    "ComponentDescription": "NSLOCTEXT(\"[C23BB685BB3913570843DFE960EC42D0]\", \"12163D32426548C6414648B39D4F168F\", \"Increases Hull Traverse Speed by {LevelValuePercentMultiplyIncrease}. Hoverdrifting for 2 seconds or longer briefly increases your Max Speed by <bold>12</> kph.\")",
+    "ComponentIcon": "/Game/UI/_Shared/Textures/Icon_Components/Temp/T_UI_Components_DriftSparker.T_UI_Components_DriftSparker",
+    "ComponentPointValues": [
+      1.1200000047683716
+    ],
+    "ComponentType": "Event",
+    "ComponentGameplayEffect": "None",
+    "EventTag": {
+      "TagName": "None"
+    },
+    "EventEffectPairs": [
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.LoadoutApplied"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_HullTraverse.GE_Components_HullTraverse_C"
+      },
+      {
+        "EventTag": {
+          "TagName": "Gameplay.Event.WhileHoverDrifting"
+        },
+        "ComponentGameplayEffect": "/Game/Blueprints/Abilities/Effects/Components/GE_Components_DriftSparkerTracker.GE_Components_DriftSparkerTracker_C"
+      }
+    ],
+    "Categories": {
+      "GameplayTags": [
+        {
+          "TagName": "Gameplay.Components.Categories.Mobility"
+        }
+      ]
+    }
+  }
+]

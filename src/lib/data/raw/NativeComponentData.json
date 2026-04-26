@@ -1,0 +1,291 @@
+[
+  {
+    "vehicleKey": "Gameplay.Vehicle.Blink",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.CoreAmp",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.PowerConverter",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.ShellCharger",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Brawler",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.RepairMechanism",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.PowerConverter",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.AdaptiveHardening",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Bush",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.ShellStabilizer",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.CamoWeb",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.SignatureObscurer",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.CanOpener",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.QuickSlot",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.Duplicator",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.SensitiveSights",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Deadeye",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.ShellStabilizer",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.CamoWeb",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.VulnBreaker",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Drone",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.StableRangefinder",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.Agitator",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.FrictionCapacitor",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Healer",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.Synchronizer",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.CatalyticReservoir",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.CoreBooster",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Ram",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.ReactiveModules",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.RepairMechanism",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.ExtendedGearing",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Ranger",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.SenseOverdrive",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.MicroPlating",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.QuickSlot",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Recall",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.VulnBreaker",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.MicroPlating",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.Fabricator",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Sentinel",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.ReactiveModules",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.ShellCharger",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.HotChamber",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Slow",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.KineticAbsorber",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.AdaptiveHardening",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.SenseOverdrive",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Sonar",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.RelentlessAdapter",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.Bulkheads",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.ModuleSurger",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Stealth",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.PhaseModule",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.EnergyExpander",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.DriftSparker",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Vanguard",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.VulnBreaker",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.StableRangefinder",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.EnergyExpander",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Vtol",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.CoreInjector",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.ShiftCloak",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.MomentumImparter",
+        "level": 10
+      }
+    ]
+  },
+  {
+    "vehicleKey": "Gameplay.Vehicle.Wall",
+    "nativeComponents": [
+      {
+        "componentKey": "Gameplay.Components.WeaknessAnalyzer",
+        "level": 3
+      },
+      {
+        "componentKey": "Gameplay.Components.HotChamber",
+        "level": 6
+      },
+      {
+        "componentKey": "Gameplay.Components.PropagationDrive",
+        "level": 10
+      }
+    ]
+  }
+]

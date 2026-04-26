@@ -1,0 +1,183 @@
+{
+  "tech_nodes": [
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent005",
+      "max_points": 5,
+      "row": 0,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent009",
+      "max_points": 1,
+      "row": 0,
+      "tier": 2,
+      "prerequisites": [
+        "Gameplay.TalentTree.Slow.Talent005"
+      ],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent013",
+      "max_points": 2,
+      "row": 0,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent017",
+      "max_points": 5,
+      "row": 0,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent002",
+      "max_points": 5,
+      "row": 1,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent006",
+      "max_points": 2,
+      "row": 1,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent010",
+      "max_points": 5,
+      "row": 1,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent014",
+      "max_points": 5,
+      "row": 1,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent018",
+      "max_points": 3,
+      "row": 1,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent022",
+      "max_points": 5,
+      "row": 1,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent026",
+      "max_points": 1,
+      "row": 1,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent003",
+      "max_points": 5,
+      "row": 2,
+      "tier": 0,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent007",
+      "max_points": 5,
+      "row": 2,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent011",
+      "max_points": 2,
+      "row": 2,
+      "tier": 2,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent015",
+      "max_points": 5,
+      "row": 2,
+      "tier": 3,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent019",
+      "max_points": 5,
+      "row": 2,
+      "tier": 4,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent023",
+      "max_points": 4,
+      "row": 2,
+      "tier": 5,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent027",
+      "max_points": 1,
+      "row": 2,
+      "tier": 6,
+      "prerequisites": [],
+      "is_keystone": true,
+      "description": ""
+    },
+    {
+      "gameplay_tag": "Gameplay.TalentTree.Slow.Talent008",
+      "max_points": 5,
+      "row": 3,
+      "tier": 1,
+      "prerequisites": [],
+      "is_keystone": false,
+      "description": ""
+    }
+  ],
+  "metadata": {
+    "num_tiers": 7,
+    "points_per_tier_required": 5,
+    "vehicle_tag": "Gameplay.Vehicle.Slow",
+    "version": 19181
+  }
+}
