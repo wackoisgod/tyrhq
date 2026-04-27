@@ -12,6 +12,7 @@ export interface ArticleSummary {
 	authorUserId: string | null;
 	tags: string[];
 	vehicleSlugs: string[] | null;
+	starCount: number;
 	publishedAt: string;
 	updatedAt: string;
 }
@@ -42,13 +43,14 @@ interface ArticleRow {
 		| null;
 	tags: string[] | null;
 	vehicle_slugs: string[] | null;
+	star_count: number;
 	published_at: string | null;
 	updated_at: string;
 	current_revision_id: string | null;
 }
 
 const SUMMARY_COLUMNS =
-	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, published_at, updated_at';
+	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at';
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
 
 function resolveAuthorDisplay(row: ArticleRow): string | null {
@@ -68,6 +70,7 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		authorUserId: row.author_user_id,
 		tags: row.tags ?? [],
 		vehicleSlugs: row.vehicle_slugs,
+		starCount: row.star_count,
 		publishedAt: row.published_at ?? row.updated_at,
 		updatedAt: row.updated_at
 	};

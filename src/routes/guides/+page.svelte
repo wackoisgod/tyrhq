@@ -67,6 +67,16 @@
 										</span>
 									{/each}
 								{/if}
+								{#if guide.starCount > 0}
+									<span
+										class="flex items-center gap-1 rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+									>
+										<svg class="h-3 w-3 text-[var(--hud-lime)]" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+											<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+										</svg>
+										<span class="font-mono">{guide.starCount}</span>
+									</span>
+								{/if}
 							</div>
 							<h2
 								class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]"
@@ -136,6 +146,16 @@
 														{tag}
 													</span>
 												{/each}
+											{/if}
+											{#if guide.starCount > 0}
+												<span
+													class="flex items-center gap-1 rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+												>
+													<svg class="h-3 w-3 text-[var(--hud-lime)]" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+														<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+													</svg>
+													<span class="font-mono">{guide.starCount}</span>
+												</span>
 											{/if}
 										</div>
 										<h3

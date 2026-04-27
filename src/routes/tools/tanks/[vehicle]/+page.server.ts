@@ -80,7 +80,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			date: g.publishedAt.slice(0, 10),
 			summary: g.summary,
 			tags: g.tags,
-			author: g.authorDisplay
+			author: g.authorDisplay,
+			starCount: g.starCount
 		}));
 
 	return {
