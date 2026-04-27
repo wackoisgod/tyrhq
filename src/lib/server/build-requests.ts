@@ -73,7 +73,7 @@ const selectionSchema = z
 				continue;
 			}
 
-			if (slotIndex > 0 && ammo.id !== 'standard' && !ammo.canLoadSecondary) {
+			if (slotIndex === 1 && ammo.id !== 'standard' && !ammo.canLoadSecondary) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					path: ['ammoIds', slotIndex],
