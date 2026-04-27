@@ -994,7 +994,7 @@ input[type="radio"] {
 }
 
 .tyr-signal-title {
-	max-width: min(100%, 22ch);
+	max-width: none;
 	font-size: clamp(1.95rem, 1.45rem + 1vw, 2.8rem);
 	line-height: 0.92;
 	letter-spacing: 0.05em;
@@ -1002,7 +1002,7 @@ input[type="radio"] {
 }
 
 .tyr-signal-title--long {
-	max-width: min(100%, 30ch);
+	max-width: none;
 	font-size: clamp(1.45rem, 1.1rem + 0.8vw, 2.1rem);
 	line-height: 0.96;
 	letter-spacing: 0.03em;
@@ -1010,7 +1010,7 @@ input[type="radio"] {
 }
 
 .tyr-signal-summary {
-	max-width: 48rem;
+	max-width: none;
 	font-size: 1rem;
 	line-height: 1.85;
 	color: var(--hud-muted);
@@ -1129,14 +1129,6 @@ input[type="radio"] {
 		width: 4rem;
 	}
 
-	.tyr-signal-title {
-		max-width: 24ch;
-	}
-
-	.tyr-signal-title--long {
-		max-width: 34ch;
-	}
-
 	.tyr-section-heading {
 		flex-direction: row;
 		align-items: end;
@@ -1154,6 +1146,18 @@ input[type="radio"] {
 
 	.tyr-brand-column {
 		max-width: 46rem;
+	}
+
+	.tyr-signal-title {
+		max-width: min(100%, 28ch);
+	}
+
+	.tyr-signal-title--long {
+		max-width: min(100%, 38ch);
+	}
+
+	.tyr-signal-summary {
+		max-width: 56rem;
 	}
 
 	.tyr-actions {
