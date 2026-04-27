@@ -139,14 +139,17 @@ const DEFAULT_RATE_LIMITS: RateLimitConfig = {
 export async function assertSubmissionRateLimits(
 	submitterId: string,
 	accountCreatedAt: string,
+	role: ProfileRole = 'user',
 	limits: RateLimitConfig = DEFAULT_RATE_LIMITS
 ): Promise<void> {
-	const ageMinutes = (Date.now() - new Date(accountCreatedAt).getTime()) / 60_000;
-	if (ageMinutes < limits.minAccountAgeMinutes) {
-		throw new SubmissionStateError(
-			'New accounts must wait 24 hours before submitting their first article.',
-			429
-		);
+	if (role !== 'contributor' && role !== 'admin') {
+		const ageMinutes = (Date.now() - new Date(accountCreatedAt).getTime()) / 60_000;
+		if (ageMinutes < limits.minAccountAgeMinutes) {
+			throw new SubmissionStateError(
+				'New accounts must wait 24 hours before submitting their first article.',
+				429
+			);
+		}
 	}
 
 	const admin = requireAdmin();
@@ -321,7 +324,8 @@ export async function updateDraftSubmission(
 export async function submitForReview(
 	submissionId: string,
 	submitterId: string,
-	accountCreatedAt: string
+	accountCreatedAt: string,
+	role: ProfileRole = 'user'
 ): Promise<SubmissionRecord> {
 	const admin = requireAdmin();
 	const existing = await getSubmissionById(submissionId);
@@ -363,7 +367,7 @@ export async function submitForReview(
 		}
 	}
 
-	await assertSubmissionRateLimits(submitterId, accountCreatedAt);
+	await assertSubmissionRateLimits(submitterId, accountCreatedAt, role);
 
 	const { data, error } = await admin
 		.from('article_submissions')
