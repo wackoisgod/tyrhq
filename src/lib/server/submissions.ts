@@ -485,6 +485,61 @@ interface PublishedArticleRow {
 	slug: string;
 }
 
+interface PublishedAuthorInfo {
+	authorDisplay: string | null;
+	authorUserId: string | null;
+}
+
+async function getProfileDisplayName(userId: string): Promise<string | null> {
+	const admin = requireAdmin();
+	const { data, error } = await admin
+		.from('profiles')
+		.select('display_name')
+		.eq('id', userId)
+		.maybeSingle<{ display_name: string | null }>();
+
+	if (error) {
+		console.error('[submissions] author profile lookup failed', error);
+		throw new SubmissionStateError('Approval failed: could not resolve the author profile.', 500);
+	}
+
+	return data?.display_name?.trim() || null;
+}
+
+async function resolvePublishedAuthor(submission: SubmissionRecord): Promise<PublishedAuthorInfo> {
+	if (!submission.parent_article_id) {
+		return {
+			authorDisplay: await getProfileDisplayName(submission.submitter_id),
+			authorUserId: submission.submitter_id
+		};
+	}
+
+	const admin = requireAdmin();
+	const { data: existingArticle, error } = await admin
+		.from('articles')
+		.select('author_display, author_user_id')
+		.eq('id', submission.parent_article_id)
+		.maybeSingle<{ author_display: string | null; author_user_id: string | null }>();
+
+	if (error) {
+		console.error('[submissions] existing article author lookup failed', error);
+		throw new SubmissionStateError('Approval failed: could not load the published article.', 500);
+	}
+
+	if (!existingArticle) {
+		throw new SubmissionStateError('Approval failed: parent article not found.', 500);
+	}
+
+	return {
+		authorDisplay:
+			existingArticle.author_display?.trim() ||
+			(existingArticle.author_user_id
+				? await getProfileDisplayName(existingArticle.author_user_id)
+				: null),
+		authorUserId: existingArticle.author_user_id
+	};
+}
+
 async function publishApprovedSubmission(
 	submission: SubmissionRecord,
 	reviewerId: string
@@ -520,6 +575,8 @@ async function publishApprovedSubmission(
 		return existingArticle;
 	}
 
+	const author = await resolvePublishedAuthor(submission);
+
 	// 1. Upsert the article row.
 	let articleId = submission.parent_article_id;
 	let articleRow: PublishedArticleRow;
@@ -534,6 +591,8 @@ async function publishApprovedSubmission(
 				summary: submission.summary,
 				body_markdown: submission.body_markdown,
 				body_html: submission.body_html,
+				author_display: author.authorDisplay,
+				author_user_id: author.authorUserId,
 				tags: submission.tags,
 				vehicle_slugs: submission.vehicle_slugs,
 				status: 'published',
@@ -557,7 +616,8 @@ async function publishApprovedSubmission(
 				summary: submission.summary,
 				body_markdown: submission.body_markdown,
 				body_html: submission.body_html,
-				author_user_id: submission.submitter_id,
+				author_display: author.authorDisplay,
+				author_user_id: author.authorUserId,
 				tags: submission.tags,
 				vehicle_slugs: submission.vehicle_slugs,
 				status: 'published',
@@ -585,6 +645,7 @@ async function publishApprovedSubmission(
 			body_html: submission.body_html,
 			tags: submission.tags,
 			vehicle_slugs: submission.vehicle_slugs,
+			author_display: author.authorDisplay,
 			created_by: reviewerId
 		})
 		.select('id')

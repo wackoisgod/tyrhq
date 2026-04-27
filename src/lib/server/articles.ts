@@ -32,6 +32,14 @@ interface ArticleRow {
 	body_html: string;
 	author_display: string | null;
 	author_user_id: string | null;
+	author_profile:
+		| {
+				display_name: string | null;
+		  }
+		| {
+				display_name: string | null;
+		  }[]
+		| null;
 	tags: string[] | null;
 	vehicle_slugs: string[] | null;
 	published_at: string | null;
@@ -40,8 +48,14 @@ interface ArticleRow {
 }
 
 const SUMMARY_COLUMNS =
-	'id, type, slug, title, summary, author_display, author_user_id, tags, vehicle_slugs, published_at, updated_at';
+	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, published_at, updated_at';
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
+
+function resolveAuthorDisplay(row: ArticleRow): string | null {
+	if (row.author_display) return row.author_display;
+	if (Array.isArray(row.author_profile)) return row.author_profile[0]?.display_name ?? null;
+	return row.author_profile?.display_name ?? null;
+}
 
 function summaryFromRow(row: ArticleRow): ArticleSummary {
 	return {
@@ -50,7 +64,7 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		slug: row.slug,
 		title: row.title,
 		summary: row.summary,
-		authorDisplay: row.author_display,
+		authorDisplay: resolveAuthorDisplay(row),
 		authorUserId: row.author_user_id,
 		tags: row.tags ?? [],
 		vehicleSlugs: row.vehicle_slugs,
