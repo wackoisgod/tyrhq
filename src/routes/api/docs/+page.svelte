@@ -60,14 +60,14 @@
 			</h1>
 			<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--hud-muted)]">
 				The contract is public. Live API calls require a Tyr HQ account and a single API key
-				generated from settings.
+				generated from the Developer API settings page.
 			</p>
 		</div>
 
 		<div class="flex flex-wrap gap-3">
 			<a href="/api/openapi.json" class="hud-cta-outline px-4 py-2 text-sm">Download OpenAPI</a>
 			{#if data.user}
-				<a href="/settings" class="hud-cta px-4 py-2 text-sm">Manage API Key</a>
+				<a href="/settings/api" class="hud-cta px-4 py-2 text-sm">Manage API Key</a>
 			{:else}
 				<a href="/auth" class="hud-cta px-4 py-2 text-sm">Sign In For API Key</a>
 			{/if}

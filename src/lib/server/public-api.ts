@@ -768,7 +768,7 @@ export function createOpenApiDocument() {
 			title: 'Tyr HQ Public API',
 			version: PUBLIC_API_VERSION,
 			description:
-				'Public read-only game data API for Tyr HQ. View this document publicly, then generate an API key from /settings to make requests.'
+				'Public read-only game data API for Tyr HQ. View this document publicly, then generate an API key from /settings/api to make requests.'
 		},
 		servers: [{ url: '/' }],
 		tags: [
@@ -786,7 +786,7 @@ export function createOpenApiDocument() {
 					type: 'http',
 					scheme: 'bearer',
 					bearerFormat: 'API Key',
-					description: 'Paste the full Tyr HQ API key issued from the settings page.'
+					description: 'Paste the full Tyr HQ API key issued from the Developer API settings page.'
 				}
 			},
 			schemas: getOpenApiSchemas()

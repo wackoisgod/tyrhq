@@ -7,6 +7,7 @@
 	import { onMount } from 'svelte';
 	import { createBrowserClient } from '@supabase/ssr';
 	import { env } from '$env/dynamic/public';
+	import NavFlyout from '$lib/components/nav/NavFlyout.svelte';
 
 	let { children, data } = $props();
 
@@ -93,13 +94,17 @@
 
 					<nav class="tyr-nav" aria-label="Primary">
 						{#each navigation as item}
-							<a
-								href={item.href}
-								class="tyr-nav-link"
-								aria-current={isActive(item.href) ? 'page' : undefined}
-							>
-								{item.label}
-							</a>
+							{#if 'columns' in item}
+								<NavFlyout {item} {isActive} />
+							{:else}
+								<a
+									href={item.href}
+									class="tyr-nav-link"
+									aria-current={isActive(item.href) ? 'page' : undefined}
+								>
+									{item.label}
+								</a>
+							{/if}
 						{/each}
 					</nav>
 				</div>
@@ -146,7 +151,7 @@
 				</p>
 			</div>
 
-			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				{#each footerSections as section}
 					<div class="hud-panel-muted p-4">
 						<h2 class="hud-label">{section.title}</h2>

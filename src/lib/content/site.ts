@@ -2,27 +2,35 @@ import { env } from '$env/dynamic/public';
 
 const repoUrl = env.PUBLIC_REPO_URL?.trim() ?? '';
 
-export const navigation = [
+export type NavLeaf = { href: string; label: string };
+export type NavGroup = {
+	label: string;
+	columns: { heading: string; items: NavLeaf[] }[];
+};
+export type NavItem = NavLeaf | NavGroup;
+
+export const navigation: NavItem[] = [
 	{ href: '/', label: 'Home' },
 	{ href: '/game', label: 'Game' },
 	{ href: '/articles', label: 'Articles' },
 	{ href: '/guides', label: 'Guides' },
 	{ href: '/tools/tanks', label: 'Tanks' },
-	{ href: '/tools/components', label: 'Components' },
-	{ href: '/maps', label: 'Maps' }
+	{
+		label: 'Resources',
+		columns: [
+			{
+				heading: 'Database',
+				items: [
+					{ href: '/tools/components', label: 'Components' },
+					{ href: '/tools/shells', label: 'Shells' }
+				]
+			},
+			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] }
+		]
+	}
 ];
 
 export const footerSections = [
-	{
-		title: 'Explore',
-		links: [
-			{ href: '/game', label: 'Game Overview' },
-			{ href: '/tools/tanks', label: 'Tank Database' },
-			{ href: '/tools/components', label: 'Component Library' },
-			{ href: '/maps', label: 'Map Atlas' },
-			{ href: '/guides', label: 'Guides' }
-		]
-	},
 	{
 		title: 'Community',
 		links: [
