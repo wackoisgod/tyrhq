@@ -133,6 +133,7 @@ function serializeAmmo(ammo: AmmoRecord) {
 		key: ammo.key,
 		slug: ammo.slug,
 		name: ammo.name,
+		displayName: ammo.displayName,
 		description: ammo.description,
 		selectable: ammo.selectable,
 		canLoadSecondary: ammo.canLoadSecondary,
@@ -538,13 +539,14 @@ function getOpenApiSchemas() {
 				key: { type: 'string' },
 				slug: { type: 'string' },
 				name: { type: 'string' },
+				displayName: { type: 'string' },
 				description: { type: 'string' },
 				selectable: { type: 'boolean' },
 				canLoadSecondary: { type: 'boolean' },
 				modifiers: { type: 'object', additionalProperties: { type: 'number' } },
 				assets: { type: 'object', additionalProperties: { type: 'string' } }
 			},
-			required: ['id', 'key', 'slug', 'name', 'description', 'selectable', 'canLoadSecondary', 'modifiers', 'assets']
+			required: ['id', 'key', 'slug', 'name', 'displayName', 'description', 'selectable', 'canLoadSecondary', 'modifiers', 'assets']
 		},
 		Component: {
 			type: 'object',

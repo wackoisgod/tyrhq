@@ -11,7 +11,29 @@ import type {
 	TankSummary
 } from '$lib/types/game';
 
-const bundle = runtimeData as GameDataBundle;
+type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
+	ammo: Array<Omit<GameDataBundle['ammo'][number], 'displayName'> & { displayName?: string }>;
+};
+
+function deriveAmmoDisplayName(key: string, fallbackName: string) {
+	const rawName = key.split('.').at(-1) ?? fallbackName;
+	return rawName
+		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.trim();
+}
+
+function normalizeBundle(rawBundle: GameDataBundle): GameDataBundle {
+	return {
+		...rawBundle,
+		ammo: rawBundle.ammo.map((ammo) => ({
+			...ammo,
+			displayName: ammo.displayName || deriveAmmoDisplayName(ammo.key, ammo.name)
+		}))
+	};
+}
+
+const bundle = normalizeBundle(runtimeData as RawGameDataBundle as GameDataBundle);
 
 function toTankSummary(): TankSummary[] {
 	return bundle.vehicles.map((vehicle) => ({
@@ -43,6 +65,7 @@ function toAmmoSummary(): AmmoSummary[] {
 		key: ammo.key,
 		slug: ammo.slug,
 		name: ammo.name,
+		displayName: ammo.displayName,
 		description: ammo.description,
 		selectable: ammo.selectable,
 		canLoadSecondary: ammo.canLoadSecondary,

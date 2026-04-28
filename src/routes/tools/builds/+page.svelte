@@ -247,6 +247,19 @@
 		return null;
 	}
 
+	function normalizeAmmoSelection(nextSelection: ReturnType<typeof getDefaultSelection>) {
+		const defaults = getDefaultSelection(catalog, nextSelection.vehicleId);
+		return defaults.ammoIds.map((fallbackAmmoId, slotIndex) => {
+			const ammoId = nextSelection.ammoIds[slotIndex] ?? fallbackAmmoId;
+			const ammo = catalog.ammoById.get(ammoId);
+			if (!ammo) return fallbackAmmoId;
+			if (slotIndex === 1 && ammo.id !== 'standard' && !ammo.canLoadSecondary) {
+				return fallbackAmmoId;
+			}
+			return ammo.id;
+		});
+	}
+
 	// Debounced auto-save to localStorage
 	$effect(() => {
 		if (!selection || !draftRestored || editingBuild) return;
@@ -368,6 +381,21 @@
 			return id;
 		});
 		if (changed) selection.componentIds = next;
+	});
+
+	$effect(() => {
+		if (!selection) return;
+		const currentSelection = selection;
+		const normalizedAmmoIds = normalizeAmmoSelection(currentSelection);
+		const previewAmmoSlot = Math.min(
+			currentSelection.previewAmmoSlot,
+			Math.max(0, normalizedAmmoIds.length - 1)
+		);
+		const ammoChanged = normalizedAmmoIds.some(
+			(ammoId, index) => ammoId !== currentSelection.ammoIds[index]
+		);
+		if (ammoChanged) selection.ammoIds = normalizedAmmoIds;
+		if (previewAmmoSlot !== currentSelection.previewAmmoSlot) selection.previewAmmoSlot = previewAmmoSlot;
 	});
 
 	const currentVehicle = $derived(
@@ -1178,13 +1206,13 @@
 															src="/images/ammo/{pickedAmmo.id}.png"
 															alt=""
 															kind="ammo"
-															label={pickedAmmo.name}
+															label={pickedAmmo.displayName}
 															class="h-5 w-5 object-contain"
 														/>
 													</span>
 												{/if}
 												<div class="min-w-0 truncate text-xs font-semibold text-[var(--hud-text)]">
-													{pickedAmmo?.name ?? 'Standard'}
+													{pickedAmmo?.displayName ?? 'Standard'}
 												</div>
 											</div>
 										</button>
@@ -1194,7 +1222,7 @@
 											class="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 rounded-sm border border-[var(--hud-variant)] bg-[var(--hud-panel)] p-3 opacity-0 shadow-[0_12px_40px_rgba(0,0,0,0.5)] transition-opacity group-hover/ammo:opacity-100"
 										>
 											<div class="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]">
-												{pickedAmmo.name}
+												{pickedAmmo.displayName}
 											</div>
 											<p class="mt-1 text-xs leading-relaxed text-[var(--hud-muted)]">
 												{pickedAmmo.description}
@@ -1639,11 +1667,11 @@
 											src="/images/ammo/{ammo.id}.png"
 											alt=""
 											kind="ammo"
-											label={ammo.name}
+											label={ammo.displayName}
 											class="h-7 w-7 shrink-0 object-contain"
 										/>
 										<span class="font-semibold leading-snug text-[var(--hud-text)]"
-											>{ammo.name}</span
+											>{ammo.displayName}</span
 										>
 									</span>
 									<p class="mt-1 flex-1 text-xs leading-relaxed text-[var(--hud-muted)]">

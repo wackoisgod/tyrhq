@@ -468,13 +468,15 @@ function recordBreakdownDelta(
 }
 
 export function createPlannerCatalog(bundle: GameDataBundle): PlannerCatalog {
+	const selectableAmmo = bundle.ammo.filter((ammo) => ammo.id === 'standard' || ammo.selectable);
+
 	return {
 		vehicles: bundle.vehicles,
-		ammo: bundle.ammo.filter((ammo) => ammo.id === 'standard' || ammo.selectable),
+		ammo: selectableAmmo,
 		components: bundle.components,
 		effects: bundle.effects,
 		vehicleById: new Map(bundle.vehicles.map((vehicle) => [vehicle.id, vehicle])),
-		ammoById: new Map(bundle.ammo.map((ammo) => [ammo.id, ammo])),
+		ammoById: new Map(selectableAmmo.map((ammo) => [ammo.id, ammo])),
 		componentById: new Map(bundle.components.map((component) => [component.id, component])),
 		talentById: new Map(bundle.talents.map((talent) => [talent.id, talent])),
 		effectById: new Map(bundle.effects.map((effect) => [effect.id, effect])),
@@ -553,7 +555,7 @@ export function computeBuild(
 		nextStats.DetectionRadius = (currentStats.DetectionRadius ?? 0) * previewAmmo.modifiers.detection;
 		nextStats.ShellVelocity = (currentStats.ShellVelocity ?? 0) * previewAmmo.modifiers.velocity;
 
-		recordBreakdownDelta(breakdown, currentStats, nextStats, `Ammo: ${previewAmmo.name}`);
+		recordBreakdownDelta(breakdown, currentStats, nextStats, `Ammo: ${previewAmmo.displayName}`);
 		currentStats = nextStats;
 	}
 

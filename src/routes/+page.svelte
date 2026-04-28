@@ -29,7 +29,10 @@
 			const tank = snapshot.tanks.find((t) => t.id === b.vehicle_id);
 			const sel = b.selection;
 			const componentIds = (sel?.componentIds ?? []).filter(Boolean);
-			const ammoIds = (sel?.ammoIds ?? []).filter((id) => id && id !== 'standard');
+			const ammoIds = (sel?.ammoIds ?? []).filter((id) => {
+				if (!id || id === 'standard') return false;
+				return Boolean(ammoById.get(id)?.selectable);
+			});
 			const components = componentIds.map((id) => {
 				const component = componentById.get(id);
 				return {
@@ -42,7 +45,7 @@
 				const ammoItem = ammoById.get(id);
 				return {
 					id,
-					name: ammoItem?.name ?? id
+					name: ammoItem?.displayName ?? id
 				};
 			});
 

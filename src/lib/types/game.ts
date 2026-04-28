@@ -25,6 +25,7 @@ export type AmmoSummary = {
 	key: string;
 	slug: string;
 	name: string;
+	displayName: string;
 	description: string;
 	selectable: boolean;
 	canLoadSecondary: boolean;

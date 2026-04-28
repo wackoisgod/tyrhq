@@ -70,7 +70,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	}
 
 	const componentNames = Object.fromEntries(bundle.components.map((c) => [c.id, c.name]));
-	const ammoNames = Object.fromEntries(bundle.ammo.map((a) => [a.id, a.name]));
+	const ammoNames = Object.fromEntries(
+		bundle.ammo
+			.filter((ammo) => ammo.id === 'standard' || ammo.selectable)
+			.map((ammo) => [ammo.id, ammo.displayName])
+	);
 
 	const relatedGuides = (await listPublishedArticles('guide'))
 		.filter((g) => g.vehicleSlugs?.includes(tank.slug))
