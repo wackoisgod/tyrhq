@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
+import { listFlyoutEntries } from '$lib/server/articles';
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	depends('supabase:auth');
@@ -27,5 +28,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		redirect(303, '/settings');
 	}
 
-	return { session, user, profile, role };
+	const flyoutEntries = await listFlyoutEntries();
+
+	return { session, user, profile, role, flyoutEntries };
 };

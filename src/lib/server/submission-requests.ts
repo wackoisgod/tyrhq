@@ -2,6 +2,9 @@ import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import { ContentValidationError } from './content-sanitize';
 import { SubmissionStateError } from './submissions';
+import { FLYOUT_SECTIONS } from '$lib/content/flyout-sections';
+
+const flyoutSectionSchema = z.enum(FLYOUT_SECTIONS).nullable().optional();
 
 export const submissionDraftSchema = z
 	.object({
@@ -13,7 +16,8 @@ export const submissionDraftSchema = z
 		bodyMarkdown: z.string().max(60_000),
 		tags: z.array(z.string()).max(20).optional(),
 		vehicleSlugs: z.array(z.string()).max(20).nullable().optional(),
-		parentArticleId: z.string().uuid().nullable().optional()
+		parentArticleId: z.string().uuid().nullable().optional(),
+		flyoutSection: flyoutSectionSchema
 	})
 	.strict();
 
@@ -28,7 +32,19 @@ export const previewBodySchema = z
 export const decisionBodySchema = z
 	.object({
 		decision: z.enum(['approve', 'changes_requested', 'reject']),
-		notes: z.string().max(2000).nullable().optional()
+		notes: z.string().max(2000).nullable().optional(),
+		// Admin-only: override the contributor's proposed flyout section and
+		// set a sort priority within that section. Ignored unless decision is
+		// "approve". Order may be negative for stable ordering.
+		flyoutSection: flyoutSectionSchema,
+		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional()
+	})
+	.strict();
+
+export const flyoutAssignmentBodySchema = z
+	.object({
+		flyoutSection: flyoutSectionSchema,
+		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional()
 	})
 	.strict();
 

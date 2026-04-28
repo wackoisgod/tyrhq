@@ -20,7 +20,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		const submission = await decideSubmission(
 			params.id!,
 			{ id: user.id, role },
-			{ decision: body.decision, notes: body.notes ?? null }
+			{
+				decision: body.decision,
+				notes: body.notes ?? null,
+				flyoutSection: body.flyoutSection,
+				flyoutOrder: body.flyoutOrder
+			}
 		);
 		return json(submission);
 	} catch (err) {

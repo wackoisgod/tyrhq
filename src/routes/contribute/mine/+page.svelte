@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+
 	let { data } = $props();
 
 	const STATUS_LABEL: Record<string, { label: string; className: string }> = {
@@ -16,9 +18,40 @@
 		rejected: { label: 'Rejected', className: 'bg-[var(--hud-inset)] text-[var(--hud-dim)]' }
 	};
 
+	const DELETABLE = new Set(['draft', 'pending', 'changes_requested', 'rejected']);
+
+	let busyId = $state<string | null>(null);
+	let actionError = $state('');
+
 	function formatDate(iso: string | null): string {
 		if (!iso) return '—';
 		return new Date(iso).toLocaleDateString();
+	}
+
+	async function deleteSubmission(submission: { id: string; title: string; status: string }) {
+		if (busyId) return;
+		const label = submission.title || '(Untitled draft)';
+		const extra =
+			submission.status === 'pending'
+				? ' This submission is currently in review — deleting it will withdraw it from the queue.'
+				: '';
+		if (!window.confirm(`Delete "${label}"? This can't be undone.${extra}`)) return;
+		busyId = submission.id;
+		actionError = '';
+		try {
+			const res = await fetch(`/api/contribute/submissions/${submission.id}`, {
+				method: 'DELETE'
+			});
+			if (!res.ok) {
+				actionError = await res.text();
+				return;
+			}
+			await invalidateAll();
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Delete failed.';
+		} finally {
+			busyId = null;
+		}
 	}
 </script>
 
@@ -44,6 +77,14 @@
 		Submit guides and articles directly from the site. Drafts save as you go; once you submit
 		for review a contributor will publish it or send feedback.
 	</p>
+
+	{#if actionError}
+		<p
+			class="mt-6 rounded-sm bg-[var(--hud-lime)]/10 p-3 text-sm text-[var(--hud-lime)]"
+		>
+			{actionError}
+		</p>
+	{/if}
 
 	{#if data.submissions.length === 0}
 		<div
@@ -86,14 +127,26 @@
 						>
 							{submission.title || '(Untitled draft)'}
 						</a>
-						{#if submission.status !== 'published'}
-							<a
-								href="/contribute/{submission.id}/edit"
-								class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
-							>
-								{submission.status === 'rejected' ? 'View' : 'Edit'} →
-							</a>
-						{/if}
+						<div class="flex flex-wrap items-center gap-3">
+							{#if submission.status !== 'published'}
+								<a
+									href="/contribute/{submission.id}/edit"
+									class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+								>
+									{submission.status === 'rejected' ? 'View' : 'Edit'} →
+								</a>
+							{/if}
+							{#if DELETABLE.has(submission.status)}
+								<button
+									type="button"
+									onclick={() => deleteSubmission(submission)}
+									disabled={busyId === submission.id}
+									class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--hud-dim)] transition hover:text-[var(--hud-lime)] disabled:opacity-50"
+								>
+									{busyId === submission.id ? 'Deleting…' : 'Delete'}
+								</button>
+							{/if}
+						</div>
 					</div>
 					{#if submission.summary}
 						<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">

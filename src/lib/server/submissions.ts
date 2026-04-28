@@ -9,6 +9,7 @@ import {
 	type SanitizedFrontmatter
 } from './content-sanitize';
 import { isSlugTaken } from './articles';
+import type { FlyoutSection } from '$lib/content/flyout-sections';
 
 export type SubmissionStatus =
 	| 'draft'
@@ -50,10 +51,12 @@ export interface SubmissionRecord {
 	updated_at: string;
 	submitted_at: string | null;
 	decided_at: string | null;
+	flyout_section: FlyoutSection | null;
+	flyout_order: number | null;
 }
 
 const SUBMISSION_COLUMNS =
-	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at';
+	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order';
 
 function requireAdmin() {
 	const admin = getSupabaseAdminClient();
@@ -84,6 +87,7 @@ export interface SubmissionDraftInput {
 	tags?: string[];
 	vehicleSlugs?: string[] | null;
 	parentArticleId?: string | null;
+	flyoutSection?: FlyoutSection | null;
 }
 
 export interface SanitizedSubmissionPayload {
@@ -255,7 +259,8 @@ export async function createDraftSubmission(
 			tags: sanitized.frontmatter.tags,
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
-			status: 'draft'
+			status: 'draft',
+			flyout_section: input.flyoutSection ?? null
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();
@@ -289,7 +294,11 @@ export async function updateDraftSubmission(
 
 	const sanitized = await sanitizeSubmissionInput(input, { enforceLength: false });
 
-	if (sanitized.contentHash === existing.content_hash) {
+	const incomingFlyout = input.flyoutSection ?? null;
+	if (
+		sanitized.contentHash === existing.content_hash &&
+		incomingFlyout === existing.flyout_section
+	) {
 		return existing;
 	}
 
@@ -306,7 +315,8 @@ export async function updateDraftSubmission(
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
 			// any meaningful edit on a "changes_requested" returns to draft
-			status: existing.status === 'changes_requested' ? 'draft' : existing.status
+			status: existing.status === 'changes_requested' ? 'draft' : existing.status,
+			flyout_section: input.flyoutSection ?? null
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)
@@ -351,7 +361,8 @@ export async function submitForReview(
 			bodyMarkdown: existing.body_markdown,
 			tags: existing.tags,
 			vehicleSlugs: existing.vehicle_slugs,
-			parentArticleId: existing.parent_article_id
+			parentArticleId: existing.parent_article_id,
+			flyoutSection: existing.flyout_section
 		},
 		{ enforceLength: true }
 	);
@@ -398,6 +409,10 @@ export type ReviewDecision = 'approve' | 'changes_requested' | 'reject';
 export interface DecisionInput {
 	decision: ReviewDecision;
 	notes?: string | null;
+	// Admin-set flyout placement (only applied when decision is "approve").
+	// Defaults to the contributor's proposal stored on the submission row.
+	flyoutSection?: FlyoutSection | null;
+	flyoutOrder?: number | null;
 }
 
 export async function decideSubmission(
@@ -429,14 +444,30 @@ export async function decideSubmission(
 	const reviewNotes = input.notes?.trim() || null;
 
 	if (input.decision === 'approve') {
-		const article = await publishApprovedSubmission(existing, reviewer.id);
+		// Admin override of flyout placement. `undefined` means "no override
+		// supplied — use the contributor's proposal stored on the row"; an
+		// explicit `null` means "remove from flyout".
+		const finalSection: FlyoutSection | null =
+			input.flyoutSection !== undefined ? input.flyoutSection : existing.flyout_section;
+		const finalOrder: number | null = finalSection
+			? input.flyoutOrder !== undefined
+				? input.flyoutOrder
+				: existing.flyout_order
+			: null;
+
+		const article = await publishApprovedSubmission(existing, reviewer.id, {
+			flyoutSection: finalSection,
+			flyoutOrder: finalOrder
+		});
 		const { data, error } = await admin
 			.from('article_submissions')
 			.update({
 				status: 'published',
 				reviewer_id: reviewer.id,
 				review_notes: reviewNotes,
-				decided_at: decidedAt
+				decided_at: decidedAt,
+				flyout_section: finalSection,
+				flyout_order: finalOrder
 			})
 			.eq('id', submissionId)
 			.select(SUBMISSION_COLUMNS)
@@ -540,9 +571,15 @@ async function resolvePublishedAuthor(submission: SubmissionRecord): Promise<Pub
 	};
 }
 
+interface PublishOptions {
+	flyoutSection: FlyoutSection | null;
+	flyoutOrder: number | null;
+}
+
 async function publishApprovedSubmission(
 	submission: SubmissionRecord,
-	reviewerId: string
+	reviewerId: string,
+	options: PublishOptions
 ): Promise<PublishedArticleRow> {
 	const admin = requireAdmin();
 	const now = new Date().toISOString();
@@ -596,7 +633,9 @@ async function publishApprovedSubmission(
 				tags: submission.tags,
 				vehicle_slugs: submission.vehicle_slugs,
 				status: 'published',
-				published_at: now
+				published_at: now,
+				flyout_section: options.flyoutSection,
+				flyout_order: options.flyoutSection ? options.flyoutOrder : null
 			})
 			.eq('id', articleId)
 			.select('id, type, slug')
@@ -621,7 +660,9 @@ async function publishApprovedSubmission(
 				tags: submission.tags,
 				vehicle_slugs: submission.vehicle_slugs,
 				status: 'published',
-				published_at: now
+				published_at: now,
+				flyout_section: options.flyoutSection,
+				flyout_order: options.flyoutSection ? options.flyoutOrder : null
 			})
 			.select('id, type, slug')
 			.single<PublishedArticleRow>();
@@ -667,6 +708,44 @@ async function publishApprovedSubmission(
 	}
 
 	return articleRow;
+}
+
+// Statuses a contributor (or admin) is allowed to delete. Anything tied to a
+// live article (`published`) or mid-publish (`approved`) is excluded — those
+// belong to the audit trail and would orphan the article row.
+const DELETABLE_STATUSES: SubmissionStatus[] = [
+	'draft',
+	'pending',
+	'changes_requested',
+	'rejected'
+];
+
+export async function deleteSubmission(
+	submissionId: string,
+	actor: { id: string; role: ProfileRole }
+): Promise<void> {
+	const admin = requireAdmin();
+	const existing = await getSubmissionById(submissionId);
+	if (!existing) throw new SubmissionStateError('Submission not found.', 404);
+
+	const isOwner = existing.submitter_id === actor.id;
+	const isAdmin = actor.role === 'admin';
+	if (!isOwner && !isAdmin) {
+		throw new SubmissionStateError('You can only delete your own submissions.', 403);
+	}
+
+	if (!DELETABLE_STATUSES.includes(existing.status)) {
+		throw new SubmissionStateError(
+			`Cannot delete a submission in status "${existing.status}".`,
+			409
+		);
+	}
+
+	const { error } = await admin.from('article_submissions').delete().eq('id', submissionId);
+	if (error) {
+		console.error('[submissions] deleteSubmission failed', error);
+		throw new SubmissionStateError('Could not delete submission.', 500);
+	}
 }
 
 function assertModerator(actor: { role: ProfileRole }) {
@@ -722,7 +801,7 @@ export async function createSuggestedEditFromArticle(
 	const { data: article, error: articleError } = await admin
 		.from('articles')
 		.select(
-			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status'
+			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status, flyout_section'
 		)
 		.eq('id', articleId)
 		.maybeSingle<{
@@ -736,6 +815,7 @@ export async function createSuggestedEditFromArticle(
 			tags: string[] | null;
 			vehicle_slugs: string[] | null;
 			status: 'draft' | 'published' | 'withdrawn';
+			flyout_section: FlyoutSection | null;
 		}>();
 
 	if (articleError || !article) {
@@ -771,7 +851,8 @@ export async function createSuggestedEditFromArticle(
 			bodyMarkdown: article.body_markdown,
 			tags: article.tags ?? [],
 			vehicleSlugs: article.vehicle_slugs,
-			parentArticleId: article.id
+			parentArticleId: article.id,
+			flyoutSection: article.flyout_section
 		},
 		{ enforceLength: false }
 	);
@@ -790,7 +871,8 @@ export async function createSuggestedEditFromArticle(
 			tags: sanitized.frontmatter.tags,
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
-			status: 'draft'
+			status: 'draft',
+			flyout_section: article.flyout_section
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();

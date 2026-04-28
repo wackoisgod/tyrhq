@@ -1,12 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 
 	let { data } = $props();
 
 	let notes = $state('');
 	let busy = $state(false);
 	let error = $state('');
+	// Default the override fields to whatever the contributor proposed (or
+	// whatever the admin previously set). Admin can change before approving.
+	/* svelte-ignore state_referenced_locally */
+	let flyoutSection = $state<FlyoutSection | ''>(data.submission.flyout_section ?? '');
+	/* svelte-ignore state_referenced_locally */
+	let flyoutOrder = $state<string>(
+		data.submission.flyout_order != null ? String(data.submission.flyout_order) : ''
+	);
 
 	async function decide(decision: 'approve' | 'changes_requested' | 'reject') {
 		if (busy) return;
@@ -18,10 +27,24 @@
 		busy = true;
 		error = '';
 		try {
+			const orderNum = flyoutOrder.trim() === '' ? null : Number(flyoutOrder);
+			if (orderNum != null && Number.isNaN(orderNum)) {
+				error = 'Flyout order must be a number.';
+				busy = false;
+				return;
+			}
+			const payload: Record<string, unknown> = {
+				decision,
+				notes: notes || null
+			};
+			if (decision === 'approve') {
+				payload.flyoutSection = flyoutSection || null;
+				payload.flyoutOrder = flyoutSection ? orderNum : null;
+			}
 			const res = await fetch(`/api/admin/submissions/${data.submission.id}/decision`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ decision, notes: notes || null })
+				body: JSON.stringify(payload)
 			});
 			if (!res.ok) {
 				error = await res.text();
@@ -131,6 +154,50 @@
 		{#if error}
 			<p class="mt-3 text-sm text-[var(--hud-lime)]">{error}</p>
 		{/if}
+
+		<div class="mt-6 grid gap-3 border-t border-[var(--hud-inset)] pt-4 md:grid-cols-[1fr_120px]">
+			<div>
+				<label
+					for="flyoutSection"
+					class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+				>
+					Resources flyout section
+				</label>
+				<select
+					id="flyoutSection"
+					bind:value={flyoutSection}
+					class="mt-2 w-full rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				>
+					<option value="">— None —</option>
+					{#each FLYOUT_SECTIONS as section}
+						<option value={section}>{section}</option>
+					{/each}
+				</select>
+				{#if data.submission.flyout_section}
+					<p class="mt-1 text-[11px] text-[var(--hud-dim)]">
+						Contributor proposed: {data.submission.flyout_section}
+					</p>
+				{/if}
+			</div>
+			<div>
+				<label
+					for="flyoutOrder"
+					class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+				>
+					Order
+				</label>
+				<input
+					id="flyoutOrder"
+					bind:value={flyoutOrder}
+					type="number"
+					step="1"
+					placeholder="0"
+					disabled={!flyoutSection}
+					class="mt-2 w-full rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-40"
+				/>
+				<p class="mt-1 text-[11px] text-[var(--hud-dim)]">Lower = earlier.</p>
+			</div>
+		</div>
 
 		{#if !data.canApprove}
 			<p class="mt-3 text-xs text-[var(--hud-dim)]">

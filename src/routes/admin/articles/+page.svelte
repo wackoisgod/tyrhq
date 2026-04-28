@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 
 	let { data } = $props();
 
@@ -11,6 +12,77 @@
 
 	let busyId = $state<string | null>(null);
 	let actionError = $state('');
+	// Per-row pending edits; keyed by article id. Only synced to the server
+	// when the admin clicks Save.
+	let sectionEdits = $state<Record<string, FlyoutSection | ''>>({});
+	let orderEdits = $state<Record<string, string>>({});
+
+	function currentSection(article: {
+		id: string;
+		flyoutSection: FlyoutSection | null;
+	}): FlyoutSection | '' {
+		return sectionEdits[article.id] ?? article.flyoutSection ?? '';
+	}
+
+	function currentOrder(article: { id: string; flyoutOrder: number | null }): string {
+		const edited = orderEdits[article.id];
+		if (edited !== undefined) return edited;
+		return article.flyoutOrder != null ? String(article.flyoutOrder) : '';
+	}
+
+	function isDirty(article: {
+		id: string;
+		flyoutSection: FlyoutSection | null;
+		flyoutOrder: number | null;
+	}): boolean {
+		const sectionChanged =
+			sectionEdits[article.id] !== undefined &&
+			(sectionEdits[article.id] || null) !== article.flyoutSection;
+		const orderChanged =
+			orderEdits[article.id] !== undefined &&
+			(orderEdits[article.id].trim() === ''
+				? null
+				: Number(orderEdits[article.id])) !== article.flyoutOrder;
+		return sectionChanged || orderChanged;
+	}
+
+	async function saveFlyout(article: {
+		id: string;
+		flyoutSection: FlyoutSection | null;
+		flyoutOrder: number | null;
+	}) {
+		if (busyId) return;
+		const section = currentSection(article);
+		const orderRaw = currentOrder(article);
+		const orderNum = orderRaw.trim() === '' ? null : Number(orderRaw);
+		if (orderNum != null && Number.isNaN(orderNum)) {
+			actionError = 'Order must be a number.';
+			return;
+		}
+		busyId = article.id;
+		actionError = '';
+		try {
+			const res = await fetch(`/api/admin/articles/${article.id}/flyout`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					flyoutSection: section || null,
+					flyoutOrder: section ? orderNum : null
+				})
+			});
+			if (!res.ok) {
+				actionError = await res.text();
+				return;
+			}
+			delete sectionEdits[article.id];
+			delete orderEdits[article.id];
+			await invalidateAll();
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Save failed.';
+		} finally {
+			busyId = null;
+		}
+	}
 
 	async function withdraw(id: string) {
 		if (busyId) return;
@@ -141,6 +213,57 @@
 					</div>
 					{#if article.summary}
 						<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{article.summary}</p>
+					{/if}
+
+					{#if article.status === 'published'}
+						<div
+							class="mt-3 grid items-end gap-2 border-t border-[var(--hud-inset)] pt-3 sm:grid-cols-[1fr_120px_auto]"
+						>
+							<label class="flex flex-col gap-1">
+								<span
+									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								>
+									Resources flyout section
+								</span>
+								<select
+									value={currentSection(article)}
+									onchange={(e) =>
+										(sectionEdits[article.id] = (e.currentTarget as HTMLSelectElement)
+											.value as FlyoutSection | '')}
+									class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+								>
+									<option value="">— Not in flyout —</option>
+									{#each FLYOUT_SECTIONS as section}
+										<option value={section}>{section}</option>
+									{/each}
+								</select>
+							</label>
+							<label class="flex flex-col gap-1">
+								<span
+									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								>
+									Order
+								</span>
+								<input
+									type="number"
+									step="1"
+									placeholder="0"
+									value={currentOrder(article)}
+									oninput={(e) =>
+										(orderEdits[article.id] = (e.currentTarget as HTMLInputElement).value)}
+									disabled={!currentSection(article)}
+									class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-40"
+								/>
+							</label>
+							<button
+								type="button"
+								onclick={() => saveFlyout(article)}
+								disabled={busyId === article.id || !isDirty(article)}
+								class="hud-cta-outline px-4 py-2 text-xs disabled:opacity-50"
+							>
+								{busyId === article.id ? 'Saving…' : 'Save'}
+							</button>
+						</div>
 					{/if}
 				</li>
 			{/each}

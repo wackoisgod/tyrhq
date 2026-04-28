@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from './supabase-admin';
+import type { FlyoutSection } from '$lib/content/flyout-sections';
 
 export type ArticleType = 'guide' | 'article';
 
@@ -15,6 +16,8 @@ export interface ArticleSummary {
 	starCount: number;
 	publishedAt: string;
 	updatedAt: string;
+	flyoutSection: FlyoutSection | null;
+	flyoutOrder: number | null;
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -47,10 +50,12 @@ interface ArticleRow {
 	published_at: string | null;
 	updated_at: string;
 	current_revision_id: string | null;
+	flyout_section: string | null;
+	flyout_order: number | null;
 }
 
 const SUMMARY_COLUMNS =
-	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at';
+	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order';
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
 
 function resolveAuthorDisplay(row: ArticleRow): string | null {
@@ -72,7 +77,9 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		vehicleSlugs: row.vehicle_slugs,
 		starCount: row.star_count,
 		publishedAt: row.published_at ?? row.updated_at,
-		updatedAt: row.updated_at
+		updatedAt: row.updated_at,
+		flyoutSection: row.flyout_section as FlyoutSection | null,
+		flyoutOrder: row.flyout_order
 	};
 }
 
@@ -175,6 +182,78 @@ export async function listAllArticlesForAdmin(): Promise<ArticleAdminRow[]> {
 			status: row.status
 		})
 	);
+}
+
+export interface FlyoutEntry {
+	section: FlyoutSection;
+	href: string;
+	label: string;
+	order: number | null;
+}
+
+/**
+ * Returns every published guide/article that an admin has assigned a flyout
+ * section to. Consumed by the layout server load to build the Resources
+ * mega-menu — expect <50 rows in practice.
+ */
+export async function listFlyoutEntries(): Promise<FlyoutEntry[]> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) return [];
+
+	const { data, error } = await admin
+		.from('articles')
+		.select('type, slug, title, flyout_section, flyout_order')
+		.eq('status', 'published')
+		.not('flyout_section', 'is', null)
+		.order('flyout_section', { ascending: true })
+		.order('flyout_order', { ascending: true, nullsFirst: false })
+		.order('title', { ascending: true });
+
+	if (error) {
+		console.error('[articles] listFlyoutEntries failed', error);
+		return [];
+	}
+
+	return ((data ?? []) as Array<{
+		type: ArticleType;
+		slug: string;
+		title: string;
+		flyout_section: string;
+		flyout_order: number | null;
+	}>).map((row) => ({
+		section: row.flyout_section as FlyoutSection,
+		href: `${row.type === 'guide' ? '/guides' : '/articles'}/${row.slug}`,
+		label: row.title,
+		order: row.flyout_order
+	}));
+}
+
+export interface FlyoutAssignmentInput {
+	flyoutSection: FlyoutSection | null;
+	flyoutOrder: number | null;
+}
+
+/**
+ * Update only the flyout assignment fields on an article. Used by the admin
+ * post-publication editor on /admin/articles. Does not touch revision history
+ * — flyout placement is editorial nav metadata, not versioned content.
+ */
+export async function updateArticleFlyoutAssignment(
+	articleId: string,
+	input: FlyoutAssignmentInput
+): Promise<void> {
+	const admin = requireAdmin();
+	const { error } = await admin
+		.from('articles')
+		.update({
+			flyout_section: input.flyoutSection,
+			flyout_order: input.flyoutSection ? input.flyoutOrder : null
+		})
+		.eq('id', articleId);
+	if (error) {
+		console.error('[articles] updateArticleFlyoutAssignment failed', error);
+		throw new Error('Could not update flyout assignment.');
+	}
 }
 
 /**

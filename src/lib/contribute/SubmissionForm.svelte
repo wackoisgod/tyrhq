@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Editor from './Editor.svelte';
 	import { goto } from '$app/navigation';
+	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 
 	type Submission = {
 		id: string;
@@ -14,6 +15,7 @@
 		vehicle_slugs: string[] | null;
 		status: string;
 		review_notes: string | null;
+		flyout_section: FlyoutSection | null;
 	};
 
 	let {
@@ -45,9 +47,12 @@
 	let status = $state(submission?.status ?? 'draft');
 	/* svelte-ignore state_referenced_locally */
 	let reviewNotes = $state(submission?.review_notes ?? '');
+	/* svelte-ignore state_referenced_locally */
+	let flyoutSection = $state<FlyoutSection | ''>(submission?.flyout_section ?? '');
 
 	let saving = $state(false);
 	let submittingForReview = $state(false);
+	let previewing = $state(false);
 	let saveError = $state('');
 	let lastSavedAt = $state<string>('');
 
@@ -67,7 +72,8 @@
 			slug: slug || null,
 			bodyMarkdown,
 			tags: parseList(tagsInput),
-			vehicleSlugs: type === 'guide' ? parseList(vehicleSlugsInput) : null
+			vehicleSlugs: type === 'guide' ? parseList(vehicleSlugsInput) : null,
+			flyoutSection: flyoutSection || null
 		};
 	}
 
@@ -93,6 +99,44 @@
 			saveError = err instanceof Error ? err.message : 'Save failed';
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function previewOnSite() {
+		if (saving || submittingForReview || previewing) return;
+		// Open the tab synchronously so we don't trip the popup blocker — the
+		// browser only honors window.open inside a direct user-gesture handler.
+		// We then fetch + redirect that tab to the preview URL once we have an id.
+		const previewWindow = window.open('about:blank', '_blank');
+		previewing = true;
+		saveError = '';
+		try {
+			const res = await fetch('/api/contribute/submissions', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(buildPayload())
+			});
+			if (!res.ok) {
+				saveError = await res.text();
+				previewWindow?.close();
+				return;
+			}
+			const data = await res.json();
+			id = data.id;
+			status = data.status;
+			lastSavedAt = new Date().toLocaleTimeString();
+			const target = `/contribute/${id}/preview`;
+			if (previewWindow) {
+				previewWindow.location.href = target;
+			} else {
+				// popup blocked — fall back to a same-tab navigation
+				window.location.href = target;
+			}
+		} catch (err) {
+			saveError = err instanceof Error ? err.message : 'Preview failed';
+			previewWindow?.close();
+		} finally {
+			previewing = false;
 		}
 	}
 
@@ -280,6 +324,30 @@
 			</div>
 		{/if}
 
+		<div class="grid gap-3 md:grid-cols-[150px_1fr]">
+			<label
+				for="flyoutSection"
+				class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+				>Resources flyout</label
+			>
+			<div class="flex flex-col gap-1">
+				<select
+					id="flyoutSection"
+					bind:value={flyoutSection}
+					class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				>
+					<option value="">— Not in Resources flyout —</option>
+					{#each FLYOUT_SECTIONS as section}
+						<option value={section}>{section}</option>
+					{/each}
+				</select>
+				<p class="text-[11px] text-[var(--hud-dim)]">
+					Optional. Suggest a heading under which this should appear in the top-nav Resources
+					menu. A reviewer will confirm or adjust on approval.
+				</p>
+			</div>
+		</div>
+
 		<div>
 			<div
 				class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
@@ -307,15 +375,24 @@
 				<button
 					type="button"
 					onclick={saveDraft}
-					disabled={saving || submittingForReview}
+					disabled={saving || submittingForReview || previewing}
 					class="hud-cta-outline px-5 py-3 text-sm disabled:opacity-50"
 				>
 					{saving ? 'Saving…' : 'Save Draft'}
 				</button>
 				<button
 					type="button"
+					onclick={previewOnSite}
+					disabled={saving || submittingForReview || previewing || !title.trim() || !bodyMarkdown.trim()}
+					class="hud-cta-ghost px-5 py-3 text-sm disabled:opacity-50"
+					title="Save and open a full-page preview in a new tab"
+				>
+					{previewing ? 'Opening…' : 'Preview On Site'}
+				</button>
+				<button
+					type="button"
 					onclick={submitForReview}
-					disabled={saving || submittingForReview || !title.trim() || !bodyMarkdown.trim()}
+					disabled={saving || submittingForReview || previewing || !title.trim() || !bodyMarkdown.trim()}
 					class="hud-cta px-5 py-3 text-sm disabled:opacity-50"
 				>
 					{submittingForReview ? 'Submitting…' : 'Submit For Review'}

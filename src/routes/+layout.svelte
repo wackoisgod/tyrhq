@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { footerSections, navigation, siteCopy } from '$lib/content/site';
+	import { buildNavigation, footerSections, siteCopy } from '$lib/content/site';
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import { page } from '$app/state';
 	import { invalidate } from '$app/navigation';
@@ -10,6 +10,8 @@
 	import NavFlyout from '$lib/components/nav/NavFlyout.svelte';
 
 	let { children, data } = $props();
+
+	const navigation = $derived(buildNavigation(data.flyoutEntries ?? []));
 
 	const isActive = (href: string) =>
 		href === '/'
