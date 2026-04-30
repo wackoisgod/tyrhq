@@ -19,7 +19,7 @@
 	{article}
 	vehicles={data.vehicles}
 	backHref="/contribute/{data.submission.id}/edit"
-	backLabel="← Back To Draft"
+	backLabel="Back To Draft"
 >
 	{#snippet banner()}
 		<div

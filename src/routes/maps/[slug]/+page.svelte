@@ -21,9 +21,17 @@
 	<!-- Back link -->
 	<a
 		href="/maps"
-		class="hud-link mb-4 inline-flex items-center gap-1.5 text-sm transition hover:text-[var(--hud-lime)]"
+		class="hud-link group mb-4 inline-flex items-center gap-2 text-sm transition hover:text-[var(--hud-lime)]"
 	>
-		<span class="text-xs">&larr;</span> Back to Map Atlas
+		<span
+			aria-hidden="true"
+			class="flex h-5 w-5 items-center justify-center rounded-sm border border-[var(--hud-variant)] bg-[var(--hud-panel-mid)] text-[var(--hud-lime)] transition group-hover:border-[var(--hud-lime)]/60 group-hover:bg-[var(--hud-lime)]/10"
+		>
+			<svg viewBox="0 0 16 16" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M10 3 5 8l5 5" />
+			</svg>
+		</span>
+		Back to Map Atlas
 	</a>
 
 	<!-- Banner -->
