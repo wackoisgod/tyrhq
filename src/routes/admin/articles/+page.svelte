@@ -230,7 +230,7 @@
 									onchange={(e) =>
 										(sectionEdits[article.id] = (e.currentTarget as HTMLSelectElement)
 											.value as FlyoutSection | '')}
-									class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+									class="hud-input rounded-sm p-2 text-sm"
 								>
 									<option value="">— Not in flyout —</option>
 									{#each FLYOUT_SECTIONS as section}
@@ -252,7 +252,7 @@
 									oninput={(e) =>
 										(orderEdits[article.id] = (e.currentTarget as HTMLInputElement).value)}
 									disabled={!currentSection(article)}
-									class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-40"
+									class="hud-input rounded-sm p-2 text-sm disabled:opacity-40"
 								/>
 							</label>
 							<button

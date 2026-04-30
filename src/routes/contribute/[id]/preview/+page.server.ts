@@ -59,7 +59,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			tags: submission.tags ?? [],
 			updatedAt: submission.updated_at,
 			authorDisplay,
-			bodyHtml
+			bodyHtml,
+			heroImageUrl: submission.hero_image_url
 		},
 		vehicles,
 		renderError

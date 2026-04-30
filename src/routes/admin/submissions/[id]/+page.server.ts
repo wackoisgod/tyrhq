@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { getSubmissionById } from '$lib/server/submissions';
 import { getArticleByIdForReview } from '$lib/server/articles';
 import { sanitizeArticleBody } from '$lib/server/content-sanitize';
+import { computeArticleDiff } from '$lib/server/article-diff';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const { session, user, role } = await locals.safeGetSession();
@@ -31,6 +32,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		? await getArticleByIdForReview(submission.parent_article_id)
 		: null;
 
+	const diff = parentArticle ? computeArticleDiff(parentArticle, submission) : null;
+
 	const isOwnSubmission = submission.submitter_id === user.id;
 	const canApprove = !isOwnSubmission || role === 'admin';
 
@@ -39,6 +42,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		renderedHtml,
 		renderError,
 		parentArticle,
+		diff,
 		canApprove,
 		isOwnSubmission,
 		role

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Editor from './Editor.svelte';
+	import ImagePicker from './ImagePicker.svelte';
 	import { goto } from '$app/navigation';
 	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 
@@ -16,6 +17,7 @@
 		status: string;
 		review_notes: string | null;
 		flyout_section: FlyoutSection | null;
+		hero_image_url: string | null;
 	};
 
 	let {
@@ -49,12 +51,18 @@
 	let reviewNotes = $state(submission?.review_notes ?? '');
 	/* svelte-ignore state_referenced_locally */
 	let flyoutSection = $state<FlyoutSection | ''>(submission?.flyout_section ?? '');
+	/* svelte-ignore state_referenced_locally */
+	let heroImageUrl = $state<string | null>(submission?.hero_image_url ?? null);
 
 	let saving = $state(false);
 	let submittingForReview = $state(false);
 	let previewing = $state(false);
 	let saveError = $state('');
 	let lastSavedAt = $state<string>('');
+	let heroUploading = $state(false);
+	let heroError = $state('');
+	let heroInput = $state<HTMLInputElement | undefined>();
+	let heroPickerOpen = $state(false);
 
 	function parseList(input: string): string[] {
 		return input
@@ -73,8 +81,48 @@
 			bodyMarkdown,
 			tags: parseList(tagsInput),
 			vehicleSlugs: type === 'guide' ? parseList(vehicleSlugsInput) : null,
-			flyoutSection: flyoutSection || null
+			flyoutSection: flyoutSection || null,
+			heroImageUrl: heroImageUrl || null
 		};
+	}
+
+	async function uploadHero(file: File) {
+		heroError = '';
+		heroUploading = true;
+		try {
+			const form = new FormData();
+			form.append('file', file);
+			if (id) form.append('submissionId', id);
+			const res = await fetch('/api/contribute/images', { method: 'POST', body: form });
+			if (!res.ok) {
+				heroError = (await res.text()) || `Upload failed (${res.status}).`;
+				return;
+			}
+			const data = await res.json();
+			heroImageUrl = data.url;
+		} catch (err) {
+			heroError = err instanceof Error ? err.message : 'Upload failed.';
+		} finally {
+			heroUploading = false;
+		}
+	}
+
+	async function onHeroSelected(event: Event) {
+		const target = event.currentTarget as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+		await uploadHero(file);
+		target.value = '';
+	}
+
+	function clearHero() {
+		heroImageUrl = null;
+		heroError = '';
+	}
+
+	function onHeroLibraryPick(upload: { url: string }) {
+		heroImageUrl = upload.url;
+		heroError = '';
 	}
 
 	async function saveDraft() {
@@ -256,7 +304,7 @@
 				type="text"
 				required
 				maxlength="200"
-				class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				class="hud-input rounded-sm p-2 text-sm"
 			/>
 		</div>
 
@@ -272,7 +320,7 @@
 				maxlength="500"
 				rows="2"
 				placeholder="A short one-liner shown on listing pages."
-				class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				class="hud-input rounded-sm p-2 text-sm"
 			></textarea>
 		</div>
 
@@ -288,7 +336,7 @@
 				type="text"
 				maxlength="80"
 				placeholder="auto-generated from title if blank"
-				class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				class="hud-input rounded-sm p-2 text-sm"
 			/>
 		</div>
 
@@ -303,7 +351,7 @@
 				bind:value={tagsInput}
 				type="text"
 				placeholder="comma-separated, e.g. heavy, survival"
-				class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				class="hud-input rounded-sm p-2 text-sm"
 			/>
 		</div>
 
@@ -319,7 +367,7 @@
 					bind:value={vehicleSlugsInput}
 					type="text"
 					placeholder="comma-separated tank slugs, e.g. atlas, hammer"
-					class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+					class="hud-input rounded-sm p-2 text-sm"
 				/>
 			</div>
 		{/if}
@@ -334,7 +382,7 @@
 				<select
 					id="flyoutSection"
 					bind:value={flyoutSection}
-					class="rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+					class="hud-input rounded-sm p-2 text-sm"
 				>
 					<option value="">— Not in Resources flyout —</option>
 					{#each FLYOUT_SECTIONS as section}
@@ -348,6 +396,84 @@
 			</div>
 		</div>
 
+		<div class="grid gap-3 md:grid-cols-[150px_1fr]">
+			<span
+				class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+			>
+				Hero image
+			</span>
+			<div class="flex flex-col gap-2">
+				{#if heroImageUrl}
+					<div class="flex flex-wrap items-start gap-3">
+						<img
+							src={heroImageUrl}
+							alt="Hero preview"
+							class="max-h-32 rounded-sm bg-[var(--hud-inset)] object-cover"
+						/>
+						<div class="flex flex-col gap-2">
+							<button
+								type="button"
+								class="hud-cta-ghost px-3 py-1.5 text-xs"
+								onclick={() => heroInput?.click()}
+								disabled={heroUploading}
+							>
+								{heroUploading ? 'Uploading…' : 'Replace'}
+							</button>
+							<button
+								type="button"
+								class="hud-cta-ghost px-3 py-1.5 text-xs"
+								onclick={() => (heroPickerOpen = true)}
+								disabled={heroUploading}
+							>
+								Choose existing
+							</button>
+							<button
+								type="button"
+								class="hud-cta-ghost px-3 py-1.5 text-xs"
+								onclick={clearHero}
+								disabled={heroUploading}
+							>
+								Remove
+							</button>
+						</div>
+					</div>
+				{:else}
+					<div class="flex flex-wrap gap-2">
+						<button
+							type="button"
+							class="hud-cta-outline px-4 py-2 text-xs"
+							onclick={() => heroInput?.click()}
+							disabled={heroUploading}
+						>
+							{heroUploading ? 'Uploading…' : 'Upload hero image'}
+						</button>
+						<button
+							type="button"
+							class="hud-cta-ghost px-4 py-2 text-xs"
+							onclick={() => (heroPickerOpen = true)}
+							disabled={heroUploading}
+						>
+							Choose existing
+						</button>
+					</div>
+				{/if}
+				<input
+					bind:this={heroInput}
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/gif"
+					class="hidden"
+					onchange={onHeroSelected}
+				/>
+				{#if heroError}
+					<p class="text-xs text-[var(--hud-lime)]">{heroError}</p>
+				{:else}
+					<p class="text-[11px] text-[var(--hud-dim)]">
+						Optional. Shown as the article banner and on listing cards.
+					</p>
+				{/if}
+			</div>
+		</div>
+
 		<div>
 			<div
 				class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
@@ -355,7 +481,7 @@
 				Body
 			</div>
 			<div class="mt-2">
-				<Editor bind:value={bodyMarkdown} />
+				<Editor bind:value={bodyMarkdown} submissionId={id} />
 			</div>
 		</div>
 	</fieldset>
@@ -401,3 +527,5 @@
 		</div>
 	</div>
 </form>
+
+<ImagePicker bind:open={heroPickerOpen} onPick={onHeroLibraryPick} />

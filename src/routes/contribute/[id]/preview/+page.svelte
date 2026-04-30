@@ -9,7 +9,8 @@
 		tags: data.submission.tags,
 		publishedAt: data.submission.updatedAt,
 		authorDisplay: data.submission.authorDisplay,
-		bodyHtml: data.submission.bodyHtml
+		bodyHtml: data.submission.bodyHtml,
+		heroImageUrl: data.submission.heroImageUrl
 	});
 </script>
 

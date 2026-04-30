@@ -70,7 +70,7 @@ const config = {
 				'form-action': ['self'],
 				'frame-ancestors': ['none'],
 				'frame-src': ['self', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
-				'img-src': ['self', 'blob:', 'data:', 'https://*.ytimg.com'],
+				'img-src': ['self', 'blob:', 'data:', 'https://*.ytimg.com', 'https://*.supabase.co'],
 				'manifest-src': ['self'],
 				'object-src': ['none'],
 				'script-src': ['self', 'wasm-unsafe-eval'],

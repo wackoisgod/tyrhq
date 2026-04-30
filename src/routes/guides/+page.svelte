@@ -49,46 +49,57 @@
 					{#each data.general as guide}
 						<a
 							href="/guides/{guide.slug}"
-							class="rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+							class="flex gap-5 rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
 							style="box-shadow: var(--hud-surface-ghost);"
 						>
-							<div class="flex flex-wrap items-center gap-3">
-								<span
-									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-								>
-									{formatDate(guide.publishedAt)}
-								</span>
-								{#if guide.tags?.length}
-									{#each guide.tags as tag}
-										<span
-											class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
-										>
-											{tag}
-										</span>
-									{/each}
-								{/if}
-								{#if guide.starCount > 0}
+							{#if guide.heroImageUrl}
+								<img
+									src={guide.heroImageUrl}
+									alt=""
+									loading="lazy"
+									decoding="async"
+									class="h-28 w-40 flex-shrink-0 rounded-sm bg-[var(--hud-inset)] object-cover"
+								/>
+							{/if}
+							<div class="min-w-0 flex-1">
+								<div class="flex flex-wrap items-center gap-3">
 									<span
-										class="flex items-center gap-1 rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+										class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 									>
-										<svg class="h-3 w-3 text-[var(--hud-lime)]" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-											<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-										</svg>
-										<span class="font-mono">{guide.starCount}</span>
+										{formatDate(guide.publishedAt)}
 									</span>
+									{#if guide.tags?.length}
+										{#each guide.tags as tag}
+											<span
+												class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+											>
+												{tag}
+											</span>
+										{/each}
+									{/if}
+									{#if guide.starCount > 0}
+										<span
+											class="flex items-center gap-1 rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+										>
+											<svg class="h-3 w-3 text-[var(--hud-lime)]" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+												<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+											</svg>
+											<span class="font-mono">{guide.starCount}</span>
+										</span>
+									{/if}
+								</div>
+								<h2
+									class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]"
+								>
+									{guide.title}
+								</h2>
+								{#if guide.summary}
+									<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{guide.summary}</p>
+								{/if}
+								{#if guide.authorDisplay}
+									<p class="mt-3 text-xs text-[var(--hud-dim)]">By {guide.authorDisplay}</p>
 								{/if}
 							</div>
-							<h2
-								class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]"
-							>
-								{guide.title}
-							</h2>
-							{#if guide.summary}
-								<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{guide.summary}</p>
-							{/if}
-							{#if guide.authorDisplay}
-								<p class="mt-3 text-xs text-[var(--hud-dim)]">By {guide.authorDisplay}</p>
-							{/if}
 						</a>
 					{/each}
 				</div>

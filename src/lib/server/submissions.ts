@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from './supabase-admin';
 import {
 	assertBodyLength,
+	assertHeroImageUrl,
 	computeContentHash,
 	ContentValidationError,
 	sanitizeArticleBody,
@@ -53,10 +54,11 @@ export interface SubmissionRecord {
 	decided_at: string | null;
 	flyout_section: FlyoutSection | null;
 	flyout_order: number | null;
+	hero_image_url: string | null;
 }
 
 const SUBMISSION_COLUMNS =
-	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order';
+	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order, hero_image_url';
 
 function requireAdmin() {
 	const admin = getSupabaseAdminClient();
@@ -88,6 +90,7 @@ export interface SubmissionDraftInput {
 	vehicleSlugs?: string[] | null;
 	parentArticleId?: string | null;
 	flyoutSection?: FlyoutSection | null;
+	heroImageUrl?: string | null;
 }
 
 export interface SanitizedSubmissionPayload {
@@ -95,6 +98,7 @@ export interface SanitizedSubmissionPayload {
 	bodyHtml: string;
 	bodyMarkdown: string;
 	contentHash: string;
+	heroImageUrl: string | null;
 }
 
 /**
@@ -117,14 +121,16 @@ export async function sanitizeSubmissionInput(
 
 	if (enforceLength) assertBodyLength(input.bodyMarkdown);
 
+	const heroImageUrl = assertHeroImageUrl(input.heroImageUrl ?? null);
 	const { html } = await sanitizeArticleBody(input.bodyMarkdown);
-	const contentHash = computeContentHash(frontmatter, html);
+	const contentHash = computeContentHash(frontmatter, html, heroImageUrl);
 
 	return {
 		frontmatter,
 		bodyHtml: html,
 		bodyMarkdown: input.bodyMarkdown,
-		contentHash
+		contentHash,
+		heroImageUrl
 	};
 }
 
@@ -260,7 +266,8 @@ export async function createDraftSubmission(
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
 			status: 'draft',
-			flyout_section: input.flyoutSection ?? null
+			flyout_section: input.flyoutSection ?? null,
+			hero_image_url: sanitized.heroImageUrl
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();
@@ -316,7 +323,8 @@ export async function updateDraftSubmission(
 			content_hash: sanitized.contentHash,
 			// any meaningful edit on a "changes_requested" returns to draft
 			status: existing.status === 'changes_requested' ? 'draft' : existing.status,
-			flyout_section: input.flyoutSection ?? null
+			flyout_section: input.flyoutSection ?? null,
+			hero_image_url: sanitized.heroImageUrl
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)
@@ -362,7 +370,8 @@ export async function submitForReview(
 			tags: existing.tags,
 			vehicleSlugs: existing.vehicle_slugs,
 			parentArticleId: existing.parent_article_id,
-			flyoutSection: existing.flyout_section
+			flyoutSection: existing.flyout_section,
+			heroImageUrl: existing.hero_image_url
 		},
 		{ enforceLength: true }
 	);
@@ -635,7 +644,8 @@ async function publishApprovedSubmission(
 				status: 'published',
 				published_at: now,
 				flyout_section: options.flyoutSection,
-				flyout_order: options.flyoutSection ? options.flyoutOrder : null
+				flyout_order: options.flyoutSection ? options.flyoutOrder : null,
+				hero_image_url: submission.hero_image_url
 			})
 			.eq('id', articleId)
 			.select('id, type, slug')
@@ -662,7 +672,8 @@ async function publishApprovedSubmission(
 				status: 'published',
 				published_at: now,
 				flyout_section: options.flyoutSection,
-				flyout_order: options.flyoutSection ? options.flyoutOrder : null
+				flyout_order: options.flyoutSection ? options.flyoutOrder : null,
+				hero_image_url: submission.hero_image_url
 			})
 			.select('id, type, slug')
 			.single<PublishedArticleRow>();
@@ -687,7 +698,8 @@ async function publishApprovedSubmission(
 			tags: submission.tags,
 			vehicle_slugs: submission.vehicle_slugs,
 			author_display: author.authorDisplay,
-			created_by: reviewerId
+			created_by: reviewerId,
+			hero_image_url: submission.hero_image_url
 		})
 		.select('id')
 		.single<{ id: string }>();
@@ -801,7 +813,7 @@ export async function createSuggestedEditFromArticle(
 	const { data: article, error: articleError } = await admin
 		.from('articles')
 		.select(
-			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status, flyout_section'
+			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status, flyout_section, hero_image_url'
 		)
 		.eq('id', articleId)
 		.maybeSingle<{
@@ -816,6 +828,7 @@ export async function createSuggestedEditFromArticle(
 			vehicle_slugs: string[] | null;
 			status: 'draft' | 'published' | 'withdrawn';
 			flyout_section: FlyoutSection | null;
+			hero_image_url: string | null;
 		}>();
 
 	if (articleError || !article) {
@@ -852,7 +865,8 @@ export async function createSuggestedEditFromArticle(
 			tags: article.tags ?? [],
 			vehicleSlugs: article.vehicle_slugs,
 			parentArticleId: article.id,
-			flyoutSection: article.flyout_section
+			flyoutSection: article.flyout_section,
+			heroImageUrl: article.hero_image_url
 		},
 		{ enforceLength: false }
 	);
@@ -872,7 +886,8 @@ export async function createSuggestedEditFromArticle(
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
 			status: 'draft',
-			flyout_section: article.flyout_section
+			flyout_section: article.flyout_section,
+			hero_image_url: sanitized.heroImageUrl
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();

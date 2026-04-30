@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { registerArticleCustomElements } from './custom-elements';
+	import ImagePicker from './ImagePicker.svelte';
 
 	/**
 	 * MVP editor: textarea + friendly toolbar + live preview.
@@ -16,15 +17,21 @@
 
 	let {
 		value = $bindable(''),
-		placeholder = 'Write your article here. Use the toolbar above for formatting.'
-	}: { value: string; placeholder?: string } = $props();
+		placeholder = 'Write your article here. Use the toolbar above for formatting.',
+		submissionId = ''
+	}: { value: string; placeholder?: string; submissionId?: string } = $props();
 
 	let textarea: HTMLTextAreaElement | undefined = $state();
+	let imageInput: HTMLInputElement | undefined = $state();
 	let previewHtml = $state('');
 	let previewError = $state('');
 	let previewLoading = $state(false);
 	let showPreview = $state(false);
 	let lastPreviewedAt = 0;
+	let uploadingImage = $state(false);
+	let uploadError = $state('');
+	let dragActive = $state(false);
+	let pickerOpen = $state(false);
 
 	onMount(() => {
 		registerArticleCustomElements();
@@ -112,6 +119,80 @@
 		queueMicrotask(() => textarea?.focus());
 	}
 
+	async function uploadImageFile(file: File) {
+		uploadError = '';
+		uploadingImage = true;
+		try {
+			const form = new FormData();
+			form.append('file', file);
+			if (submissionId) form.append('submissionId', submissionId);
+			const res = await fetch('/api/contribute/images', { method: 'POST', body: form });
+			if (!res.ok) {
+				uploadError = (await res.text()) || `Upload failed (${res.status}).`;
+				return;
+			}
+			const data = await res.json();
+			const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '');
+			insertBlock(`![${alt}](${data.url})`);
+		} catch (err) {
+			uploadError = err instanceof Error ? err.message : 'Upload failed.';
+		} finally {
+			uploadingImage = false;
+		}
+	}
+
+	function pickImage() {
+		uploadError = '';
+		imageInput?.click();
+	}
+
+	function openLibrary() {
+		uploadError = '';
+		pickerOpen = true;
+	}
+
+	function onLibraryPick(upload: { url: string }) {
+		insertBlock(`![](${upload.url})`);
+	}
+
+	async function onImageSelected(event: Event) {
+		const target = event.currentTarget as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+		await uploadImageFile(file);
+		// Reset so picking the same file again still fires `change`.
+		target.value = '';
+	}
+
+	function onTextareaDragEnter(event: DragEvent) {
+		if (!event.dataTransfer?.types.includes('Files')) return;
+		event.preventDefault();
+		dragActive = true;
+	}
+
+	function onTextareaDragOver(event: DragEvent) {
+		if (!event.dataTransfer?.types.includes('Files')) return;
+		event.preventDefault();
+		dragActive = true;
+	}
+
+	function onTextareaDragLeave(event: DragEvent) {
+		// Only clear when leaving the textarea entirely (not bubbling between children).
+		if (event.currentTarget === event.target) dragActive = false;
+	}
+
+	async function onTextareaDrop(event: DragEvent) {
+		if (!event.dataTransfer?.files?.length) return;
+		event.preventDefault();
+		dragActive = false;
+		const file = event.dataTransfer.files[0];
+		if (!file.type.startsWith('image/')) {
+			uploadError = 'Drop an image file (PNG, JPEG, WebP, or GIF).';
+			return;
+		}
+		await uploadImageFile(file);
+	}
+
 	async function refreshPreview() {
 		const now = Date.now();
 		lastPreviewedAt = now;
@@ -179,6 +260,30 @@
 		<button type="button" class="tb-btn" onclick={() => insertAtLineStart('> ')} title="Quote">&gt;</button>
 		<button type="button" class="tb-btn" onclick={() => wrapSelection('`', '`', 'code')} title="Inline code">&lt;/&gt;</button>
 		<button type="button" class="tb-btn" onclick={insertLink} title="Link">Link</button>
+		<button
+			type="button"
+			class="tb-btn"
+			onclick={pickImage}
+			disabled={uploadingImage}
+			title="Upload an image"
+		>
+			{uploadingImage ? '⇪ Uploading…' : '🖼 Image'}
+		</button>
+		<button
+			type="button"
+			class="tb-btn"
+			onclick={openLibrary}
+			title="Pick from your previously uploaded images"
+		>
+			📁 Library
+		</button>
+		<input
+			bind:this={imageInput}
+			type="file"
+			accept="image/png,image/jpeg,image/webp,image/gif"
+			class="hidden"
+			onchange={onImageSelected}
+		/>
 		<span class="tb-sep"></span>
 		<button type="button" class="tb-btn" onclick={insertYoutube} title="Insert YouTube video">▶ YouTube</button>
 		<button type="button" class="tb-btn" onclick={() => insertCallout('info')} title="Info callout">ⓘ Info</button>
@@ -194,13 +299,25 @@
 		</button>
 	</div>
 
+	{#if uploadError}
+		<p class="mb-2 rounded-sm bg-[var(--hud-lime)]/10 p-2 text-xs text-[var(--hud-lime)]">
+			{uploadError}
+		</p>
+	{/if}
+
 	<div class={showPreview ? 'grid gap-3 md:grid-cols-2' : ''}>
 		<textarea
 			bind:this={textarea}
 			bind:value
 			{placeholder}
-			class="min-h-[420px] w-full resize-y rounded-sm bg-[var(--hud-inset)] p-3 font-mono text-sm leading-6 text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+			class="hud-input min-h-[420px] w-full resize-y rounded-sm p-3 font-mono text-sm leading-6 {dragActive
+				? 'shadow-[inset_0_0_0_2px_var(--hud-teal)]'
+				: ''}"
 			spellcheck="true"
+			ondragenter={onTextareaDragEnter}
+			ondragover={onTextareaDragOver}
+			ondragleave={onTextareaDragLeave}
+			ondrop={onTextareaDrop}
 		></textarea>
 
 		{#if showPreview}
@@ -225,6 +342,8 @@
 		{/if}
 	</div>
 </div>
+
+<ImagePicker bind:open={pickerOpen} onPick={onLibraryPick} />
 
 <style>
 	.tb-btn {

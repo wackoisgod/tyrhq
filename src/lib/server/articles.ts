@@ -18,6 +18,7 @@ export interface ArticleSummary {
 	updatedAt: string;
 	flyoutSection: FlyoutSection | null;
 	flyoutOrder: number | null;
+	heroImageUrl: string | null;
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -52,10 +53,11 @@ interface ArticleRow {
 	current_revision_id: string | null;
 	flyout_section: string | null;
 	flyout_order: number | null;
+	hero_image_url: string | null;
 }
 
 const SUMMARY_COLUMNS =
-	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order';
+	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order, hero_image_url';
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
 
 function resolveAuthorDisplay(row: ArticleRow): string | null {
@@ -79,7 +81,8 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		publishedAt: row.published_at ?? row.updated_at,
 		updatedAt: row.updated_at,
 		flyoutSection: row.flyout_section as FlyoutSection | null,
-		flyoutOrder: row.flyout_order
+		flyoutOrder: row.flyout_order,
+		heroImageUrl: row.hero_image_url
 	};
 }
 

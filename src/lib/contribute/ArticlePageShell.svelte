@@ -22,6 +22,7 @@
 			publishedAt: string;
 			authorDisplay: string | null;
 			bodyHtml: string;
+			heroImageUrl?: string | null;
 		};
 		vehicles?: Vehicle[];
 		backHref: string;
@@ -103,6 +104,16 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if article.heroImageUrl}
+		<img
+			src={article.heroImageUrl}
+			alt=""
+			loading="eager"
+			decoding="async"
+			class="mt-8 w-full rounded-sm bg-[var(--hud-inset)] object-cover"
+		/>
+	{/if}
 
 	<div class="mt-8">
 		<ArticleBody html={article.bodyHtml} />

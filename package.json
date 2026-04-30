@@ -35,6 +35,8 @@
 		"@sveltejs/adapter-vercel": "^6.3.3",
 		"@threlte/core": "^8.5.9",
 		"@threlte/extras": "^9.14.9",
+		"@types/diff": "^7.0.2",
+		"diff": "^9.0.0",
 		"fast-xml-parser": "^5.7.2",
 		"rehype-sanitize": "^6.0.0",
 		"rehype-stringify": "^10.0.0",

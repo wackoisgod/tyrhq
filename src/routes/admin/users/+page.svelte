@@ -198,7 +198,7 @@
 												u.id,
 												e.currentTarget.value as 'user' | 'contributor' | 'admin'
 											)}
-										class="rounded-sm bg-[var(--hud-inset)] px-2 py-1 text-xs text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-50"
+										class="hud-input rounded-sm px-2 py-1 text-xs disabled:opacity-50"
 									>
 										<option value="user">User</option>
 										<option value="contributor">Reviewer</option>
@@ -234,7 +234,7 @@
 				bind:value={searchQuery}
 				placeholder="email or callsign…"
 				autocomplete="off"
-				class="min-w-[260px] flex-1 rounded-sm bg-[var(--hud-inset)] px-3 py-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+				class="hud-input min-w-[260px] flex-1 rounded-sm px-3 py-2 text-sm"
 			/>
 			<button
 				type="submit"
@@ -311,7 +311,7 @@
 												u.id,
 												e.currentTarget.value as 'user' | 'contributor' | 'admin'
 											)}
-										class="rounded-sm bg-[var(--hud-inset)] px-2 py-1 text-xs text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-50"
+										class="hud-input rounded-sm px-2 py-1 text-xs disabled:opacity-50"
 									>
 										<option value="user">User</option>
 										<option value="contributor">Reviewer</option>

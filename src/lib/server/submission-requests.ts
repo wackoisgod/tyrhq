@@ -17,7 +17,11 @@ export const submissionDraftSchema = z
 		tags: z.array(z.string()).max(20).optional(),
 		vehicleSlugs: z.array(z.string()).max(20).nullable().optional(),
 		parentArticleId: z.string().uuid().nullable().optional(),
-		flyoutSection: flyoutSectionSchema
+		flyoutSection: flyoutSectionSchema,
+		// Full https URL of an uploaded image. The bucket-prefix check happens
+		// in `assertHeroImageUrl` once we have the env-derived prefix; we just
+		// shape-check here.
+		heroImageUrl: z.string().url().max(1024).nullable().optional()
 	})
 	.strict();
 

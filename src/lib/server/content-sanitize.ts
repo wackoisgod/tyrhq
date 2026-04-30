@@ -9,6 +9,7 @@ import rehypeStringify from 'rehype-stringify';
 import { visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
 import type { Node } from 'unist';
+import { env as publicEnv } from '$env/dynamic/public';
 
 export const CALLOUT_TYPES = ['info', 'warning', 'tip'] as const;
 export type CalloutType = (typeof CALLOUT_TYPES)[number];
@@ -124,17 +125,72 @@ function validateAggroDirectives() {
 }
 
 /**
+ * Restrict <img src> to our own storage bucket. Inline body images come from
+ * the upload endpoint, which only writes to `article-images/` under
+ * PUBLIC_SUPABASE_URL — anything else (imgur hotlinks, raw HTML <img> tags
+ * pasted into markdown) is a content-validation error.
+ *
+ * Also strips srcset (we don't generate it; it's an injection vector if
+ * accepted blindly) and forces lazy loading + async decoding for everything
+ * we accept.
+ */
+function validateImageSources(allowedPrefix: string) {
+	return (tree: Root) => {
+		visit(tree as unknown as Node, 'element', (node: Node) => {
+			const el = node as Node & {
+				tagName?: string;
+				properties?: Record<string, unknown> | null;
+			};
+			if (el.tagName !== 'img') return;
+			const props = (el.properties ?? {}) as Record<string, unknown>;
+			const src = typeof props.src === 'string' ? props.src : null;
+			if (!src || !allowedPrefix || !src.startsWith(allowedPrefix)) {
+				throw new ContentValidationError(
+					'body',
+					'Images must be uploaded via the editor — external URLs are not allowed.'
+				);
+			}
+			delete props.srcSet;
+			delete props.srcset;
+			props.loading = 'lazy';
+			props.decoding = 'async';
+			el.properties = props;
+		});
+	};
+}
+
+const ARTICLE_IMAGE_BUCKET_PATH = '/storage/v1/object/public/article-images/';
+
+/**
+ * Returns the public URL prefix every uploaded image must start with. Reads
+ * lazily so test code can run without `PUBLIC_SUPABASE_URL` set (unit tests
+ * pass an explicit prefix to `sanitizeArticleBody`).
+ */
+export function getArticleImageHostPrefix(): string {
+	const base = publicEnv.PUBLIC_SUPABASE_URL;
+	if (!base) return '';
+	try {
+		return new URL(ARTICLE_IMAGE_BUCKET_PATH, base).toString();
+	} catch {
+		return '';
+	}
+}
+
+/**
  * Hardened HAST sanitizer schema. Starts from rehype's default (which is the GitHub
  * sanitize schema — already strict, no `<script>`, no `on*` attributes) and adds our
- * two custom elements.
+ * two custom elements plus an explicit allow-list for `<img>` attributes (the
+ * source itself is gated by `validateImageSources` upstream).
  */
 function buildSanitizeSchema(): Schema {
 	const tagNames = new Set([...(defaultSchema.tagNames ?? []), 'aggro-youtube', 'aggro-callout']);
+	if (!tagNames.has('img')) tagNames.add('img');
 
 	const attributes: Schema['attributes'] = {
 		...(defaultSchema.attributes ?? {}),
 		'aggro-youtube': [['data-id'], ['data-title']],
-		'aggro-callout': [['data-type'], ['data-title']]
+		'aggro-callout': [['data-type'], ['data-title']],
+		img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding']
 	};
 
 	return {
@@ -148,13 +204,26 @@ function buildSanitizeSchema(): Schema {
 
 const sanitizeSchema = buildSanitizeSchema();
 
-const processor = unified()
-	.use(remarkParse)
-	.use(remarkDirective)
-	.use(validateAggroDirectives)
-	.use(remarkRehype, { allowDangerousHtml: false })
-	.use(rehypeSanitize, sanitizeSchema)
-	.use(rehypeStringify);
+function buildProcessor(imageHostPrefix: string) {
+	return unified()
+		.use(remarkParse)
+		.use(remarkDirective)
+		.use(validateAggroDirectives)
+		.use(remarkRehype, { allowDangerousHtml: false })
+		.use(validateImageSources, imageHostPrefix)
+		.use(rehypeSanitize, sanitizeSchema)
+		.use(rehypeStringify);
+}
+
+let cachedProcessor: ReturnType<typeof buildProcessor> | null = null;
+let cachedProcessorPrefix: string | null = null;
+
+function getProcessor(imageHostPrefix: string) {
+	if (cachedProcessor && cachedProcessorPrefix === imageHostPrefix) return cachedProcessor;
+	cachedProcessor = buildProcessor(imageHostPrefix);
+	cachedProcessorPrefix = imageHostPrefix;
+	return cachedProcessor;
+}
 
 export interface SanitizeResult {
 	html: string;
@@ -163,11 +232,19 @@ export interface SanitizeResult {
 
 /**
  * Render community markdown to safe HTML. Throws ContentValidationError on
- * unknown directives or malformed attributes — the caller surfaces these to
- * the contributor with a field-specific error.
+ * unknown directives, malformed attributes, or images sourced outside our
+ * storage bucket — the caller surfaces these to the contributor with a
+ * field-specific error.
+ *
+ * `imageHostPrefix` overrides the env-derived default; tests use this to
+ * exercise image rules without needing PUBLIC_SUPABASE_URL set.
  */
-export async function sanitizeArticleBody(markdown: string): Promise<SanitizeResult> {
-	const file = await processor.process(markdown);
+export async function sanitizeArticleBody(
+	markdown: string,
+	options: { imageHostPrefix?: string } = {}
+): Promise<SanitizeResult> {
+	const imageHostPrefix = options.imageHostPrefix ?? getArticleImageHostPrefix();
+	const file = await getProcessor(imageHostPrefix).process(markdown);
 	const html = String(file);
 
 	// Cheap word count for length validation (server-rendered, so we count after
@@ -295,7 +372,8 @@ export function sanitizeFrontmatter(input: ArticleFrontmatterInput): SanitizedFr
 
 export function computeContentHash(
 	frontmatter: SanitizedFrontmatter,
-	bodyHtml: string
+	bodyHtml: string,
+	heroImageUrl: string | null = null
 ): string {
 	const payload = JSON.stringify({
 		type: frontmatter.type,
@@ -305,9 +383,37 @@ export function computeContentHash(
 		tags: frontmatter.tags,
 		vehicleSlugs: frontmatter.vehicleSlugs,
 		authorDisplay: frontmatter.authorDisplay,
-		bodyHtml
+		bodyHtml,
+		heroImageUrl
 	});
 	return createHash('sha256').update(payload).digest('hex');
+}
+
+/**
+ * Validate a hero/thumbnail URL against the same bucket-prefix rule that
+ * `validateImageSources` enforces for inline body images. Returns the
+ * trimmed URL, or null when the input is empty.
+ *
+ * Pass `imageHostPrefix` to override the env-derived default (used by tests).
+ */
+export function assertHeroImageUrl(
+	value: string | null | undefined,
+	imageHostPrefix?: string
+): string | null {
+	if (value === null || value === undefined) return null;
+	const trimmed = String(value).trim();
+	if (!trimmed) return null;
+	if (trimmed.length > 1024) {
+		throw new ContentValidationError('heroImageUrl', 'Hero image URL is too long.');
+	}
+	const prefix = imageHostPrefix ?? getArticleImageHostPrefix();
+	if (!prefix || !trimmed.startsWith(prefix)) {
+		throw new ContentValidationError(
+			'heroImageUrl',
+			'Hero image must be uploaded via the editor — external URLs are not allowed.'
+		);
+	}
+	return trimmed;
 }
 
 export const BODY_MIN_CHARS = 200;

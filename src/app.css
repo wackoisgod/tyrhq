@@ -508,6 +508,31 @@ input[type="radio"] {
 	border: none;
 }
 
+/*
+ * Field boundary for inputs/textareas/selects sitting on the dark inset
+ * background. Without an idle ghost-border the field is nearly invisible
+ * against `--hud-panel`. Focus state escalates to the teal accent.
+ */
+.hud-input {
+	background: var(--hud-inset);
+	color: var(--hud-text);
+	box-shadow: inset 0 0 0 1px rgba(160, 170, 217, 0.18);
+	outline: none;
+	transition: box-shadow 0.15s ease;
+}
+.hud-input::placeholder {
+	color: rgba(160, 170, 217, 0.42);
+}
+.hud-input:hover:not(:focus):not(:disabled) {
+	box-shadow: inset 0 0 0 1px rgba(160, 170, 217, 0.32);
+}
+.hud-input:focus {
+	box-shadow: inset 0 0 0 1px var(--hud-teal);
+}
+.hud-input:disabled {
+	opacity: 0.6;
+}
+
 .settings-tabs {
 	display: flex;
 	flex-wrap: wrap;

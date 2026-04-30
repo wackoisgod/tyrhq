@@ -6,8 +6,13 @@ import {
 	slugify,
 	computeContentHash,
 	assertBodyLength,
+	assertHeroImageUrl,
 	BODY_MIN_CHARS
 } from './content-sanitize';
+
+// Tests that exercise image rules pass an explicit prefix so they don't
+// depend on PUBLIC_SUPABASE_URL being set in the test environment.
+const TEST_IMAGE_PREFIX = 'https://example.test/storage/v1/object/public/article-images/';
 
 describe('sanitizeArticleBody', () => {
 	it('renders ordinary markdown to safe HTML', async () => {
@@ -23,7 +28,10 @@ describe('sanitizeArticleBody', () => {
 	});
 
 	it('drops on* event handler attributes', async () => {
-		const { html } = await sanitizeArticleBody('<img src="x" onerror="alert(1)">');
+		const { html } = await sanitizeArticleBody(
+			`<img src="${TEST_IMAGE_PREFIX}x.png" onerror="alert(1)">`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
 		expect(html).not.toContain('onerror');
 	});
 
@@ -160,5 +168,86 @@ describe('assertBodyLength', () => {
 
 	it('accepts a body at exactly the minimum', () => {
 		expect(() => assertBodyLength('a'.repeat(BODY_MIN_CHARS))).not.toThrow();
+	});
+});
+
+describe('image source validation', () => {
+	it('accepts markdown images that point at the configured bucket', async () => {
+		const { html } = await sanitizeArticleBody(
+			`![ok](${TEST_IMAGE_PREFIX}2026/04/abc.png)`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
+		expect(html).toContain('<img');
+		expect(html).toContain(`src="${TEST_IMAGE_PREFIX}2026/04/abc.png"`);
+	});
+
+	it('forces lazy loading and async decoding on accepted images', async () => {
+		const { html } = await sanitizeArticleBody(
+			`![ok](${TEST_IMAGE_PREFIX}x.png)`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
+		expect(html).toContain('loading="lazy"');
+		expect(html).toContain('decoding="async"');
+	});
+
+	it('rejects markdown images with an external URL', async () => {
+		await expect(
+			sanitizeArticleBody('![bad](https://imgur.com/abc.png)', {
+				imageHostPrefix: TEST_IMAGE_PREFIX
+			})
+		).rejects.toThrow(/uploaded via the editor/);
+	});
+
+	it('rejects images when no host prefix is configured', async () => {
+		await expect(
+			sanitizeArticleBody(`![nope](${TEST_IMAGE_PREFIX}x.png)`, { imageHostPrefix: '' })
+		).rejects.toThrow(ContentValidationError);
+	});
+
+	it('strips srcset from accepted img tags', async () => {
+		const { html } = await sanitizeArticleBody(
+			`<img src="${TEST_IMAGE_PREFIX}x.png" srcset="${TEST_IMAGE_PREFIX}y.png 2x">`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
+		expect(html).not.toMatch(/srcset/i);
+	});
+});
+
+describe('assertHeroImageUrl', () => {
+	it('returns null for empty input', () => {
+		expect(assertHeroImageUrl(null, TEST_IMAGE_PREFIX)).toBeNull();
+		expect(assertHeroImageUrl('', TEST_IMAGE_PREFIX)).toBeNull();
+		expect(assertHeroImageUrl('   ', TEST_IMAGE_PREFIX)).toBeNull();
+	});
+
+	it('accepts URLs under the configured prefix', () => {
+		const url = `${TEST_IMAGE_PREFIX}2026/04/hero.jpg`;
+		expect(assertHeroImageUrl(url, TEST_IMAGE_PREFIX)).toBe(url);
+	});
+
+	it('rejects external URLs', () => {
+		expect(() => assertHeroImageUrl('https://imgur.com/h.png', TEST_IMAGE_PREFIX)).toThrow(
+			ContentValidationError
+		);
+	});
+
+	it('rejects when no prefix is configured', () => {
+		expect(() => assertHeroImageUrl(`${TEST_IMAGE_PREFIX}x.png`, '')).toThrow(
+			ContentValidationError
+		);
+	});
+
+	it('rejects implausibly long URLs', () => {
+		const longUrl = TEST_IMAGE_PREFIX + 'x'.repeat(2000) + '.png';
+		expect(() => assertHeroImageUrl(longUrl, TEST_IMAGE_PREFIX)).toThrow(/too long/);
+	});
+});
+
+describe('computeContentHash with hero image', () => {
+	it('changes when the hero image url changes', () => {
+		const fm = sanitizeFrontmatter({ type: 'guide', title: 'Foo' });
+		const a = computeContentHash(fm, '<p>x</p>', null);
+		const b = computeContentHash(fm, '<p>x</p>', `${TEST_IMAGE_PREFIX}h.png`);
+		expect(a).not.toBe(b);
 	});
 });

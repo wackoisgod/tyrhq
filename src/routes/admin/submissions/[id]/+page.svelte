@@ -8,6 +8,7 @@
 	let notes = $state('');
 	let busy = $state(false);
 	let error = $state('');
+	let diffView = $state<'inline' | 'side-by-side'>('inline');
 	// Default the override fields to whatever the contributor proposed (or
 	// whatever the admin previously set). Admin can change before approving.
 	/* svelte-ignore state_referenced_locally */
@@ -98,6 +99,19 @@
 		<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{data.submission.summary}</p>
 	{/if}
 
+	{#if data.submission.hero_image_url}
+		<div class="mt-4 flex flex-wrap items-center gap-3">
+			<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+				Hero image
+			</span>
+			<img
+				src={data.submission.hero_image_url}
+				alt=""
+				class="max-h-24 rounded-sm bg-[var(--hud-inset)] object-cover"
+			/>
+		</div>
+	{/if}
+
 	{#if data.renderError}
 		<div
 			class="mt-4 rounded-sm bg-[var(--hud-lime)]/10 p-3 text-sm text-[var(--hud-lime)]"
@@ -107,28 +121,147 @@
 		</div>
 	{/if}
 
-	{#if data.parentArticle}
-		<div class="mt-8 grid gap-6 md:grid-cols-2">
-			<div>
+	{#if data.parentArticle && data.diff}
+		{#if data.diff.fieldDeltas.length > 0}
+			<div
+				class="mt-8 rounded-sm bg-[var(--hud-panel)] p-4"
+				style="box-shadow: var(--hud-surface-ghost);"
+			>
 				<div
-					class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+					class="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 				>
-					Currently published
+					Field changes
 				</div>
-				<div class="rounded-sm bg-[var(--hud-panel)] p-4" style="box-shadow: var(--hud-surface-ghost);">
-					<ArticleBody html={data.parentArticle.bodyHtml} />
-				</div>
+				<dl class="grid gap-3 text-sm">
+					{#each data.diff.fieldDeltas as delta (delta.field)}
+						<div class="grid gap-1 md:grid-cols-[140px_1fr] md:items-baseline">
+							<dt
+								class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-muted)]"
+							>
+								{delta.label}
+							</dt>
+							<dd class="diff-field">
+								{#if delta.kind === 'list'}
+									<div class="flex flex-wrap gap-1.5">
+										{#each delta.removed as tag}
+											<span class="diff-chip diff-chip-del">−{tag}</span>
+										{/each}
+										{#each delta.added as tag}
+											<span class="diff-chip diff-chip-add">+{tag}</span>
+										{/each}
+									</div>
+								{:else if delta.field === 'heroImageUrl'}
+									<div class="flex flex-wrap items-center gap-3">
+										{#if delta.before}
+											<figure class="diff-hero diff-hero-del">
+												<img src={delta.before} alt="" />
+												<figcaption>before</figcaption>
+											</figure>
+										{/if}
+										{#if delta.after}
+											<figure class="diff-hero diff-hero-add">
+												<img src={delta.after} alt="" />
+												<figcaption>after</figcaption>
+											</figure>
+										{/if}
+									</div>
+								{:else}
+									<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+										{#if delta.before}
+											<span class="diff-token diff-token-del">{delta.before}</span>
+										{/if}
+										{#if delta.after}
+											<span class="diff-token diff-token-add">{delta.after}</span>
+										{/if}
+									</div>
+								{/if}
+							</dd>
+						</div>
+					{/each}
+				</dl>
 			</div>
-			<div>
-				<div
-					class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
-				>
-					Proposed
+		{/if}
+
+		<div class="mt-8">
+			<div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+				<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+					Body changes
+					{#if !data.diff.bodyChanged}
+						<span class="ml-2 normal-case tracking-normal text-[var(--hud-muted)]">
+							(no body changes)
+						</span>
+					{/if}
 				</div>
-				<div class="rounded-sm bg-[var(--hud-panel)] p-4" style="box-shadow: var(--hud-surface-ghost);">
+				{#if data.diff.bodyChanged}
+					<div class="flex gap-1 text-[10px] font-semibold uppercase tracking-[0.18em]">
+						<button
+							type="button"
+							class="diff-toggle"
+							class:is-active={diffView === 'inline'}
+							onclick={() => (diffView = 'inline')}
+						>
+							Inline diff
+						</button>
+						<button
+							type="button"
+							class="diff-toggle"
+							class:is-active={diffView === 'side-by-side'}
+							onclick={() => (diffView = 'side-by-side')}
+						>
+							Side-by-side
+						</button>
+					</div>
+				{/if}
+			</div>
+
+			{#if !data.diff.bodyChanged}
+				<div
+					class="rounded-sm bg-[var(--hud-panel)] p-4"
+					style="box-shadow: var(--hud-surface-ghost);"
+				>
 					<ArticleBody html={data.renderedHtml} />
 				</div>
-			</div>
+			{:else if diffView === 'inline'}
+				<div
+					class="rounded-sm bg-[var(--hud-panel)] p-4"
+					style="box-shadow: var(--hud-surface-ghost);"
+				>
+					<pre class="diff-body"><!--
+					-->{#each data.diff.bodyChunks as chunk, i (i)}{#if chunk.kind === 'add'}<span
+									class="diff-add">{chunk.value}</span
+								>{:else if chunk.kind === 'del'}<span class="diff-del">{chunk.value}</span
+								>{:else}{chunk.value}{/if}{/each}</pre>
+				</div>
+			{:else}
+				<div class="grid gap-6 md:grid-cols-2">
+					<div>
+						<div
+							class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+						>
+							Currently published
+						</div>
+						<div
+							class="rounded-sm bg-[var(--hud-panel)] p-4"
+							style="box-shadow: var(--hud-surface-ghost);"
+						>
+							<ArticleBody html={data.parentArticle.bodyHtml} />
+						</div>
+					</div>
+					<div>
+						<div
+							class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Proposed
+						</div>
+						<div
+							class="rounded-sm bg-[var(--hud-panel)] p-4"
+							style="box-shadow: var(--hud-surface-ghost);"
+						>
+							<ArticleBody html={data.renderedHtml} />
+						</div>
+					</div>
+				</div>
+			{/if}
 		</div>
 	{:else}
 		<div class="mt-8 rounded-sm bg-[var(--hud-panel)] p-4" style="box-shadow: var(--hud-surface-ghost);">
@@ -147,7 +280,7 @@
 			id="notes"
 			bind:value={notes}
 			rows="3"
-			class="mt-2 w-full rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+			class="hud-input mt-2 w-full rounded-sm p-2 text-sm"
 			placeholder="Visible to the contributor."
 		></textarea>
 
@@ -166,7 +299,7 @@
 				<select
 					id="flyoutSection"
 					bind:value={flyoutSection}
-					class="mt-2 w-full rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)]"
+					class="hud-input mt-2 w-full rounded-sm p-2 text-sm"
 				>
 					<option value="">— None —</option>
 					{#each FLYOUT_SECTIONS as section}
@@ -193,7 +326,7 @@
 					step="1"
 					placeholder="0"
 					disabled={!flyoutSection}
-					class="mt-2 w-full rounded-sm bg-[var(--hud-inset)] p-2 text-sm text-[var(--hud-text)] outline-none focus:shadow-[inset_0_0_0_1px_var(--hud-teal)] disabled:opacity-40"
+					class="hud-input mt-2 w-full rounded-sm p-2 text-sm disabled:opacity-40"
 				/>
 				<p class="mt-1 text-[11px] text-[var(--hud-dim)]">Lower = earlier.</p>
 			</div>
@@ -233,3 +366,127 @@
 		</div>
 	</div>
 </section>
+
+<style>
+	.diff-body {
+		margin: 0;
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-size: 0.8125rem;
+		line-height: 1.65;
+		color: var(--hud-muted);
+		white-space: pre-wrap;
+		word-wrap: break-word;
+		max-height: 70vh;
+		overflow-y: auto;
+	}
+
+	.diff-add {
+		background: rgba(98, 232, 132, 0.18);
+		color: #b8ffce;
+		box-shadow: inset 0 -1px 0 0 rgba(98, 232, 132, 0.6);
+		border-radius: 1px;
+		padding: 0 1px;
+	}
+
+	.diff-del {
+		background: rgba(255, 92, 122, 0.16);
+		color: #ffb0bf;
+		text-decoration: line-through;
+		text-decoration-color: rgba(255, 92, 122, 0.7);
+		border-radius: 1px;
+		padding: 0 1px;
+	}
+
+	.diff-toggle {
+		padding: 0.35rem 0.75rem;
+		color: var(--hud-dim);
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 2px;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s, background 0.15s;
+	}
+	.diff-toggle:hover {
+		color: var(--hud-text);
+	}
+	.diff-toggle.is-active {
+		color: var(--hud-teal);
+		border-color: var(--hud-teal);
+		background: rgba(153, 247, 255, 0.08);
+	}
+
+	.diff-token {
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-size: 0.8125rem;
+		padding: 0.1rem 0.35rem;
+		border-radius: 2px;
+		word-break: break-word;
+	}
+	.diff-token-del {
+		background: rgba(255, 92, 122, 0.16);
+		color: #ffb0bf;
+		text-decoration: line-through;
+		text-decoration-color: rgba(255, 92, 122, 0.7);
+	}
+	.diff-token-add {
+		background: rgba(98, 232, 132, 0.18);
+		color: #b8ffce;
+		box-shadow: inset 0 -1px 0 0 rgba(98, 232, 132, 0.6);
+	}
+
+	.diff-chip {
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-size: 0.75rem;
+		padding: 0.1rem 0.4rem;
+		border-radius: 2px;
+		letter-spacing: 0.02em;
+	}
+	.diff-chip-del {
+		background: rgba(255, 92, 122, 0.16);
+		color: #ffb0bf;
+		text-decoration: line-through;
+		text-decoration-color: rgba(255, 92, 122, 0.7);
+	}
+	.diff-chip-add {
+		background: rgba(98, 232, 132, 0.18);
+		color: #b8ffce;
+	}
+
+	.diff-hero {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 4px;
+		border-radius: 2px;
+	}
+	.diff-hero img {
+		max-height: 80px;
+		max-width: 140px;
+		border-radius: 2px;
+		object-fit: cover;
+		display: block;
+	}
+	.diff-hero figcaption {
+		font-size: 9px;
+		text-transform: uppercase;
+		letter-spacing: 0.16em;
+		text-align: center;
+	}
+	.diff-hero-del {
+		background: rgba(255, 92, 122, 0.12);
+	}
+	.diff-hero-del figcaption {
+		color: #ffb0bf;
+	}
+	.diff-hero-del img {
+		filter: grayscale(0.5);
+		opacity: 0.7;
+	}
+	.diff-hero-add {
+		background: rgba(98, 232, 132, 0.12);
+	}
+	.diff-hero-add figcaption {
+		color: #b8ffce;
+	}
+</style>

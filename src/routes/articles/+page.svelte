@@ -32,36 +32,47 @@
 			{#each data.posts as post}
 				<a
 					href="/articles/{post.slug}"
-					class="rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					class="flex gap-5 rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
 					style="box-shadow: var(--hud-surface-ghost);"
 				>
-					<div class="flex flex-wrap items-center gap-3">
-						<span
-							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+					{#if post.heroImageUrl}
+						<img
+							src={post.heroImageUrl}
+							alt=""
+							loading="lazy"
+							decoding="async"
+							class="h-28 w-40 flex-shrink-0 rounded-sm bg-[var(--hud-inset)] object-cover"
+						/>
+					{/if}
+					<div class="min-w-0 flex-1">
+						<div class="flex flex-wrap items-center gap-3">
+							<span
+								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+							>
+								{formatDate(post.publishedAt)}
+							</span>
+							{#if post.tags?.length}
+								{#each post.tags as tag}
+									<span
+										class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+									>
+										{tag}
+									</span>
+								{/each}
+							{/if}
+						</div>
+						<h2
+							class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]"
 						>
-							{formatDate(post.publishedAt)}
-						</span>
-						{#if post.tags?.length}
-							{#each post.tags as tag}
-								<span
-									class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
-								>
-									{tag}
-								</span>
-							{/each}
+							{post.title}
+						</h2>
+						{#if post.summary}
+							<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{post.summary}</p>
+						{/if}
+						{#if post.authorDisplay}
+							<p class="mt-3 text-xs text-[var(--hud-dim)]">By {post.authorDisplay}</p>
 						{/if}
 					</div>
-					<h2
-						class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]"
-					>
-						{post.title}
-					</h2>
-					{#if post.summary}
-						<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">{post.summary}</p>
-					{/if}
-					{#if post.authorDisplay}
-						<p class="mt-3 text-xs text-[var(--hud-dim)]">By {post.authorDisplay}</p>
-					{/if}
 				</a>
 			{/each}
 		</div>
