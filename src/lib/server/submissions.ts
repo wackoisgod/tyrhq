@@ -230,6 +230,20 @@ export async function listSubmissionsForUser(userId: string): Promise<Submission
 	return (data as SubmissionRecord[]) ?? [];
 }
 
+export async function countPendingReviewSubmissions(): Promise<number> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) return 0;
+	const { count, error } = await admin
+		.from('article_submissions')
+		.select('id', { head: true, count: 'exact' })
+		.eq('status', 'pending');
+	if (error) {
+		console.error('[submissions] countPendingReviewSubmissions failed', error);
+		return 0;
+	}
+	return count ?? 0;
+}
+
 export async function listPendingSubmissions(): Promise<SubmissionRecord[]> {
 	const admin = requireAdmin();
 	const { data, error } = await admin
@@ -292,7 +306,7 @@ export async function updateDraftSubmission(
 	if (existing.submitter_id !== submitterId) {
 		throw new SubmissionStateError('You cannot edit another contributor’s submission.', 403);
 	}
-	if (!['draft', 'changes_requested'].includes(existing.status)) {
+	if (!['draft', 'changes_requested', 'rejected'].includes(existing.status)) {
 		throw new SubmissionStateError(
 			`Submission cannot be edited while status is "${existing.status}".`,
 			409
@@ -309,6 +323,9 @@ export async function updateDraftSubmission(
 		return existing;
 	}
 
+	// any meaningful edit on a "changes_requested" or "rejected" returns to draft
+	const reopens = existing.status === 'changes_requested' || existing.status === 'rejected';
+
 	const { data, error } = await admin
 		.from('article_submissions')
 		.update({
@@ -321,8 +338,7 @@ export async function updateDraftSubmission(
 			tags: sanitized.frontmatter.tags,
 			vehicle_slugs: sanitized.frontmatter.vehicleSlugs,
 			content_hash: sanitized.contentHash,
-			// any meaningful edit on a "changes_requested" returns to draft
-			status: existing.status === 'changes_requested' ? 'draft' : existing.status,
+			status: reopens ? 'draft' : existing.status,
 			flyout_section: input.flyoutSection ?? null,
 			hero_image_url: sanitized.heroImageUrl
 		})
@@ -351,7 +367,7 @@ export async function submitForReview(
 	if (existing.submitter_id !== submitterId) {
 		throw new SubmissionStateError('You cannot submit another contributor’s draft.', 403);
 	}
-	if (!['draft', 'changes_requested'].includes(existing.status)) {
+	if (!['draft', 'changes_requested', 'rejected'].includes(existing.status)) {
 		throw new SubmissionStateError(
 			`Submission is already in status "${existing.status}".`,
 			409

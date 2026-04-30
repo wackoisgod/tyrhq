@@ -55,6 +55,16 @@
 				<div>{siteCopy.title}</div>
 				<div class="tyr-topbar__center">{siteCopy.tagline}</div>
 				<div class="tyr-topbar__right">
+					{#if data.pendingReviewCount > 0}
+						<a
+							href="/admin/submissions"
+							class="tyr-review-pill"
+							aria-label="{data.pendingReviewCount} submission{data.pendingReviewCount === 1 ? '' : 's'} awaiting review"
+						>
+							<span class="tyr-review-pill__label">Review</span>
+							<span class="tyr-review-pill__count">{data.pendingReviewCount}</span>
+						</a>
+					{/if}
 					<a
 						href={data.user ? '/settings' : '/auth'}
 						class="tyr-account-chip"

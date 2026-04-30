@@ -133,7 +133,7 @@
 									href="/contribute/{submission.id}/edit"
 									class="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
 								>
-									{submission.status === 'rejected' ? 'View' : 'Edit'} →
+									Edit →
 								</a>
 							{/if}
 							{#if DELETABLE.has(submission.status)}

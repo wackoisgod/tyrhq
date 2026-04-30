@@ -222,7 +222,10 @@
 	}
 
 	const editable = $derived(
-		!status || status === 'draft' || status === 'changes_requested'
+		!status ||
+			status === 'draft' ||
+			status === 'changes_requested' ||
+			status === 'rejected'
 	);
 </script>
 
@@ -267,6 +270,9 @@
 			{#if reviewNotes}
 				<p class="mt-1 whitespace-pre-wrap">{reviewNotes}</p>
 			{/if}
+			<p class="mt-2 text-xs text-[var(--hud-muted)]">
+				You can revise this draft and resubmit for review.
+			</p>
 		</div>
 	{:else if status === 'published'}
 		<div
