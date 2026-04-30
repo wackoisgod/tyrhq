@@ -20,6 +20,7 @@
 		TALENT_POINTS_REQUIRED_PER_TIER_STEP
 	} from '$lib/game-engine/build';
 	import {
+		fillComponentDescription,
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
@@ -1135,7 +1136,7 @@
 													<span class="text-[9px] uppercase tracking-wider text-[var(--hud-dim)]">{formatComponentCategory(picked.category)}</span>
 												</div>
 												<p class="mt-1.5 text-xs leading-relaxed text-[var(--hud-muted)]">
-													{plainComponentDescription(picked.description)}
+													{fillComponentDescription(picked.description, picked.pointValues)}
 												</p>
 											</div>
 										{/if}
@@ -1574,9 +1575,9 @@
 											</span>
 											<p
 												class="mt-2 flex-1 text-xs leading-relaxed text-[var(--hud-muted)] line-clamp-4 sm:line-clamp-5"
-												title={plainComponentDescription(component.description)}
+												title={fillComponentDescription(component.description, component.pointValues)}
 											>
-												{plainComponentDescription(component.description)}
+												{fillComponentDescription(component.description, component.pointValues)}
 											</p>
 										</button>
 									{/each}
