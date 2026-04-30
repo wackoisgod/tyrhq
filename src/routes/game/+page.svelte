@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { siteCopy } from '$lib/content/site';
 
-	const trailerEmbedUrl = 'https://www.youtube-nocookie.com/embed/DBNzOYPch_k?rel=0';
+	const trailerEmbedUrl = 'https://www.youtube-nocookie.com/embed/1Wy-s8ps6vU?rel=0';
 
 	const overviewSections = [
 		{
