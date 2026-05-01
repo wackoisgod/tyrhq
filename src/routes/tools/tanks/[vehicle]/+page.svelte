@@ -164,6 +164,16 @@
 
 		<div class="mt-4">
 			{#if data.publicBuilds.length > 0}
+				<div class="mb-3 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+					<span>Sorted by stars · Top {data.publicBuilds.length}</span>
+					<a
+						href={`/builds/browse?vehicle=${data.tank.slug}&sort=top`}
+						class="text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+						data-sveltekit-preload-data="hover"
+					>
+						See all builds for {data.tank.name} &rarr;
+					</a>
+				</div>
 				<div class="grid gap-3 sm:grid-cols-2">
 					{#each data.publicBuilds as build}
 						{@const componentIds = (build.selection?.componentIds ?? []).filter(Boolean).filter((id) => data.componentNames[id])}
