@@ -82,6 +82,27 @@ describe('sanitizeArticleBody', () => {
 		expect(html).toContain('<a href="https://example.com">two</a>');
 	});
 
+	it('renders GFM tables (pipe syntax) into proper <table> markup', async () => {
+		const md = [
+			'| Source       | Stacks how                           |',
+			'| ------------ | ------------------------------------ |',
+			'| Talents      | Same-type percents sum, applied once |',
+			'| Enemy armor  | Multiplies in sequence — compounds   |'
+		].join('\n');
+		const { html } = await sanitizeArticleBody(md);
+		expect(html).toContain('<table>');
+		expect(html).toContain('<thead>');
+		expect(html).toContain('<tbody>');
+		expect(html).toContain('<th>Source</th>');
+		expect(html).toContain('<td>Talents</td>');
+		expect(html).toContain('<td>Multiplies in sequence — compounds</td>');
+	});
+
+	it('renders GFM strikethrough', async () => {
+		const { html } = await sanitizeArticleBody('~~old value~~');
+		expect(html).toContain('<del>old value</del>');
+	});
+
 	it('strips javascript: URLs from links', async () => {
 		const { html } = await sanitizeArticleBody('[click](javascript:alert(1))');
 		// rehype-sanitize defaultSchema drops javascript: from href

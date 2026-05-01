@@ -747,26 +747,103 @@ input[type="radio"] {
 .prose-hud h2 {
 	font-family: var(--font-display);
 	font-weight: 900;
-	font-size: 2rem;
-	line-height: 0.92;
-	letter-spacing: 0.08em;
+	font-size: 1.85rem;
+	line-height: 1.08;
+	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--hud-text);
-	margin-top: 1.5rem;
+	margin-top: 1.75rem;
+	margin-bottom: 0.5rem;
+}
+
+/* Emphasis inside HUD-display headings: the display face has no real italic,
+   so browsers faux-slant it and it looks rough. Fall back to a teal accent
+   that keeps the semantic "this is the contrast word" without faking italic. */
+.prose-hud h2 em,
+.prose-hud h3 em,
+.prose-hud h2 i,
+.prose-hud h3 i {
+	font-style: normal;
+	color: var(--hud-teal);
+	letter-spacing: inherit;
 }
 
 .prose-hud h3 {
 	font-family: var(--font-display);
-	font-weight: 900;
-	font-size: 1.45rem;
-	line-height: 0.96;
-	letter-spacing: 0.08em;
+	font-weight: 700;
+	font-size: 1.05rem;
+	line-height: 1.1;
+	letter-spacing: 0.16em;
 	text-transform: uppercase;
-	color: var(--hud-text);
-	margin-top: 1.25rem;
+	color: var(--hud-muted);
+	margin-top: 1.5rem;
 }
 
 .prose-hud strong {
+	color: var(--hud-text);
+}
+
+/* ---- Code blocks (fenced) and inline code ---- */
+.prose-hud pre {
+	position: relative;
+	margin: 1.25rem 0;
+	padding: 1.05rem 1.15rem;
+	background: rgba(4, 8, 18, 0.92);
+	border: 1px solid rgba(160, 170, 217, 0.22);
+	border-left: 3px solid var(--hud-teal);
+	border-radius: 2px;
+	/* Long single-line math wraps instead of triggering a horizontal scrollbar.
+	   `pre-wrap` preserves whitespace (so column-aligned multi-line math stays
+	   aligned) while still allowing soft-wrap at spaces. */
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-x: auto; /* safety net for absurdly long unbroken tokens */
+	font-family: var(--font-mono);
+	font-size: 0.9rem;
+	line-height: 1.7;
+	color: var(--hud-text);
+	box-shadow:
+		inset 0 1px 0 rgba(153, 247, 255, 0.06),
+		0 2px 12px rgba(0, 0, 0, 0.35);
+	/* Thin themed scrollbar for the rare case wrap can't avoid overflow. */
+	scrollbar-width: thin;
+	scrollbar-color: rgba(153, 247, 255, 0.3) transparent;
+}
+
+.prose-hud pre::-webkit-scrollbar {
+	height: 6px;
+	background: transparent;
+}
+.prose-hud pre::-webkit-scrollbar-thumb {
+	background: rgba(153, 247, 255, 0.3);
+	border-radius: 3px;
+}
+.prose-hud pre::-webkit-scrollbar-thumb:hover {
+	background: rgba(153, 247, 255, 0.5);
+}
+.prose-hud pre::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.prose-hud pre > code {
+	display: block;
+	background: transparent;
+	border: 0;
+	padding: 0;
+	font-family: inherit;
+	font-size: inherit;
+	color: inherit;
+	white-space: inherit;
+	word-break: inherit;
+}
+
+.prose-hud :not(pre) > code {
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	padding: 0.05em 0.35em;
+	background: rgba(160, 170, 217, 0.09);
+	border: 1px solid rgba(160, 170, 217, 0.14);
+	border-radius: 2px;
 	color: var(--hud-text);
 }
 
@@ -775,6 +852,94 @@ input[type="radio"] {
 	background: linear-gradient(90deg, transparent, rgba(160, 170, 217, 0.24), transparent);
 	border: none;
 	margin: 1.5rem 0;
+}
+
+/* ---- GFM tables (rendered via remark-gfm + rehype-sanitize defaults) ---- */
+.prose-hud table {
+	width: 100%;
+	margin: 1.25rem 0;
+	border-collapse: collapse;
+	border: 1px solid rgba(160, 170, 217, 0.18);
+	background: rgba(20, 26, 41, 0.55);
+	font-size: 0.9rem;
+	line-height: 1.55;
+	table-layout: auto;
+}
+
+/* Wrap tables inside the article body so they horizontally scroll on narrow
+   viewports without breaking column alignment. The wrapper is added via the
+   sanitize pipeline (remark-rehype) — see content-sanitize.ts. */
+.prose-hud .table-wrap {
+	margin: 1.25rem 0;
+	overflow-x: auto;
+}
+
+.prose-hud .table-wrap > table {
+	margin: 0;
+}
+
+.prose-hud thead {
+	background: rgba(61, 71, 102, 0.45);
+	border-bottom: 1px solid rgba(160, 170, 217, 0.32);
+}
+
+.prose-hud th {
+	padding: 0.65rem 0.9rem;
+	text-align: left;
+	vertical-align: top;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--hud-teal);
+	white-space: nowrap;
+}
+
+.prose-hud td {
+	padding: 0.65rem 0.9rem;
+	text-align: left;
+	vertical-align: top;
+	color: var(--hud-muted);
+	border-top: 1px solid rgba(160, 170, 217, 0.12);
+}
+
+/* Zebra-stripe rows for scannability. nth-child counts inside <tbody> only. */
+.prose-hud tbody tr:nth-child(even) td {
+	background: rgba(160, 170, 217, 0.04);
+}
+
+.prose-hud tbody tr:hover td {
+	background: rgba(153, 247, 255, 0.05);
+}
+
+/* Reset list/paragraph margins inside cells so multi-line cell content doesn't
+   inherit the loose vertical rhythm meant for body copy. */
+.prose-hud td p,
+.prose-hud th p {
+	margin: 0;
+}
+
+.prose-hud td ul,
+.prose-hud td ol,
+.prose-hud th ul,
+.prose-hud th ol {
+	margin: 0;
+}
+
+.prose-hud td strong,
+.prose-hud th strong {
+	color: var(--hud-text);
+}
+
+/* Alignment classes that remark-gfm emits for `:---:` style table alignments. */
+.prose-hud th[align='center'],
+.prose-hud td[align='center'] {
+	text-align: center;
+}
+.prose-hud th[align='right'],
+.prose-hud td[align='right'] {
+	text-align: right;
 }
 
 .tyr-topbar {

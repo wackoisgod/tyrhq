@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import remarkRehype from 'remark-rehype';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -207,6 +208,11 @@ const sanitizeSchema = buildSanitizeSchema();
 function buildProcessor(imageHostPrefix: string) {
 	return unified()
 		.use(remarkParse)
+		// remark-gfm enables GitHub-flavored markdown: tables, strikethrough, task lists,
+		// autolinks, footnotes. All output is still funnelled through rehype-sanitize, so
+		// the new node types only render if their HAST tags are in the allow-list (the
+		// default schema already permits table/thead/tbody/tr/th/td/del/input[checkbox]).
+		.use(remarkGfm)
 		.use(remarkDirective)
 		.use(validateAggroDirectives)
 		.use(remarkRehype, { allowDangerousHtml: false })
