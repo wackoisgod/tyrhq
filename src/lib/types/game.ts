@@ -1,3 +1,9 @@
+export type VehicleAbility = {
+	name: string;
+	description: string;
+	icon: string;
+};
+
 export type TankSummary = {
 	id: string;
 	key: string;
@@ -18,6 +24,7 @@ export type TankSummary = {
 		detection: number;
 		camo: number;
 	};
+	ability: VehicleAbility;
 };
 
 export type AmmoSummary = {
@@ -87,6 +94,7 @@ export type VehicleRecord = {
 	isWorkInProgress: boolean;
 	selectable: boolean;
 	stats: Record<string, number>;
+	ability: VehicleAbility;
 	loadout: {
 		componentSlotCount: number;
 		ammoSlotCount: number;

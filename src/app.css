@@ -361,6 +361,11 @@ input[type="radio"] {
 	color: var(--hud-lime);
 }
 
+.ui-fallback-icon--ability {
+	background: rgba(153, 247, 255, 0.12);
+	color: var(--hud-teal);
+}
+
 .ui-fallback-icon--generic {
 	background: rgba(160, 170, 217, 0.1);
 	color: var(--hud-dim);

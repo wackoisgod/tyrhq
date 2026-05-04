@@ -116,10 +116,12 @@ function serializeVehicle(vehicle: VehicleRecord) {
 		selectable: vehicle.selectable,
 		isWorkInProgress: vehicle.isWorkInProgress,
 		stats: vehicle.stats,
+		ability: vehicle.ability,
 		loadout: vehicle.loadout,
 		nativeComponents: vehicle.nativeComponents,
 		assets: {
 			imageUrl: getPublicImageUrl('images/vehicles', vehicle.id),
+			abilityIconUrl: getPublicImageUrl('images/abilities', vehicle.id),
 			modelUrl: getPublicImageUrl('models/vehicles', vehicle.id, 'glb'),
 			visualModelUrl: getPublicImageUrl('models/vehicles', `${vehicle.id}-visual`, 'glb'),
 			armorDataUrl: getPublicImageUrl('models/vehicles', `${vehicle.id}-armor`, 'json')
@@ -526,11 +528,20 @@ function getOpenApiSchemas() {
 				selectable: { type: 'boolean' },
 				isWorkInProgress: { type: 'boolean' },
 				stats: { type: 'object', additionalProperties: { type: 'number' } },
+				ability: {
+					type: 'object',
+					required: ['name', 'description', 'icon'],
+					properties: {
+						name: { type: 'string' },
+						description: { type: 'string' },
+						icon: { type: 'string' }
+					}
+				},
 				loadout: { type: 'object', additionalProperties: true },
 				nativeComponents: { type: 'array', items: { type: 'object', additionalProperties: true } },
 				assets: { type: 'object', additionalProperties: { type: 'string' } }
 			},
-			required: ['id', 'key', 'slug', 'name', 'classId', 'classLabel', 'selectable', 'isWorkInProgress', 'stats', 'loadout', 'nativeComponents', 'assets']
+			required: ['id', 'key', 'slug', 'name', 'classId', 'classLabel', 'selectable', 'isWorkInProgress', 'stats', 'ability', 'loadout', 'nativeComponents', 'assets']
 		},
 		Ammo: {
 			type: 'object',

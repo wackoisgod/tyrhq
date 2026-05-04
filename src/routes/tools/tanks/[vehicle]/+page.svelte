@@ -15,6 +15,9 @@
 		{ label: 'Detection', value: data.tank.stats.detection, unit: 'm' },
 		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' }
 	]);
+	const hasAbilityDetails = $derived(
+		Boolean(data.tank.ability?.description || data.tank.ability?.icon)
+	);
 
 	function formatValue(value: number | undefined, unit: string) {
 		if (value == null) return '0';
@@ -140,6 +143,34 @@
 					</div>
 				{/each}
 			</div>
+			{#if hasAbilityDetails}
+				<section class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.22)]">
+					<div class="flex items-start gap-4">
+						<div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-[var(--hud-inset)] shadow-[inset_0_0_0_1px_rgba(153,247,255,0.18)]">
+							<FallbackImage
+								src="/images/abilities/{data.tank.id}.png"
+								alt="{data.tank.name} ability"
+								kind="ability"
+								label="{data.tank.name} ability"
+								class="h-11 w-11 object-contain"
+							/>
+						</div>
+						<div class="min-w-0">
+							<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
+								Ability
+							</div>
+							<h2 class="mt-1 font-[var(--font-display)] text-2xl font-semibold uppercase text-[var(--hud-text)]">
+								{data.tank.ability.name || 'Commander Ability'}
+							</h2>
+							{#if data.tank.ability.description}
+								<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+									{data.tank.ability.description}
+								</p>
+							{/if}
+						</div>
+					</div>
+				</section>
+			{/if}
 		</div>
 	</div>
 

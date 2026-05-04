@@ -55,7 +55,8 @@ function toTankSummary(): TankSummary[] {
 			vision: Number(vehicle.stats.VisionRadius ?? 0),
 			detection: Number(vehicle.stats.DetectionRadius ?? 0),
 			camo: Number(vehicle.stats.CamoPercentage ?? 0)
-		}
+		},
+		ability: vehicle.ability
 	}));
 }
 

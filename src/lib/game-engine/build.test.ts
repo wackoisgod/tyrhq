@@ -101,6 +101,11 @@ function makeVehicle(id: string, stats: Record<string, number>, defaultAmmo: str
 		isWorkInProgress: false,
 		selectable: true,
 		stats,
+		ability: {
+			name: 'Commander Ability',
+			description: '',
+			icon: ''
+		},
 		loadout: {
 			componentSlotCount: 4,
 			ammoSlotCount: 1,

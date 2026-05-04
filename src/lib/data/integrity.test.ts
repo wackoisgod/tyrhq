@@ -60,6 +60,14 @@ function listMapImageIds() {
 		.sort();
 }
 
+function listAbilityIconIds() {
+	const abilityDir = path.join(assetsRoot, 'images', 'abilities');
+	return readdirSync(abilityDir)
+		.filter((fileName) => fileName.endsWith('.png'))
+		.map((fileName) => fileName.replace(/\.png$/, ''))
+		.sort();
+}
+
 describe('generated data integrity', () => {
 	it('keeps runtime references internally consistent', () => {
 		const bundle = readJson<GameDataBundle>(runtimePath);
@@ -107,6 +115,18 @@ describe('generated data integrity', () => {
 
 		for (const map of bundle.maps) {
 			expect(hasMapImages(map.id)).toBe(true);
+		}
+	});
+
+	it('keeps vehicle ability data and icons aligned with runtime ids', () => {
+		const bundle = readJson<GameDataBundle>(runtimePath);
+		const abilityIconIds = new Set(listAbilityIconIds());
+
+		for (const vehicle of bundle.vehicles) {
+			expect(vehicle.ability.name).not.toBe('');
+			expect(vehicle.ability.description).not.toBe('');
+			expect(vehicle.ability.icon).not.toBe('');
+			expect(abilityIconIds.has(vehicle.id)).toBe(true);
 		}
 	});
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	type ImageKind = 'vehicle' | 'component' | 'ammo' | 'talent' | 'generic';
+	type ImageKind = 'vehicle' | 'component' | 'ammo' | 'talent' | 'ability' | 'generic';
 
 	let {
 		src,
@@ -34,9 +34,11 @@
 				: kind === 'component'
 					? 'C'
 					: kind === 'ammo'
-						? 'A'
-						: kind === 'talent'
-							? 'T'
+					? 'A'
+					: kind === 'talent'
+						? 'T'
+						: kind === 'ability'
+							? 'AB'
 							: '?';
 		}
 		return words
@@ -54,7 +56,9 @@
 					? 'ui-fallback-icon--ammo'
 					: kind === 'talent'
 						? 'ui-fallback-icon--talent'
-						: 'ui-fallback-icon--generic'
+						: kind === 'ability'
+							? 'ui-fallback-icon--ability'
+							: 'ui-fallback-icon--generic'
 	);
 
 	const effectiveTitle = $derived((title || label || alt).trim());

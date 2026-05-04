@@ -27,3 +27,4 @@ vite.config.ts.timestamp-*
 .tmp-data-repo
 scripts/__pycache__
 .p4-results
+drafts
