@@ -41,7 +41,12 @@ export const decisionBodySchema = z
 		// set a sort priority within that section. Ignored unless decision is
 		// "approve". Order may be negative for stable ordering.
 		flyoutSection: flyoutSectionSchema,
-		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional()
+		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional(),
+		// Optimistic-concurrency guard: the content_hash the reviewer was
+		// looking at when they made the call. If the contributor edited the
+		// pending submission in the meantime, the hash on the row will differ
+		// and the decision is rejected so the reviewer can re-read.
+		expectedContentHash: z.string().max(128).nullable().optional()
 	})
 	.strict();
 

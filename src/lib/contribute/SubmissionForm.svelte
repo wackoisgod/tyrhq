@@ -224,9 +224,11 @@
 	const editable = $derived(
 		!status ||
 			status === 'draft' ||
+			status === 'pending' ||
 			status === 'changes_requested' ||
 			status === 'rejected'
 	);
+	const alreadySubmitted = $derived(status === 'pending');
 </script>
 
 <form
@@ -240,7 +242,13 @@
 		<div
 			class="rounded-sm border-l-2 border-[var(--hud-teal)] bg-[var(--hud-teal)]/10 p-3 text-sm text-[var(--hud-text)]"
 		>
-			This submission is in review. You can't edit it until the reviewer responds.
+			<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
+				In review
+			</div>
+			<p class="mt-1">
+				This submission is queued for review. You can keep editing until a reviewer responds; saved
+				changes will be visible on the next reviewer pass. No need to resubmit.
+			</p>
 		</div>
 	{:else if status === 'changes_requested'}
 		<div
@@ -521,14 +529,16 @@
 				>
 					{previewing ? 'Opening…' : 'Preview On Site'}
 				</button>
-				<button
-					type="button"
-					onclick={submitForReview}
-					disabled={saving || submittingForReview || previewing || !title.trim() || !bodyMarkdown.trim()}
-					class="hud-cta px-5 py-3 text-sm disabled:opacity-50"
-				>
-					{submittingForReview ? 'Submitting…' : 'Submit For Review'}
-				</button>
+				{#if !alreadySubmitted}
+					<button
+						type="button"
+						onclick={submitForReview}
+						disabled={saving || submittingForReview || previewing || !title.trim() || !bodyMarkdown.trim()}
+						class="hud-cta px-5 py-3 text-sm disabled:opacity-50"
+					>
+						{submittingForReview ? 'Submitting…' : 'Submit For Review'}
+					</button>
+				{/if}
 			{/if}
 		</div>
 	</div>

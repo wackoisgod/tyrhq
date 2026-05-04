@@ -306,14 +306,18 @@ export async function updateDraftSubmission(
 	if (existing.submitter_id !== submitterId) {
 		throw new SubmissionStateError('You cannot edit another contributor’s submission.', 403);
 	}
-	if (!['draft', 'changes_requested', 'rejected'].includes(existing.status)) {
+	if (!['draft', 'pending', 'changes_requested', 'rejected'].includes(existing.status)) {
 		throw new SubmissionStateError(
 			`Submission cannot be edited while status is "${existing.status}".`,
 			409
 		);
 	}
 
-	const sanitized = await sanitizeSubmissionInput(input, { enforceLength: false });
+	// While pending, re-validate at the stricter submit-time bar so a contributor
+	// can't sneak a too-short body past review by editing it post-submit.
+	const sanitized = await sanitizeSubmissionInput(input, {
+		enforceLength: existing.status === 'pending'
+	});
 
 	const incomingFlyout = input.flyoutSection ?? null;
 	if (
@@ -323,7 +327,9 @@ export async function updateDraftSubmission(
 		return existing;
 	}
 
-	// any meaningful edit on a "changes_requested" or "rejected" returns to draft
+	// any meaningful edit on a "changes_requested" or "rejected" returns to draft.
+	// "pending" stays "pending": the contributor can keep iterating until a reviewer
+	// decides, but the submission does not need to be re-submitted.
 	const reopens = existing.status === 'changes_requested' || existing.status === 'rejected';
 
 	const { data, error } = await admin
@@ -438,6 +444,10 @@ export interface DecisionInput {
 	// Defaults to the contributor's proposal stored on the submission row.
 	flyoutSection?: FlyoutSection | null;
 	flyoutOrder?: number | null;
+	// Optimistic-concurrency guard. When provided, the reviewer's decision
+	// is rejected if the row's content_hash no longer matches (the contributor
+	// edited the pending submission while the reviewer was reading it).
+	expectedContentHash?: string | null;
 }
 
 export async function decideSubmission(
@@ -462,6 +472,16 @@ export async function decideSubmission(
 		throw new SubmissionStateError(
 			'Contributors cannot review their own submissions. Ask another reviewer.',
 			403
+		);
+	}
+	if (
+		input.expectedContentHash &&
+		existing.content_hash &&
+		input.expectedContentHash !== existing.content_hash
+	) {
+		throw new SubmissionStateError(
+			'The contributor edited this submission while you were reviewing. Reload to see the latest version before deciding.',
+			409
 		);
 	}
 

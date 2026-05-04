@@ -36,7 +36,11 @@
 			}
 			const payload: Record<string, unknown> = {
 				decision,
-				notes: notes || null
+				notes: notes || null,
+				// Optimistic-concurrency guard: the contributor can edit a pending
+				// submission while we read it. Send the hash we reviewed so the
+				// server rejects the decision if the body changed underneath us.
+				expectedContentHash: data.submission.content_hash ?? null
 			};
 			if (decision === 'approve') {
 				payload.flyoutSection = flyoutSection || null;

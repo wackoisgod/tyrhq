@@ -9,6 +9,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const supabaseUrl = env.PUBLIC_SUPABASE_URL;
 	const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 	const configuredSiteOrigin = getConfiguredSiteOrigin();
+	let hasAuthenticatedSession = false;
+	const authCookieHeaders: Record<string, string> = {};
+
+	const finalizeResponse = (response: Response) =>
+		applySecurityHeaders(response, event.url, {
+			privateCache: hasAuthenticatedSession || Object.keys(authCookieHeaders).length > 0,
+			extraHeaders: authCookieHeaders
+		});
 
 	if (configuredSiteOrigin) {
 		const configuredSiteUrl = new URL(configuredSiteOrigin);
@@ -31,16 +39,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!supabaseUrl || !supabaseAnonKey) {
 		event.locals.supabase = null as unknown as SupabaseClient;
 		event.locals.safeGetSession = async () => ({ session: null, user: null, role: 'user' });
-		return applySecurityHeaders(await resolve(event), event.url);
+		return finalizeResponse(await resolve(event));
 	}
 
 	event.locals.supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
 		cookies: {
 			getAll: () => event.cookies.getAll(),
-			setAll: (cookiesToSet) => {
+			setAll: (cookiesToSet, headersToSet) => {
 				cookiesToSet.forEach(({ name, value, options }) => {
 					event.cookies.set(name, value, { ...options, path: '/' });
 				});
+				Object.assign(authCookieHeaders, headersToSet);
 			}
 		}
 	});
@@ -52,7 +61,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!error) {
 			const cleanUrl = new URL(event.url);
 			cleanUrl.searchParams.delete('code');
-			redirect(303, cleanUrl.pathname + cleanUrl.search);
+			return finalizeResponse(
+				new Response(null, {
+					status: 303,
+					headers: { Location: cleanUrl.pathname + cleanUrl.search }
+				})
+			);
 		}
 	}
 
@@ -62,6 +76,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			error
 		} = await event.locals.supabase.auth.getUser();
 		if (error || !user) return { session: null, user: null, role: 'user' };
+		hasAuthenticatedSession = true;
 
 		const {
 			data: { session }
@@ -76,12 +91,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return { session, user, role: profile?.role ?? 'user' };
 	};
 
-	return applySecurityHeaders(
+	return finalizeResponse(
 		await resolve(event, {
 			filterSerializedResponseHeaders(name) {
 				return name === 'content-range' || name === 'x-supabase-api-version';
 			}
-		}),
-		event.url
+		})
 	);
 };
