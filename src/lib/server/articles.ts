@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from './supabase-admin';
 import type { FlyoutSection } from '$lib/content/flyout-sections';
+import { isRecentlyPublished } from '$lib/utils/article-recency';
 
 export type ArticleType = 'guide' | 'article';
 
@@ -16,6 +17,7 @@ export interface ArticleSummary {
 	starCount: number;
 	publishedAt: string;
 	updatedAt: string;
+	isNew: boolean;
 	flyoutSection: FlyoutSection | null;
 	flyoutOrder: number | null;
 	heroImageUrl: string | null;
@@ -67,6 +69,7 @@ function resolveAuthorDisplay(row: ArticleRow): string | null {
 }
 
 function summaryFromRow(row: ArticleRow): ArticleSummary {
+	const publishedAt = row.published_at ?? row.updated_at;
 	return {
 		id: row.id,
 		type: row.type,
@@ -78,8 +81,9 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		tags: row.tags ?? [],
 		vehicleSlugs: row.vehicle_slugs,
 		starCount: row.star_count,
-		publishedAt: row.published_at ?? row.updated_at,
+		publishedAt,
 		updatedAt: row.updated_at,
+		isNew: isRecentlyPublished(publishedAt),
 		flyoutSection: row.flyout_section as FlyoutSection | null,
 		flyoutOrder: row.flyout_order,
 		heroImageUrl: row.hero_image_url

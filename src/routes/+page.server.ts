@@ -1,5 +1,6 @@
 import { getGameSnapshot } from '$lib/data/game-data';
 import { fetchSteamNews, fetchYouTubePlaylist } from '$lib/server/content';
+import { listPublishedArticles } from '$lib/server/articles';
 import type { HeroFrontmatter } from '$lib/types/content';
 
 const heroMetaMap = import.meta.glob('/src/content/home/hero.md', {
@@ -35,6 +36,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const steamNews = await fetchSteamNews('2445260', 1);
 	const latestSteamPost = steamNews[0] ?? null;
 
+	// Latest articles + guides combined, newest first
+	const [articles, guides] = await Promise.all([
+		listPublishedArticles('article'),
+		listPublishedArticles('guide')
+	]);
+	const latestDispatches = [...articles, ...guides]
+		.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+		.slice(0, 3);
+
 	return {
 		snapshot,
 		hero: {
@@ -44,6 +54,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		},
 		latestSteamPost,
 		devVideos,
-		latestBuilds
+		latestBuilds,
+		latestDispatches
 	};
 };

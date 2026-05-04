@@ -23,6 +23,7 @@
 			authorDisplay: string | null;
 			bodyHtml: string;
 			heroImageUrl?: string | null;
+			isNew?: boolean;
 		};
 		vehicles?: Vehicle[];
 		backHref: string;
@@ -64,6 +65,9 @@
 
 	<div class="mt-6">
 		<div class="flex flex-wrap items-center gap-3">
+			{#if article.isNew}
+				<span class="tyr-new-pill">New</span>
+			{/if}
 			<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
 				{formatDate(article.publishedAt)}
 			</span>

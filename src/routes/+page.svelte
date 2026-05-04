@@ -100,6 +100,77 @@
 		</a>
 	</div>
 
+	{#if data.latestDispatches.length > 0}
+		<section class="flex flex-col gap-4">
+			<div class="tyr-section-heading">
+				<div class="tyr-shell-accent">
+					<div class="tyr-shell-kicker">Latest Dispatches</div>
+					<h2 class="tyr-section-title">Field Manual</h2>
+				</div>
+				<div class="flex flex-wrap gap-2">
+					<a href="/articles" class="hud-cta-ghost px-4 py-3">Articles</a>
+					<a href="/guides" class="hud-cta-ghost px-4 py-3">Guides</a>
+				</div>
+			</div>
+
+			<div class="grid gap-3">
+				{#each data.latestDispatches as dispatch (dispatch.id)}
+					<a
+						href={`${dispatch.type === 'guide' ? '/guides' : '/articles'}/${dispatch.slug}`}
+						class="flex gap-5 rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+						style="box-shadow: var(--hud-surface-ghost);"
+					>
+						{#if dispatch.heroImageUrl}
+							<img
+								src={dispatch.heroImageUrl}
+								alt=""
+								loading="lazy"
+								decoding="async"
+								class="h-24 w-32 flex-shrink-0 rounded-sm bg-[var(--hud-inset)] object-cover"
+							/>
+						{/if}
+						<div class="min-w-0 flex-1">
+							<div class="flex flex-wrap items-center gap-3">
+								{#if dispatch.isNew}
+									<span class="tyr-new-pill">New</span>
+								{/if}
+								<span
+									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								>
+									{dispatch.publishedAt.slice(0, 10)}
+								</span>
+								<span
+									class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+								>
+									{dispatch.type === 'guide' ? 'Guide' : 'Article'}
+								</span>
+								{#if dispatch.tags?.length}
+									{#each dispatch.tags.slice(0, 2) as tag}
+										<span
+											class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-muted)]"
+										>
+											{tag}
+										</span>
+									{/each}
+								{/if}
+							</div>
+							<h3
+								class="mt-2 font-[var(--font-display)] text-lg font-semibold text-[var(--hud-text)]"
+							>
+								{dispatch.title}
+							</h3>
+							{#if dispatch.summary}
+								<p class="mt-1 line-clamp-2 text-sm leading-6 text-[var(--hud-muted)]">
+									{dispatch.summary}
+								</p>
+							{/if}
+						</div>
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
+
 	{#if buildsWithVehicle.length > 0}
 		<section class="flex flex-col gap-4">
 			<div class="tyr-section-heading">

@@ -1314,6 +1314,20 @@ input[type="radio"] {
 	box-shadow: inset 2px 0 0 0 var(--hud-teal);
 }
 
+.tyr-new-pill {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 2px;
+	padding: 1px 6px;
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	background: var(--hud-lime);
+	color: var(--hud-inset);
+}
+
 @media (max-width: 767px) {
 	.tyr-nav-flyout {
 		flex-direction: column;

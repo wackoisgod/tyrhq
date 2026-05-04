@@ -63,6 +63,9 @@
 							{/if}
 							<div class="min-w-0 flex-1">
 								<div class="flex flex-wrap items-center gap-3">
+									{#if guide.isNew}
+										<span class="tyr-new-pill">New</span>
+									{/if}
 									<span
 										class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 									>
@@ -144,6 +147,9 @@
 										style="box-shadow: var(--hud-surface-ghost);"
 									>
 										<div class="flex flex-wrap items-center gap-3">
+											{#if guide.isNew}
+												<span class="tyr-new-pill">New</span>
+											{/if}
 											<span
 												class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 											>

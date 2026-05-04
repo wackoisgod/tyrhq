@@ -283,6 +283,9 @@
 							class="hud-panel-muted p-4 transition hover:shadow-[inset_3px_0_0_0_var(--hud-teal)]"
 						>
 							<div class="flex flex-wrap items-center gap-2">
+								{#if guide.isNew}
+									<span class="tyr-new-pill">New</span>
+								{/if}
 								<span
 									class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 								>

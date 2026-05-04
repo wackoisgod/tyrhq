@@ -85,7 +85,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			summary: g.summary,
 			tags: g.tags,
 			author: g.authorDisplay,
-			starCount: g.starCount
+			starCount: g.starCount,
+			isNew: g.isNew
 		}));
 
 	return {
