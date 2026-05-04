@@ -47,16 +47,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 	]);
 	const PREVIEW_LIMIT = 3;
 	// Patches sort by version desc (back-publishing v0.4.1 today shouldn't
-	// outrank v0.5.x). Other types stay chronological. The "all" merge keeps
-	// chronological ordering across types — a back-published patch still
-	// counts as recent activity in that mixed feed.
+	// outrank v0.5.x); other types stay chronological. The "all" merge mixes
+	// only articles + guides — patches stay categorically separate and are
+	// only surfaced under their own chip.
 	const patchesByVersion = [...patches].sort((a, b) => {
 		const cmp = compareVersionsDesc(a.version, b.version);
 		if (cmp !== 0) return cmp;
 		return b.publishedAt.localeCompare(a.publishedAt);
 	});
 	const latestDispatches = {
-		all: [...articles, ...guides, ...patches]
+		all: [...articles, ...guides]
 			.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
 			.slice(0, PREVIEW_LIMIT),
 		article: articles.slice(0, PREVIEW_LIMIT),
