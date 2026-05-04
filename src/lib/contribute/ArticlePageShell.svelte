@@ -14,7 +14,7 @@
 		footer,
 		banner
 	}: {
-		type: 'guide' | 'article';
+		type: 'guide' | 'article' | 'patch';
 		article: {
 			title: string;
 			summary: string | null;
@@ -24,6 +24,7 @@
 			bodyHtml: string;
 			heroImageUrl?: string | null;
 			isNew?: boolean;
+			version?: string | null;
 		};
 		vehicles?: Vehicle[];
 		backHref: string;
@@ -67,6 +68,13 @@
 		<div class="flex flex-wrap items-center gap-3">
 			{#if article.isNew}
 				<span class="tyr-new-pill">New</span>
+			{/if}
+			{#if type === 'patch' && article.version}
+				<span
+					class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-[var(--hud-teal)]"
+				>
+					{article.version}
+				</span>
 			{/if}
 			<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
 				{formatDate(article.publishedAt)}

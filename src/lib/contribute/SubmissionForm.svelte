@@ -6,7 +6,7 @@
 
 	type Submission = {
 		id: string;
-		type: 'guide' | 'article';
+		type: 'guide' | 'article' | 'patch';
 		title: string;
 		summary: string | null;
 		slug: string | null;
@@ -18,12 +18,13 @@
 		review_notes: string | null;
 		flyout_section: FlyoutSection | null;
 		hero_image_url: string | null;
+		version: string | null;
 	};
 
 	let {
 		submission = null,
 		defaultType = 'guide'
-	}: { submission?: Submission | null; defaultType?: 'guide' | 'article' } = $props();
+	}: { submission?: Submission | null; defaultType?: 'guide' | 'article' | 'patch' } = $props();
 
 	// Form fields copy the initial submission into local state and become the
 	// editable source of truth; further updates from the parent are intentionally
@@ -32,7 +33,7 @@
 	/* svelte-ignore state_referenced_locally */
 	let id = $state(submission?.id ?? '');
 	/* svelte-ignore state_referenced_locally */
-	let type = $state<'guide' | 'article'>(submission?.type ?? defaultType);
+	let type = $state<'guide' | 'article' | 'patch'>(submission?.type ?? defaultType);
 	/* svelte-ignore state_referenced_locally */
 	let title = $state(submission?.title ?? '');
 	/* svelte-ignore state_referenced_locally */
@@ -53,6 +54,8 @@
 	let flyoutSection = $state<FlyoutSection | ''>(submission?.flyout_section ?? '');
 	/* svelte-ignore state_referenced_locally */
 	let heroImageUrl = $state<string | null>(submission?.hero_image_url ?? null);
+	/* svelte-ignore state_referenced_locally */
+	let version = $state(submission?.version ?? '');
 
 	let saving = $state(false);
 	let submittingForReview = $state(false);
@@ -81,8 +84,9 @@
 			bodyMarkdown,
 			tags: parseList(tagsInput),
 			vehicleSlugs: type === 'guide' ? parseList(vehicleSlugsInput) : null,
-			flyoutSection: flyoutSection || null,
-			heroImageUrl: heroImageUrl || null
+			flyoutSection: type === 'patch' ? null : flyoutSection || null,
+			heroImageUrl: heroImageUrl || null,
+			version: type === 'patch' ? version.trim() || null : null
 		};
 	}
 
@@ -296,15 +300,36 @@
 			<legend class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
 				Type
 			</legend>
-			<div class="flex gap-3">
+			<div class="flex flex-wrap gap-3">
 				<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
 					<input type="radio" bind:group={type} name="type" value="guide" /> Guide
 				</label>
 				<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
 					<input type="radio" bind:group={type} name="type" value="article" /> Article
 				</label>
+				<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
+					<input type="radio" bind:group={type} name="type" value="patch" /> Patch Notes
+				</label>
 			</div>
 		</fieldset>
+
+		{#if type === 'patch'}
+			<div class="grid gap-3 md:grid-cols-[150px_1fr]">
+				<label
+					for="version"
+					class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+					>Version</label
+				>
+				<input
+					id="version"
+					bind:value={version}
+					type="text"
+					maxlength="40"
+					placeholder="e.g. v0.5.2"
+					class="hud-input rounded-sm p-2 text-sm"
+				/>
+			</div>
+		{/if}
 
 		<div class="grid gap-3 md:grid-cols-[150px_1fr]">
 			<label
@@ -386,29 +411,31 @@
 			</div>
 		{/if}
 
-		<div class="grid gap-3 md:grid-cols-[150px_1fr]">
-			<label
-				for="flyoutSection"
-				class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-				>Resources flyout</label
-			>
-			<div class="flex flex-col gap-1">
-				<select
-					id="flyoutSection"
-					bind:value={flyoutSection}
-					class="hud-input rounded-sm p-2 text-sm"
+		{#if type !== 'patch'}
+			<div class="grid gap-3 md:grid-cols-[150px_1fr]">
+				<label
+					for="flyoutSection"
+					class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+					>Resources flyout</label
 				>
-					<option value="">— Not in Resources flyout —</option>
-					{#each FLYOUT_SECTIONS as section}
-						<option value={section}>{section}</option>
-					{/each}
-				</select>
-				<p class="text-[11px] text-[var(--hud-dim)]">
-					Optional. Suggest a heading under which this should appear in the top-nav Resources
-					menu. A reviewer will confirm or adjust on approval.
-				</p>
+				<div class="flex flex-col gap-1">
+					<select
+						id="flyoutSection"
+						bind:value={flyoutSection}
+						class="hud-input rounded-sm p-2 text-sm"
+					>
+						<option value="">— Not in Resources flyout —</option>
+						{#each FLYOUT_SECTIONS as section}
+							<option value={section}>{section}</option>
+						{/each}
+					</select>
+					<p class="text-[11px] text-[var(--hud-dim)]">
+						Optional. Suggest a heading under which this should appear in the top-nav Resources
+						menu. A reviewer will confirm or adjust on approval.
+					</p>
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<div class="grid gap-3 md:grid-cols-[150px_1fr]">
 			<span

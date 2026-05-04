@@ -266,23 +266,25 @@ export async function sanitizeArticleBody(
  * so the content_hash represents what the reviewer will see.
  */
 export interface ArticleFrontmatterInput {
-	type: 'guide' | 'article';
+	type: 'guide' | 'article' | 'patch';
 	title: string;
 	summary?: string | null;
 	slug?: string | null;
 	tags?: string[] | null;
 	vehicleSlugs?: string[] | null;
 	authorDisplay?: string | null;
+	version?: string | null;
 }
 
 export interface SanitizedFrontmatter {
-	type: 'guide' | 'article';
+	type: 'guide' | 'article' | 'patch';
 	title: string;
 	summary: string | null;
 	slug: string;
 	tags: string[];
 	vehicleSlugs: string[] | null;
 	authorDisplay: string | null;
+	version: string | null;
 }
 
 const HTML_TAG_RE = /<[^>]*>/g;
@@ -301,9 +303,11 @@ export function slugify(input: string): string {
 		.slice(0, 80);
 }
 
+const VERSION_RE = /^[A-Za-z0-9._+\-\s]{1,40}$/;
+
 export function sanitizeFrontmatter(input: ArticleFrontmatterInput): SanitizedFrontmatter {
-	if (input.type !== 'guide' && input.type !== 'article') {
-		throw new ContentValidationError('type', 'type must be "guide" or "article"');
+	if (input.type !== 'guide' && input.type !== 'article' && input.type !== 'patch') {
+		throw new ContentValidationError('type', 'type must be "guide", "article", or "patch"');
 	}
 
 	const title = stripHtml(input.title ?? '');
@@ -365,6 +369,20 @@ export function sanitizeFrontmatter(input: ArticleFrontmatterInput): SanitizedFr
 		vehicleSlugs = cleaned;
 	}
 
+	let version: string | null = null;
+	if (input.version != null) {
+		const v = stripHtml(String(input.version));
+		if (v) {
+			if (!VERSION_RE.test(v)) {
+				throw new ContentValidationError(
+					'version',
+					'Version must be 1-40 characters of letters, numbers, dots, dashes, underscores, plus signs, or spaces.'
+				);
+			}
+			version = v;
+		}
+	}
+
 	return {
 		type: input.type,
 		title,
@@ -372,7 +390,8 @@ export function sanitizeFrontmatter(input: ArticleFrontmatterInput): SanitizedFr
 		slug: slugRaw,
 		tags,
 		vehicleSlugs,
-		authorDisplay
+		authorDisplay,
+		version
 	};
 }
 
@@ -389,6 +408,7 @@ export function computeContentHash(
 		tags: frontmatter.tags,
 		vehicleSlugs: frontmatter.vehicleSlugs,
 		authorDisplay: frontmatter.authorDisplay,
+		version: frontmatter.version,
 		bodyHtml,
 		heroImageUrl
 	});

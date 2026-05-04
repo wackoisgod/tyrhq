@@ -2,7 +2,7 @@ import { getSupabaseAdminClient } from './supabase-admin';
 import type { FlyoutSection } from '$lib/content/flyout-sections';
 import { isRecentlyPublished } from '$lib/utils/article-recency';
 
-export type ArticleType = 'guide' | 'article';
+export type ArticleType = 'guide' | 'article' | 'patch';
 
 export interface ArticleSummary {
 	id: string;
@@ -21,6 +21,7 @@ export interface ArticleSummary {
 	flyoutSection: FlyoutSection | null;
 	flyoutOrder: number | null;
 	heroImageUrl: string | null;
+	version: string | null;
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -56,10 +57,11 @@ interface ArticleRow {
 	flyout_section: string | null;
 	flyout_order: number | null;
 	hero_image_url: string | null;
+	version: string | null;
 }
 
 const SUMMARY_COLUMNS =
-	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order, hero_image_url';
+	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order, hero_image_url, version';
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
 
 function resolveAuthorDisplay(row: ArticleRow): string | null {
@@ -86,7 +88,8 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		isNew: isRecentlyPublished(publishedAt),
 		flyoutSection: row.flyout_section as FlyoutSection | null,
 		flyoutOrder: row.flyout_order,
-		heroImageUrl: row.hero_image_url
+		heroImageUrl: row.hero_image_url,
+		version: row.version
 	};
 }
 
@@ -229,10 +232,16 @@ export async function listFlyoutEntries(): Promise<FlyoutEntry[]> {
 		flyout_order: number | null;
 	}>).map((row) => ({
 		section: row.flyout_section as FlyoutSection,
-		href: `${row.type === 'guide' ? '/guides' : '/articles'}/${row.slug}`,
+		href: `${typeRoot(row.type)}/${row.slug}`,
 		label: row.title,
 		order: row.flyout_order
 	}));
+}
+
+function typeRoot(type: ArticleType): string {
+	if (type === 'guide') return '/guides';
+	if (type === 'patch') return '/patch-notes';
+	return '/articles';
 }
 
 export interface FlyoutAssignmentInput {

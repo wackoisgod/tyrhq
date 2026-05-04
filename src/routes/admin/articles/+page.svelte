@@ -122,8 +122,14 @@
 		}
 	}
 
-	function publicHref(article: { type: 'guide' | 'article'; slug: string }) {
-		return `/${article.type === 'guide' ? 'guides' : 'articles'}/${article.slug}`;
+	function publicHref(article: { type: 'guide' | 'article' | 'patch'; slug: string }) {
+		const root =
+			article.type === 'guide'
+				? 'guides'
+				: article.type === 'patch'
+					? 'patch-notes'
+					: 'articles';
+		return `/${root}/${article.slug}`;
 	}
 </script>
 

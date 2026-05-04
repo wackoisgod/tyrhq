@@ -10,7 +10,8 @@
 		publishedAt: data.submission.updatedAt,
 		authorDisplay: data.submission.authorDisplay,
 		bodyHtml: data.submission.bodyHtml,
-		heroImageUrl: data.submission.heroImageUrl
+		heroImageUrl: data.submission.heroImageUrl,
+		version: data.submission.version
 	});
 </script>
 

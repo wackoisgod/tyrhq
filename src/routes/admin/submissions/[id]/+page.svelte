@@ -89,7 +89,7 @@
 			<span
 				class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-muted)]"
 			>
-				Suggested edit to /{data.parentArticle.type === 'guide' ? 'guides' : 'articles'}/{data.parentArticle.slug}
+				Suggested edit to /{data.parentArticle.type === 'guide' ? 'guides' : data.parentArticle.type === 'patch' ? 'patch-notes' : 'articles'}/{data.parentArticle.slug}
 			</span>
 		{/if}
 	</div>

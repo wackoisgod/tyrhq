@@ -1,6 +1,7 @@
 import { getGameSnapshot } from '$lib/data/game-data';
 import { fetchSteamNews, fetchYouTubePlaylist } from '$lib/server/content';
 import { listPublishedArticles } from '$lib/server/articles';
+import { compareVersionsDesc } from '$lib/utils/version';
 import type { HeroFrontmatter } from '$lib/types/content';
 
 const heroMetaMap = import.meta.glob('/src/content/home/hero.md', {
@@ -36,14 +37,32 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const steamNews = await fetchSteamNews('2445260', 1);
 	const latestSteamPost = steamNews[0] ?? null;
 
-	// Latest articles + guides combined, newest first
-	const [articles, guides] = await Promise.all([
+	// Pre-slice each type so the home's All/Articles/Guides/Patches filter chips
+	// can switch instantly without a server round-trip and each chip always
+	// shows that type's newest items.
+	const [articles, guides, patches] = await Promise.all([
 		listPublishedArticles('article'),
-		listPublishedArticles('guide')
+		listPublishedArticles('guide'),
+		listPublishedArticles('patch')
 	]);
-	const latestDispatches = [...articles, ...guides]
-		.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-		.slice(0, 3);
+	const PREVIEW_LIMIT = 3;
+	// Patches sort by version desc (back-publishing v0.4.1 today shouldn't
+	// outrank v0.5.x). Other types stay chronological. The "all" merge keeps
+	// chronological ordering across types — a back-published patch still
+	// counts as recent activity in that mixed feed.
+	const patchesByVersion = [...patches].sort((a, b) => {
+		const cmp = compareVersionsDesc(a.version, b.version);
+		if (cmp !== 0) return cmp;
+		return b.publishedAt.localeCompare(a.publishedAt);
+	});
+	const latestDispatches = {
+		all: [...articles, ...guides, ...patches]
+			.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+			.slice(0, PREVIEW_LIMIT),
+		article: articles.slice(0, PREVIEW_LIMIT),
+		guide: guides.slice(0, PREVIEW_LIMIT),
+		patch: patchesByVersion.slice(0, PREVIEW_LIMIT)
+	};
 
 	return {
 		snapshot,

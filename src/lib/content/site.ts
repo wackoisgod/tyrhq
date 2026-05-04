@@ -33,7 +33,8 @@ export const navigation: NavItem[] = [
 					{ href: '/tools/shells', label: 'Shells' }
 				]
 			},
-			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] }
+			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] },
+			{ heading: 'Updates', items: [{ href: '/patch-notes', label: 'Patch Notes' }] }
 		]
 	}
 ];
@@ -92,6 +93,7 @@ export const footerSections = [
 			{ href: '/auth', label: 'Accounts' },
 			{ href: '/builds', label: 'My Builds' },
 			{ href: '/contribute', label: 'Contribute' },
+			{ href: '/patch-notes', label: 'Patch Notes' },
 			{ href: '/settings', label: 'Settings' }
 		]
 	},

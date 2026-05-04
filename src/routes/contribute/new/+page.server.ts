@@ -8,6 +8,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	const requestedType = url.searchParams.get('type');
-	const type: 'guide' | 'article' = requestedType === 'article' ? 'article' : 'guide';
+	const type: 'guide' | 'article' | 'patch' =
+		requestedType === 'article'
+			? 'article'
+			: requestedType === 'patch'
+				? 'patch'
+				: 'guide';
 	return { type };
 };

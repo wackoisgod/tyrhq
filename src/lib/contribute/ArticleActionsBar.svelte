@@ -8,10 +8,22 @@
 		canModerate
 	}: {
 		articleId: string;
-		articleType: 'guide' | 'article';
+		articleType: 'guide' | 'article' | 'patch';
 		signedIn: boolean;
 		canModerate: boolean;
 	} = $props();
+
+	function listingHref(type: 'guide' | 'article' | 'patch'): string {
+		if (type === 'guide') return '/guides';
+		if (type === 'patch') return '/patch-notes';
+		return '/articles';
+	}
+
+	function typeLabel(type: 'guide' | 'article' | 'patch'): string {
+		if (type === 'guide') return 'guide';
+		if (type === 'patch') return 'patch note';
+		return 'article';
+	}
 
 	let busy = $state(false);
 	let error = $state('');
@@ -39,7 +51,7 @@
 
 	async function withdraw() {
 		if (busy) return;
-		const label = articleType === 'guide' ? 'guide' : 'article';
+		const label = typeLabel(articleType);
 		if (
 			!window.confirm(
 				`Withdraw this ${label}? It will 404 for everyone until you restore it from /admin/articles.`
@@ -56,7 +68,7 @@
 				error = await res.text();
 				return;
 			}
-			await goto(articleType === 'guide' ? '/guides' : '/articles');
+			await goto(listingHref(articleType));
 			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Withdraw failed.';

@@ -28,6 +28,12 @@
 		return new Date(iso).toLocaleDateString();
 	}
 
+	function publicListingRoot(type: string): string {
+		if (type === 'guide') return 'guides';
+		if (type === 'patch') return 'patch-notes';
+		return 'articles';
+	}
+
 	async function deleteSubmission(submission: { id: string; title: string; status: string }) {
 		if (busyId) return;
 		const label = submission.title || '(Untitled draft)';
@@ -121,7 +127,7 @@
 					<div class="mt-2 flex flex-wrap items-baseline justify-between gap-3">
 						<a
 							href={submission.status === 'published' && submission.slug
-								? `/${submission.type === 'guide' ? 'guides' : 'articles'}/${submission.slug}`
+								? `/${publicListingRoot(submission.type)}/${submission.slug}`
 								: `/contribute/${submission.id}/edit`}
 							class="font-[var(--font-display)] text-lg font-semibold text-[var(--hud-text)] transition hover:text-[var(--hud-teal)]"
 						>

@@ -9,7 +9,7 @@ const flyoutSectionSchema = z.enum(FLYOUT_SECTIONS).nullable().optional();
 export const submissionDraftSchema = z
 	.object({
 		id: z.string().uuid().optional(),
-		type: z.enum(['guide', 'article']),
+		type: z.enum(['guide', 'article', 'patch']),
 		title: z.string().max(400),
 		summary: z.string().max(1000).nullable().optional(),
 		slug: z.string().max(100).nullable().optional(),
@@ -21,7 +21,9 @@ export const submissionDraftSchema = z
 		// Full https URL of an uploaded image. The bucket-prefix check happens
 		// in `assertHeroImageUrl` once we have the env-derived prefix; we just
 		// shape-check here.
-		heroImageUrl: z.string().url().max(1024).nullable().optional()
+		heroImageUrl: z.string().url().max(1024).nullable().optional(),
+		// Display label for patch notes (e.g. "v0.5.2"). Ignored for other types.
+		version: z.string().max(40).nullable().optional()
 	})
 	.strict();
 

@@ -34,7 +34,7 @@ export type ProfileRole = 'user' | 'contributor' | 'admin';
 
 export interface SubmissionRecord {
 	id: string;
-	type: 'guide' | 'article';
+	type: 'guide' | 'article' | 'patch';
 	parent_article_id: string | null;
 	submitter_id: string;
 	title: string;
@@ -55,10 +55,11 @@ export interface SubmissionRecord {
 	flyout_section: FlyoutSection | null;
 	flyout_order: number | null;
 	hero_image_url: string | null;
+	version: string | null;
 }
 
 const SUBMISSION_COLUMNS =
-	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order, hero_image_url';
+	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order, hero_image_url, version';
 
 function requireAdmin() {
 	const admin = getSupabaseAdminClient();
@@ -81,7 +82,7 @@ export class SubmissionStateError extends Error {
 }
 
 export interface SubmissionDraftInput {
-	type: 'guide' | 'article';
+	type: 'guide' | 'article' | 'patch';
 	title: string;
 	summary?: string | null;
 	slug?: string | null;
@@ -91,6 +92,7 @@ export interface SubmissionDraftInput {
 	parentArticleId?: string | null;
 	flyoutSection?: FlyoutSection | null;
 	heroImageUrl?: string | null;
+	version?: string | null;
 }
 
 export interface SanitizedSubmissionPayload {
@@ -116,7 +118,8 @@ export async function sanitizeSubmissionInput(
 		summary: input.summary,
 		slug: input.slug,
 		tags: input.tags,
-		vehicleSlugs: input.vehicleSlugs
+		vehicleSlugs: input.vehicleSlugs,
+		version: input.version
 	} as ArticleFrontmatterInput);
 
 	if (enforceLength) assertBodyLength(input.bodyMarkdown);
@@ -281,7 +284,8 @@ export async function createDraftSubmission(
 			content_hash: sanitized.contentHash,
 			status: 'draft',
 			flyout_section: input.flyoutSection ?? null,
-			hero_image_url: sanitized.heroImageUrl
+			hero_image_url: sanitized.heroImageUrl,
+			version: sanitized.frontmatter.type === 'patch' ? sanitized.frontmatter.version : null
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();
@@ -346,7 +350,8 @@ export async function updateDraftSubmission(
 			content_hash: sanitized.contentHash,
 			status: reopens ? 'draft' : existing.status,
 			flyout_section: input.flyoutSection ?? null,
-			hero_image_url: sanitized.heroImageUrl
+			hero_image_url: sanitized.heroImageUrl,
+			version: sanitized.frontmatter.type === 'patch' ? sanitized.frontmatter.version : null
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)
@@ -393,7 +398,8 @@ export async function submitForReview(
 			vehicleSlugs: existing.vehicle_slugs,
 			parentArticleId: existing.parent_article_id,
 			flyoutSection: existing.flyout_section,
-			heroImageUrl: existing.hero_image_url
+			heroImageUrl: existing.hero_image_url,
+			version: existing.version
 		},
 		{ enforceLength: true }
 	);
@@ -557,7 +563,7 @@ export async function decideSubmission(
 
 interface PublishedArticleRow {
 	id: string;
-	type: 'guide' | 'article';
+	type: 'guide' | 'article' | 'patch';
 	slug: string;
 }
 
@@ -681,7 +687,8 @@ async function publishApprovedSubmission(
 				published_at: now,
 				flyout_section: options.flyoutSection,
 				flyout_order: options.flyoutSection ? options.flyoutOrder : null,
-				hero_image_url: submission.hero_image_url
+				hero_image_url: submission.hero_image_url,
+				version: submission.type === 'patch' ? submission.version : null
 			})
 			.eq('id', articleId)
 			.select('id, type, slug')
@@ -709,7 +716,8 @@ async function publishApprovedSubmission(
 				published_at: now,
 				flyout_section: options.flyoutSection,
 				flyout_order: options.flyoutSection ? options.flyoutOrder : null,
-				hero_image_url: submission.hero_image_url
+				hero_image_url: submission.hero_image_url,
+				version: submission.type === 'patch' ? submission.version : null
 			})
 			.select('id, type, slug')
 			.single<PublishedArticleRow>();
@@ -849,12 +857,12 @@ export async function createSuggestedEditFromArticle(
 	const { data: article, error: articleError } = await admin
 		.from('articles')
 		.select(
-			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status, flyout_section, hero_image_url'
+			'id, type, slug, title, summary, body_markdown, body_html, tags, vehicle_slugs, status, flyout_section, hero_image_url, version'
 		)
 		.eq('id', articleId)
 		.maybeSingle<{
 			id: string;
-			type: 'guide' | 'article';
+			type: 'guide' | 'article' | 'patch';
 			slug: string;
 			title: string;
 			summary: string | null;
@@ -865,6 +873,7 @@ export async function createSuggestedEditFromArticle(
 			status: 'draft' | 'published' | 'withdrawn';
 			flyout_section: FlyoutSection | null;
 			hero_image_url: string | null;
+			version: string | null;
 		}>();
 
 	if (articleError || !article) {
@@ -902,7 +911,8 @@ export async function createSuggestedEditFromArticle(
 			vehicleSlugs: article.vehicle_slugs,
 			parentArticleId: article.id,
 			flyoutSection: article.flyout_section,
-			heroImageUrl: article.hero_image_url
+			heroImageUrl: article.hero_image_url,
+			version: article.version
 		},
 		{ enforceLength: false }
 	);
@@ -923,7 +933,8 @@ export async function createSuggestedEditFromArticle(
 			content_hash: sanitized.contentHash,
 			status: 'draft',
 			flyout_section: article.flyout_section,
-			hero_image_url: sanitized.heroImageUrl
+			hero_image_url: sanitized.heroImageUrl,
+			version: article.type === 'patch' ? sanitized.frontmatter.version : null
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();
