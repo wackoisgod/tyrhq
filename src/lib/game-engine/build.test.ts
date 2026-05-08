@@ -35,30 +35,46 @@ function makeAmmo(id: string, displayName: string, damage = 1, modOverrides: Par
 	};
 }
 
-function makeEffect(id: string, attribute: string, op: 'AddBase' | 'MultiplyAdditive', value: number): EffectRecord {
+function makeEffect(
+	id: string,
+	attribute: string,
+	op: 'AddBase' | 'MultiplyAdditive',
+	value: number,
+	options: { stackLimit?: number; magnitudeType?: 'ScalableFloat' | 'CustomCalculationClass' } = {}
+): EffectRecord {
+	const magnitudeType = options.magnitudeType ?? 'ScalableFloat';
 	return {
 		id,
 		path: `/Game/Effects/GE_${id}.GE_${id}`,
-		stackLimit: 1,
+		stackLimit: options.stackLimit ?? 1,
 		tags: [],
 		modifiers: [
 			{
 				attribute,
 				op,
-				magnitude: `ScalableFloatMagnitude=(Value=${value})`,
-				magnitudeType: 'ScalableFloat'
+				magnitude:
+					magnitudeType === 'ScalableFloat'
+						? `ScalableFloatMagnitude=(Value=${value})`
+						: 'MagnitudeCalculationType=CustomCalculationClass',
+				magnitudeType
 			}
 		]
 	};
 }
 
-function makeComponent(id: string, name: string, effectIds: string[], pointValues = [0]): ComponentRecord {
+function makeComponent(
+	id: string,
+	name: string,
+	effectIds: string[],
+	pointValues = [0],
+	description = ''
+): ComponentRecord {
 	return {
 		id,
 		key: id,
 		slug: id,
 		name,
-		description: '',
+		description,
 		categoryId: 'test',
 		category: 'Test',
 		pointValues,
@@ -209,6 +225,55 @@ describe('computeBuild aggregator math', () => {
 		// Per-source contributions sum to (final − base):
 		const total = breakdown.reduce((s, e) => s + e.delta, 0);
 		expect(total).toBeCloseTo(159 - 125, 4);
+	});
+
+	it('shell charger: max stacks uses the 3-stack cap when falling back from custom magnitude data', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const shellChargerEffect = makeEffect(
+			'ShellChargerBuff',
+			'ShellDamage',
+			'AddBase',
+			0,
+			{ stackLimit: 3, magnitudeType: 'CustomCalculationClass' }
+		);
+		const shellCharger = makeComponent(
+			'shell_charger',
+			'SHELL CHARGER',
+			['ShellChargerBuff'],
+			[7.5],
+			'Increases base Shell Damage by {LevelValue} whenever you penetrate an enemy. This effect can stack up to 3 times but falls off on a non-penetration.'
+		);
+		const vehicle = makeVehicle('test_tank', { ShellDamage: 125 }, 'standard', 'tree_test');
+		const tree = makeTree('tree_test', 'test_tank', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [shellCharger],
+			talents: [],
+			effects: [shellChargerEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(
+			catalog,
+			{
+				vehicleId: 'test_tank',
+				ammoIds: ['standard'],
+				previewAmmoSlot: 0,
+				componentIds: ['shell_charger', '', '', ''],
+				talentPoints: {}
+			},
+			{ assumeMaxStacks: true }
+		);
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.ShellDamage).toBeCloseTo(147.5, 4);
+		const componentEntry = build!.breakdown.ShellDamage?.find((e) =>
+			e.source.startsWith('Component:')
+		);
+		expect(componentEntry?.delta).toBeCloseTo(22.5, 4);
 	});
 
 	it('max health: percent buff applies to (base + Σflat), not just base (BULKHEADS case)', () => {

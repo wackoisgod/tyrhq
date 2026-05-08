@@ -494,6 +494,39 @@ function getEventStackCount(effect: EffectRecord | undefined, allowMaxStacks: bo
 	return effect?.stackLimit && effect.stackLimit > 1 ? effect.stackLimit : 1;
 }
 
+function getDescriptionStackLimit(description: string) {
+	const normalized = normalizeDescription(description);
+	const matches = [
+		normalized.match(/\bstack(?:s|ing)?\s+up\s+to\s+(\d+)/),
+		normalized.match(/\bup\s+to\s+(\d+)\s+(?:times|stacks?)\b/),
+		normalized.match(/\bmax(?:imum)?\s+stacks?\s*(?:of|:)?\s*(\d+)/)
+	];
+
+	for (const match of matches) {
+		const value = Number(match?.[1]);
+		if (Number.isFinite(value) && value > 1) return Math.floor(value);
+	}
+
+	return 1;
+}
+
+function getFallbackStackCount(
+	effects: readonly EffectRecord[],
+	description: string,
+	allowMaxStacks: boolean
+) {
+	if (!allowMaxStacks) return 1;
+
+	let stackCount = getDescriptionStackLimit(description);
+	for (const effect of effects) {
+		const effectName = getEffectName(effect.path);
+		if (effectName && /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
+		stackCount = Math.max(stackCount, getEventStackCount(effect, true));
+	}
+
+	return Math.max(1, stackCount);
+}
+
 function getTalentPointValue(talent: TalentRecord, points: number) {
 	const clampedPoints = Math.min(Math.max(points, 1), talent.pointValues.length);
 	return talent.pointValues[clampedPoints - 1] ?? 0;
@@ -684,10 +717,11 @@ export function computeBuild(
 		const conditional = isConditionalComponent(component);
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
+		const componentEffects = [...new Set(component.effectIds)]
+			.map((effectId) => catalog.effectById.get(effectId))
+			.filter((effect): effect is EffectRecord => Boolean(effect));
 
-		for (const effectId of [...new Set(component.effectIds)]) {
-			const effect = catalog.effectById.get(effectId);
-			if (!effect) continue;
+		for (const effect of componentEffects) {
 			const effectName = getEffectName(effect.path);
 			if (!effectName || /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
 
@@ -724,7 +758,11 @@ export function computeBuild(
 		}
 
 		if (!appliedAny) {
-			const fallbackStacks = assumeMaxStacks && allowsStacking ? 2 : 1;
+			const fallbackStacks = getFallbackStackCount(
+				componentEffects,
+				description,
+				assumeMaxStacks && allowsStacking
+			);
 			const edits = getDescriptionBasedComponentEdits(component, fallbackStacks);
 			for (const edit of edits) {
 				pushContribution(contributions, edit, source, conditional, order++);
