@@ -16,6 +16,7 @@
 	// when the admin clicks Save.
 	let sectionEdits = $state<Record<string, FlyoutSection | ''>>({});
 	let orderEdits = $state<Record<string, string>>({});
+	let pinnedEdits = $state<Record<string, boolean>>({});
 
 	function currentSection(article: {
 		id: string;
@@ -30,10 +31,16 @@
 		return article.flyoutOrder != null ? String(article.flyoutOrder) : '';
 	}
 
+	function currentPinned(article: { id: string; isPinned: boolean }): boolean {
+		return pinnedEdits[article.id] ?? article.isPinned;
+	}
+
 	function isDirty(article: {
 		id: string;
+		type: 'guide' | 'article' | 'patch';
 		flyoutSection: FlyoutSection | null;
 		flyoutOrder: number | null;
+		isPinned: boolean;
 	}): boolean {
 		const sectionChanged =
 			sectionEdits[article.id] !== undefined &&
@@ -43,13 +50,19 @@
 			(orderEdits[article.id].trim() === ''
 				? null
 				: Number(orderEdits[article.id])) !== article.flyoutOrder;
-		return sectionChanged || orderChanged;
+		const pinnedChanged =
+			article.type === 'guide' &&
+			pinnedEdits[article.id] !== undefined &&
+			pinnedEdits[article.id] !== article.isPinned;
+		return sectionChanged || orderChanged || pinnedChanged;
 	}
 
-	async function saveFlyout(article: {
+	async function saveArticleSettings(article: {
 		id: string;
+		type: 'guide' | 'article' | 'patch';
 		flyoutSection: FlyoutSection | null;
 		flyoutOrder: number | null;
+		isPinned: boolean;
 	}) {
 		if (busyId) return;
 		const section = currentSection(article);
@@ -62,13 +75,22 @@
 		busyId = article.id;
 		actionError = '';
 		try {
+			const payload: {
+				flyoutSection: FlyoutSection | null;
+				flyoutOrder: number | null;
+				isPinned?: boolean;
+			} = {
+				flyoutSection: section || null,
+				flyoutOrder: section ? orderNum : null
+			};
+			if (article.type === 'guide' && pinnedEdits[article.id] !== undefined) {
+				payload.isPinned = currentPinned(article);
+			}
+
 			const res = await fetch(`/api/admin/articles/${article.id}/flyout`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					flyoutSection: section || null,
-					flyoutOrder: section ? orderNum : null
-				})
+				body: JSON.stringify(payload)
 			});
 			if (!res.ok) {
 				actionError = await res.text();
@@ -76,6 +98,7 @@
 			}
 			delete sectionEdits[article.id];
 			delete orderEdits[article.id];
+			delete pinnedEdits[article.id];
 			await invalidateAll();
 		} catch (err) {
 			actionError = err instanceof Error ? err.message : 'Save failed.';
@@ -223,7 +246,7 @@
 
 					{#if article.status === 'published'}
 						<div
-							class="mt-3 grid items-end gap-2 border-t border-[var(--hud-inset)] pt-3 sm:grid-cols-[1fr_120px_auto]"
+							class="mt-3 grid items-end gap-2 border-t border-[var(--hud-inset)] pt-3 sm:grid-cols-[minmax(0,1fr)_120px_auto_auto]"
 						>
 							<label class="flex flex-col gap-1">
 								<span
@@ -261,9 +284,26 @@
 									class="hud-input rounded-sm p-2 text-sm disabled:opacity-40"
 								/>
 							</label>
+							{#if article.type === 'guide'}
+								<label
+									class="flex min-h-10 items-center gap-2 rounded-sm bg-[var(--hud-inset)] px-3 py-2 text-xs text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(160,170,217,0.12)]"
+								>
+									<input
+										type="checkbox"
+										checked={currentPinned(article)}
+										onchange={(e) =>
+											(pinnedEdits[article.id] = (e.currentTarget as HTMLInputElement).checked)}
+									/>
+									<span
+										class="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+									>
+										Pin guide
+									</span>
+								</label>
+							{/if}
 							<button
 								type="button"
-								onclick={() => saveFlyout(article)}
+								onclick={() => saveArticleSettings(article)}
 								disabled={busyId === article.id || !isDirty(article)}
 								class="hud-cta-outline px-4 py-2 text-xs disabled:opacity-50"
 							>

@@ -7,8 +7,10 @@ export async function load({ setHeaders }) {
 	});
 
 	const guides = await listPublishedArticles('guide');
+	const pinned = guides.filter((g) => g.isPinned);
+	const unpinnedGuides = guides.filter((g) => !g.isPinned);
 
-	const general = guides.filter((g) => !g.vehicleSlugs?.length);
+	const general = unpinnedGuides.filter((g) => !g.vehicleSlugs?.length);
 
 	const tanks = getGameSnapshot().tanks;
 	const tankBySlug = new Map(tanks.map((t) => [t.slug, t]));
@@ -24,7 +26,7 @@ export async function load({ setHeaders }) {
 		}
 	>();
 
-	for (const guide of guides) {
+	for (const guide of unpinnedGuides) {
 		if (!guide.vehicleSlugs?.length) continue;
 		for (const vehicleSlug of guide.vehicleSlugs) {
 			const tank = tankBySlug.get(vehicleSlug);
@@ -47,6 +49,7 @@ export async function load({ setHeaders }) {
 	const vehicleGroups = [...groupsBySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
 
 	return {
+		pinned,
 		general,
 		vehicleGroups
 	};

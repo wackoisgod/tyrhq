@@ -55,7 +55,8 @@ export const decisionBodySchema = z
 export const flyoutAssignmentBodySchema = z
 	.object({
 		flyoutSection: flyoutSectionSchema,
-		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional()
+		flyoutOrder: z.number().int().min(-10_000).max(10_000).nullable().optional(),
+		isPinned: z.boolean().optional()
 	})
 	.strict();
 

@@ -24,6 +24,7 @@
 			bodyHtml: string;
 			heroImageUrl?: string | null;
 			isNew?: boolean;
+			isPinned?: boolean;
 			version?: string | null;
 		};
 		vehicles?: Vehicle[];
@@ -66,6 +67,23 @@
 
 	<div class="mt-6">
 		<div class="flex flex-wrap items-center gap-3">
+			{#if type === 'guide' && article.isPinned}
+				<span class="tyr-pinned-pill">
+					<svg
+						class="h-3 w-3"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="m15 4 5 5-4 1-4 4v4l-2 2-2-6-6-2 2-2h4l4-4z" />
+					</svg>
+					Pinned
+				</span>
+			{/if}
 			{#if article.isNew}
 				<span class="tyr-new-pill">New</span>
 			{/if}

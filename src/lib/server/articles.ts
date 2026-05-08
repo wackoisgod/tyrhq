@@ -22,6 +22,7 @@ export interface ArticleSummary {
 	flyoutOrder: number | null;
 	heroImageUrl: string | null;
 	version: string | null;
+	isPinned: boolean;
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -58,11 +59,25 @@ interface ArticleRow {
 	flyout_order: number | null;
 	hero_image_url: string | null;
 	version: string | null;
+	is_pinned?: boolean | null;
 }
 
-const SUMMARY_COLUMNS =
+const SUMMARY_COLUMNS_BASE =
 	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order, hero_image_url, version';
+const SUMMARY_COLUMNS = `${SUMMARY_COLUMNS_BASE}, is_pinned`;
+const DETAIL_COLUMNS_BASE = `${SUMMARY_COLUMNS_BASE}, body_markdown, body_html, current_revision_id`;
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
+
+function isMissingPinnedColumn(error: { code?: string; message?: string } | null): boolean {
+	return Boolean(error && error.code === '42703' && error.message?.includes('is_pinned'));
+}
+
+function withPinnedDefault(row: ArticleRow): ArticleRow {
+	return {
+		...row,
+		is_pinned: row.is_pinned ?? false
+	};
+}
 
 function resolveAuthorDisplay(row: ArticleRow): string | null {
 	if (row.author_display) return row.author_display;
@@ -89,7 +104,8 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		flyoutSection: row.flyout_section as FlyoutSection | null,
 		flyoutOrder: row.flyout_order,
 		heroImageUrl: row.hero_image_url,
-		version: row.version
+		version: row.version,
+		isPinned: row.is_pinned ?? false
 	};
 }
 
@@ -116,19 +132,35 @@ export async function listPublishedArticles(type: ArticleType): Promise<ArticleS
 	const admin = getSupabaseAdminClient();
 	if (!admin) return [];
 
-	const { data, error } = await admin
+	let data: ArticleRow[] | null = null;
+	let error: { code?: string; message?: string } | null = null;
+
+	const result = await admin
 		.from('articles')
 		.select(SUMMARY_COLUMNS)
 		.eq('type', type)
 		.eq('status', 'published')
 		.order('published_at', { ascending: false });
+	data = result.data as ArticleRow[] | null;
+	error = result.error;
+
+	if (isMissingPinnedColumn(error)) {
+		const legacy = await admin
+			.from('articles')
+			.select(SUMMARY_COLUMNS_BASE)
+			.eq('type', type)
+			.eq('status', 'published')
+			.order('published_at', { ascending: false });
+		data = legacy.data as ArticleRow[] | null;
+		error = legacy.error;
+	}
 
 	if (error) {
 		console.error('[articles] listPublishedArticles failed', error);
 		return [];
 	}
 
-	return ((data as ArticleRow[]) ?? []).map(summaryFromRow);
+	return (data ?? []).map(withPinnedDefault).map(summaryFromRow);
 }
 
 export async function getPublishedArticle(
@@ -138,34 +170,66 @@ export async function getPublishedArticle(
 	const admin = getSupabaseAdminClient();
 	if (!admin) return null;
 
-	const { data, error } = await admin
+	let data: ArticleRow | null = null;
+	let error: { code?: string; message?: string } | null = null;
+
+	const result = await admin
 		.from('articles')
 		.select(DETAIL_COLUMNS)
 		.eq('type', type)
 		.eq('slug', slug)
 		.eq('status', 'published')
 		.maybeSingle<ArticleRow>();
+	data = result.data;
+	error = result.error;
+
+	if (isMissingPinnedColumn(error)) {
+		const legacy = await admin
+			.from('articles')
+			.select(DETAIL_COLUMNS_BASE)
+			.eq('type', type)
+			.eq('slug', slug)
+			.eq('status', 'published')
+			.maybeSingle<ArticleRow>();
+		data = legacy.data;
+		error = legacy.error;
+	}
 
 	if (error) {
 		console.error('[articles] getPublishedArticle failed', error);
 		return null;
 	}
 
-	return data ? detailFromRow(data) : null;
+	return data ? detailFromRow(withPinnedDefault(data)) : null;
 }
 
 export async function getArticleByIdForReview(id: string): Promise<ArticleDetail | null> {
 	const admin = requireAdmin();
-	const { data, error } = await admin
+	let data: ArticleRow | null = null;
+	let error: { code?: string; message?: string } | null = null;
+
+	const result = await admin
 		.from('articles')
 		.select(DETAIL_COLUMNS)
 		.eq('id', id)
 		.maybeSingle<ArticleRow>();
+	data = result.data;
+	error = result.error;
+
+	if (isMissingPinnedColumn(error)) {
+		const legacy = await admin
+			.from('articles')
+			.select(DETAIL_COLUMNS_BASE)
+			.eq('id', id)
+			.maybeSingle<ArticleRow>();
+		data = legacy.data;
+		error = legacy.error;
+	}
 	if (error) {
 		console.error('[articles] getArticleByIdForReview failed', error);
 		return null;
 	}
-	return data ? detailFromRow(data) : null;
+	return data ? detailFromRow(withPinnedDefault(data)) : null;
 }
 
 export interface ArticleAdminRow extends ArticleSummary {
@@ -178,20 +242,33 @@ export interface ArticleAdminRow extends ArticleSummary {
  */
 export async function listAllArticlesForAdmin(): Promise<ArticleAdminRow[]> {
 	const admin = requireAdmin();
-	const { data, error } = await admin
+	type ArticleAdminRawRow = ArticleRow & { status: 'draft' | 'published' | 'withdrawn' };
+	let data: ArticleAdminRawRow[] | null = null;
+	let error: { code?: string; message?: string } | null = null;
+
+	const result = await admin
 		.from('articles')
 		.select(`${SUMMARY_COLUMNS}, status`)
 		.order('updated_at', { ascending: false });
+	data = result.data as ArticleAdminRawRow[] | null;
+	error = result.error;
+
+	if (isMissingPinnedColumn(error)) {
+		const legacy = await admin
+			.from('articles')
+			.select(`${SUMMARY_COLUMNS_BASE}, status`)
+			.order('updated_at', { ascending: false });
+		data = legacy.data as ArticleAdminRawRow[] | null;
+		error = legacy.error;
+	}
 	if (error) {
 		console.error('[articles] listAllArticlesForAdmin failed', error);
 		return [];
 	}
-	return ((data as (ArticleRow & { status: 'draft' | 'published' | 'withdrawn' })[]) ?? []).map(
-		(row) => ({
-			...summaryFromRow(row),
-			status: row.status
-		})
-	);
+	return (data ?? []).map((row) => ({
+		...summaryFromRow(withPinnedDefault(row)),
+		status: row.status
+	}));
 }
 
 export interface FlyoutEntry {
@@ -247,6 +324,7 @@ function typeRoot(type: ArticleType): string {
 export interface FlyoutAssignmentInput {
 	flyoutSection: FlyoutSection | null;
 	flyoutOrder: number | null;
+	isPinned?: boolean;
 }
 
 /**
@@ -259,16 +337,25 @@ export async function updateArticleFlyoutAssignment(
 	input: FlyoutAssignmentInput
 ): Promise<void> {
 	const admin = requireAdmin();
+	const update: {
+		flyout_section: FlyoutSection | null;
+		flyout_order: number | null;
+		is_pinned?: boolean;
+	} = {
+		flyout_section: input.flyoutSection,
+		flyout_order: input.flyoutSection ? input.flyoutOrder : null
+	};
+	if (input.isPinned !== undefined) {
+		update.is_pinned = input.isPinned;
+	}
+
 	const { error } = await admin
 		.from('articles')
-		.update({
-			flyout_section: input.flyoutSection,
-			flyout_order: input.flyoutSection ? input.flyoutOrder : null
-		})
+		.update(update)
 		.eq('id', articleId);
 	if (error) {
 		console.error('[articles] updateArticleFlyoutAssignment failed', error);
-		throw new Error('Could not update flyout assignment.');
+		throw new Error('Could not update article settings.');
 	}
 }
 

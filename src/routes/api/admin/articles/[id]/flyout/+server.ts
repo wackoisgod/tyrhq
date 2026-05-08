@@ -17,7 +17,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	try {
 		await updateArticleFlyoutAssignment(params.id!, {
 			flyoutSection: body.flyoutSection ?? null,
-			flyoutOrder: body.flyoutOrder ?? null
+			flyoutOrder: body.flyoutOrder ?? null,
+			isPinned: body.isPinned
 		});
 		return json({ ok: true });
 	} catch (err) {
