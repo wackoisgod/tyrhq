@@ -126,7 +126,7 @@ export type ComputedBuild = {
 	}>;
 };
 
-const attributeAliasMap = new Map([['ShellSwapTime', 'IntraClipReloadTime']]);
+const attributeAliasMap = new Map<string, string>();
 
 const componentEffectMappings = [
 	{ pattern: /MaxAndStartingEnergyMultiply/i, key: 'MaxAbilityResource', mode: 'mult' },
@@ -147,6 +147,7 @@ const componentEffectMappings = [
 	{ pattern: /ReloadTimePercent/i, key: 'ReloadTime', mode: 'mult' },
 	{ pattern: /ReloadTime/i, key: 'ReloadTime', mode: 'add' },
 	{ pattern: /Intra.*Reload/i, key: 'IntraClipReloadTime', mode: 'add' },
+	{ pattern: /ShellSwapTime/i, key: 'ShellSwapTime', mode: 'add' },
 	{ pattern: /AbilityCooldown(?:Reduction)/i, key: 'AbilityCooldown', mode: 'add', negate: true },
 	{ pattern: /AbilityCooldown/i, key: 'AbilityCooldown', mode: 'add' },
 	{ pattern: /(?<!HealFor)AbilityCost|EnergyCost/i, key: 'AbilityCost', mode: 'mult' },
@@ -165,6 +166,7 @@ const descriptionStatMappings = [
 	{ pattern: /penetration/, key: 'ShellPenetration' },
 	{ pattern: /reload time/, key: 'ReloadTime' },
 	{ pattern: /intra.*reload|intra-?clip/, key: 'IntraClipReloadTime' },
+	{ pattern: /shell swap time/, key: 'ShellSwapTime' },
 	{ pattern: /clip size/, key: 'ClipSize' },
 	{ pattern: /shell velocity|velocity/, key: 'ShellVelocity' },
 	{ pattern: /base dispersion|aiming dispersion/, key: 'BaseDispersionPenalty' },

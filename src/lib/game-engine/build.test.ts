@@ -427,4 +427,47 @@ describe('computeBuild aggregator math', () => {
 		expect(build!.stats.MaxHealth).toBeCloseTo(1500, 4);
 		expect(build!.breakdown.ShellDamage ?? []).toHaveLength(0);
 	});
+
+	it('shell swap time talents do not modify intra-clip reload time', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const shellSwapEffect = makeEffect('ShellSwapTime', 'ShellSwapTime', 'AddBase', -2.2);
+		const shellSwapTalent = makeTalent(
+			'brawler-talent001',
+			'Shell Swap Time',
+			['ShellSwapTime'],
+			[-1.1, -2.2],
+			2
+		);
+		const vehicle = makeVehicle(
+			'brawler',
+			{ IntraClipReloadTime: 4.5, ShellSwapTime: 4 },
+			'standard',
+			'tree_brawler'
+		);
+		const tree = makeTree('tree_brawler', 'brawler', ['brawler-talent001']);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [shellSwapTalent],
+			effects: [shellSwapEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'brawler',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { 'brawler-talent001': 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.IntraClipReloadTime).toBeCloseTo(4.5, 4);
+		expect(build!.stats.ShellSwapTime).toBeCloseTo(1.8, 4);
+		expect(build!.breakdown.IntraClipReloadTime ?? []).toHaveLength(0);
+		expect(build!.breakdown.ShellSwapTime?.[0]?.delta).toBeCloseTo(-2.2, 4);
+	});
 });

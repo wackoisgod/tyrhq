@@ -11,6 +11,7 @@ export const statDefinitions: StatDefinition[] = [
 	{ key: 'ShellPenetration', label: 'Penetration', group: 'Weapon' },
 	{ key: 'ReloadTime', label: 'Reload Time', group: 'Weapon', unit: 's', lowerBetter: true },
 	{ key: 'IntraClipReloadTime', label: 'Intra Reload', group: 'Weapon', unit: 's', lowerBetter: true },
+	{ key: 'ShellSwapTime', label: 'Shell Swap Time', group: 'Weapon', unit: 's', lowerBetter: true },
 	{ key: 'ShellVelocity', label: 'Shell Velocity', group: 'Weapon', unit: 'm/s' },
 	{
 		key: 'BaseDispersionPenalty',
