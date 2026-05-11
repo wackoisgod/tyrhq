@@ -1371,6 +1371,11 @@ input[type="radio"] {
 		backdrop-filter: none;
 		-webkit-backdrop-filter: none;
 		box-shadow: none;
+		display: none;
+	}
+
+	.tyr-nav-flyout__panel[data-open="true"] {
+		display: block;
 	}
 
 	.tyr-nav-flyout__cols {
