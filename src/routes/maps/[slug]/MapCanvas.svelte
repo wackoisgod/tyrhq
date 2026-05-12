@@ -446,10 +446,44 @@
 		});
 	}
 
+	function trimPointsForArrowEnd(points: Point[], w: number, h: number, strokeWidth: number): Point[] {
+		if (points.length < 2) return points;
+		const arrowHeadSize = Math.max(12, strokeWidth * 4.6);
+		const back = arrowHeadSize * 0.68;
+		if (back <= 0) return points;
+
+		let remaining = back;
+		const lastIndex = points.length - 1;
+		for (let i = lastIndex; i > 0; i -= 1) {
+			const next = points[i];
+			const prev = points[i - 1];
+			const dx = (next.x - prev.x) * w;
+			const dy = (next.y - prev.y) * h;
+			const segLen = Math.hypot(dx, dy);
+			if (segLen <= 0) continue;
+			if (segLen >= remaining) {
+				const t = remaining / segLen;
+				const trimmed = {
+					x: next.x - (next.x - prev.x) * t,
+					y: next.y - (next.y - prev.y) * t
+				};
+				return [...points.slice(0, i), trimmed];
+			}
+			remaining -= segLen;
+		}
+
+		return [points[0]];
+	}
+
 	function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, w: number, h: number) {
 		if (stroke.points.length < 2) return;
+		const isPenArrow = stroke.tool === 'pen' && stroke.endType === 'arrow';
+		const pointsForCurve = isPenArrow
+			? trimPointsForArrowEnd(stroke.points, w, h, stroke.width)
+			: stroke.points;
+
 		ctx.save();
-		ctx.lineCap = stroke.tool === 'pen' && stroke.endType === 'arrow' ? 'butt' : 'round';
+		ctx.lineCap = isPenArrow ? 'butt' : 'round';
 		ctx.lineJoin = 'round';
 		ctx.lineWidth = stroke.width;
 		if (stroke.tool === 'eraser') {
@@ -460,9 +494,11 @@
 			ctx.strokeStyle = stroke.color;
 		}
 		applyLineStyleToCanvas(ctx, stroke.lineStyle, stroke.width);
-		ctx.beginPath();
-		drawStrokePath(ctx, stroke.points, w, h);
-		ctx.stroke();
+		if (pointsForCurve.length >= 2) {
+			ctx.beginPath();
+			drawStrokePath(ctx, pointsForCurve, w, h);
+			ctx.stroke();
+		}
 		ctx.setLineDash([]);
 
 		if (stroke.tool === 'pen') {
