@@ -449,7 +449,7 @@
 	function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke, w: number, h: number) {
 		if (stroke.points.length < 2) return;
 		ctx.save();
-		ctx.lineCap = 'round';
+		ctx.lineCap = stroke.tool === 'pen' && stroke.endType === 'arrow' ? 'butt' : 'round';
 		ctx.lineJoin = 'round';
 		ctx.lineWidth = stroke.width;
 		if (stroke.tool === 'eraser') {
@@ -806,9 +806,11 @@
 		const geometry = getArrowGeometry(shape.start, shape.end, shape.width);
 		if (!geometry) return shape.end;
 		const { angle, back } = geometry;
+		const length = Math.hypot(shape.end.x - shape.start.x, shape.end.y - shape.start.y);
+		const trim = Math.min(back, Math.max(0, length));
 		return {
-			x: shape.end.x - back * Math.cos(angle),
-			y: shape.end.y - back * Math.sin(angle)
+			x: shape.end.x - trim * Math.cos(angle),
+			y: shape.end.y - trim * Math.sin(angle)
 		};
 	}
 
@@ -1225,7 +1227,7 @@
 		ctx.strokeStyle = shape.color;
 		ctx.fillStyle = shape.color;
 		ctx.lineWidth = shape.width;
-		ctx.lineCap = 'round';
+		ctx.lineCap = shape.endType === 'arrow' ? 'butt' : 'round';
 		ctx.lineJoin = 'round';
 		ctx.shadowColor = withAlpha(shape.color, 0.35);
 		ctx.shadowBlur = shape.width * 2.4;
@@ -2800,6 +2802,7 @@
 								>
 									{#if shape.kind === 'line'}
 										{@const lineEnd = getLineDrawEnd(shape)}
+										{@const visibleCap = shape.endType === 'arrow' ? 'butt' : 'round'}
 										{#if selectedShapeId === shape.id}
 											<line
 												x1={toSvgCoord(shape.start.x)}
@@ -2831,7 +2834,7 @@
 											stroke-width={getShapeStrokeWidth(shape)}
 											stroke-dasharray={getSvgDashArray(shape.lineStyle, getShapeStrokeWidth(shape))}
 											vector-effect="non-scaling-stroke"
-											stroke-linecap="round"
+											stroke-linecap={visibleCap}
 											stroke-linejoin="round"
 										/>
 										{#if shape.endType === 'arrow'}
@@ -3012,6 +3015,7 @@
 								<g opacity="0.92">
 									{#if currentShape.kind === 'line'}
 										{@const previewLineEnd = getLineDrawEnd(currentShape)}
+										{@const previewCap = currentShape.endType === 'arrow' ? 'butt' : 'round'}
 										<line
 											x1={toSvgCoord(currentShape.start.x)}
 											y1={toSvgCoord(currentShape.start.y)}
@@ -3021,7 +3025,7 @@
 											stroke-width={getShapeStrokeWidth(currentShape)}
 											stroke-dasharray={getSvgDashArray(currentShape.lineStyle, getShapeStrokeWidth(currentShape))}
 											vector-effect="non-scaling-stroke"
-											stroke-linecap="round"
+											stroke-linecap={previewCap}
 										/>
 										{#if currentShape.endType === 'arrow'}
 											<polygon points={getArrowHeadPoints(currentShape.start, currentShape.end, currentShape.width)} fill={currentShape.color} />
