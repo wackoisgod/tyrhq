@@ -125,6 +125,41 @@ export async function getMapRoomWithEffectiveState(shareToken: string) {
 	};
 }
 
+export async function updateMapRoomMap(input: {
+	shareToken: string;
+	hostUserId: string;
+	mapSlug: string;
+}) {
+	const admin = getAdminClientOrThrow();
+	const room = await getMapRoomByToken(input.shareToken);
+	if (!room) return { room: null as MapRoomRecord | null, forbidden: false };
+	if (room.host_user_id !== input.hostUserId) {
+		return { room: null as MapRoomRecord | null, forbidden: true };
+	}
+	if (room.map_slug === input.mapSlug) {
+		return { room, forbidden: false };
+	}
+
+	const { error: deleteError } = await admin.from('map_room_events').delete().eq('room_id', room.id);
+	if (deleteError) throw deleteError;
+
+	const now = new Date().toISOString();
+	const { data, error } = await admin
+		.from('map_rooms')
+		.update({
+			map_slug: input.mapSlug,
+			state: {},
+			updated_at: now,
+			last_activity_at: now
+		})
+		.eq('id', room.id)
+		.select('id, map_slug, host_user_id, title, share_token, state, created_at, updated_at, last_activity_at')
+		.single<MapRoomRecord>();
+
+	if (error) throw error;
+	return { room: data, forbidden: false };
+}
+
 export async function appendMapRoomEvent(shareToken: string, envelope: PlannerOperationEnvelope) {
 	const admin = getAdminClientOrThrow();
 	const room = await getMapRoomByToken(shareToken);

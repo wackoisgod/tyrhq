@@ -38,12 +38,14 @@
 	};
 	type CurrentUserIdentity = { id: string; displayName: string } | null;
 	type RoomConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+	type AvailableMap = { slug: string; name: string };
 
 	let {
 		minimapSrc,
 		mapName,
 		mapSlug,
 		tanks,
+		availableMaps = [],
 		mapMeters = 1000,
 		room = null,
 		currentUser = null
@@ -52,6 +54,7 @@
 		mapName: string;
 		mapSlug: string;
 		tanks: TankInfo[];
+		availableMaps?: AvailableMap[];
 		mapMeters?: number;
 		room?: MapRoomConfig | null;
 		currentUser?: CurrentUserIdentity;
@@ -153,6 +156,8 @@
 	let roomError = $state<string | null>(null);
 	let roomNotice = $state<string | null>(null);
 	let liveRoomBusy = $state(false);
+	let mapChangeBusy = $state(false);
+	let mapChangeSelection = $state('');
 	let copyRoomLinkLabel = $state('Copy Room Link');
 	let actorId = $state('');
 	let actorName = $state('');
@@ -759,15 +764,22 @@
 		};
 	}
 
-	function getArrowHeadPoints(start: Point, end: Point, width: number) {
+	function getArrowGeometry(start: Point, end: Point, width: number) {
 		const displayWidth = getDisplayStrokeWidth(width);
 		const length = Math.hypot(end.x - start.x, end.y - start.y);
-		if (length < 0.002) return '';
+		if (length < 0.002) return null;
 
 		const angle = Math.atan2(end.y - start.y, end.x - start.x);
 		const head = Math.max(0.018, displayWidth * 0.0046);
 		const back = head * 0.68;
+		return { angle, head, back };
+	}
 
+	function getArrowHeadPoints(start: Point, end: Point, width: number) {
+		const geometry = getArrowGeometry(start, end, width);
+		if (!geometry) return '';
+
+		const { angle, head, back } = geometry;
 		const points = [
 			end,
 			{
@@ -787,6 +799,17 @@
 		return points
 			.map((point) => `${Math.round(point.x * 1000)} ${Math.round(point.y * 1000)}`)
 			.join(', ');
+	}
+
+	function getLineDrawEnd(shape: { start: Point; end: Point; endType: LineEnd; width: number }): Point {
+		if (shape.endType !== 'arrow') return shape.end;
+		const geometry = getArrowGeometry(shape.start, shape.end, shape.width);
+		if (!geometry) return shape.end;
+		const { angle, back } = geometry;
+		return {
+			x: shape.end.x - back * Math.cos(angle),
+			y: shape.end.y - back * Math.sin(angle)
+		};
 	}
 
 	function getStopCapSegment(start: Point, end: Point, width: number) {
@@ -999,6 +1022,55 @@
 		}
 	}
 
+	async function changeRoomMap(targetSlug: string) {
+		if (!room || !room.isHost || mapChangeBusy) return;
+		if (!targetSlug || targetSlug === mapSlug) return;
+		if (typeof window === 'undefined') return;
+
+		mapChangeBusy = true;
+		roomError = null;
+		roomNotice = 'Switching map…';
+
+		try {
+			const response = await fetch(`/api/map-rooms/${room.token}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ mapSlug: targetSlug })
+			});
+
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({ message: 'Failed to change map' }));
+				roomError = body.message ?? 'Failed to change map';
+				roomNotice = null;
+				mapChangeSelection = mapSlug;
+				return;
+			}
+
+			const payload = await response.json();
+			const nextUrl = (payload.roomUrl as string | undefined) ?? `/maps/${targetSlug}/room/${room.token}`;
+
+			if (roomChannel) {
+				try {
+					await roomChannel.send({
+						type: 'broadcast',
+						event: 'map-changed',
+						payload: { mapSlug: targetSlug, roomUrl: nextUrl }
+					});
+				} catch {
+					/* best-effort broadcast; receivers will still re-sync on next room load */
+				}
+			}
+
+			window.location.assign(nextUrl);
+		} catch {
+			roomError = 'Network error while changing map.';
+			roomNotice = null;
+			mapChangeSelection = mapSlug;
+		} finally {
+			mapChangeBusy = false;
+		}
+	}
+
 	function syncParticipantsFromPresence() {
 		if (!roomChannel) {
 			participants = [];
@@ -1145,6 +1217,10 @@
 		const length = Math.hypot(x2 - x1, y2 - y1);
 		if (length < 4) return;
 
+		const lineDrawEnd = getLineDrawEnd(shape);
+		const lineX2 = lineDrawEnd.x * w;
+		const lineY2 = lineDrawEnd.y * h;
+
 		ctx.save();
 		ctx.strokeStyle = shape.color;
 		ctx.fillStyle = shape.color;
@@ -1157,7 +1233,7 @@
 
 		ctx.beginPath();
 		ctx.moveTo(x1, y1);
-		ctx.lineTo(x2, y2);
+		ctx.lineTo(lineX2, lineY2);
 		ctx.stroke();
 		ctx.setLineDash([]);
 
@@ -1715,10 +1791,8 @@
 		if (!canvasEl || !containerEl) return;
 		const rect = containerEl.getBoundingClientRect();
 		const dpr = window.devicePixelRatio || 1;
-		canvasEl.width = rect.width * dpr;
-		canvasEl.height = rect.height * dpr;
-		const ctx = canvasEl.getContext('2d');
-		if (ctx) ctx.scale(dpr, dpr);
+		canvasEl.width = Math.max(1, Math.round(rect.width * dpr));
+		canvasEl.height = Math.max(1, Math.round(rect.height * dpr));
 		redrawPlanner();
 		captureBaseHeight();
 	}
@@ -2510,6 +2584,14 @@
 				applyOperationLocally(envelope.operation, { remember: false });
 				roomNotice = null;
 			})
+			.on('broadcast', { event: 'map-changed' }, ({ payload }) => {
+				const next = payload as { mapSlug?: string; roomUrl?: string } | undefined;
+				if (!next?.mapSlug || next.mapSlug === mapSlug) return;
+				if (typeof window === 'undefined') return;
+				roomNotice = 'The host changed the map. Loading…';
+				const target = next.roomUrl ?? (room ? `/maps/${next.mapSlug}/room/${room.token}` : null);
+				if (target) window.location.assign(target);
+			})
 			.on('presence', { event: 'sync' }, () => {
 				syncParticipantsFromPresence();
 			})
@@ -2717,6 +2799,7 @@
 									oncontextmenu={(e) => deleteShape(e, shape.id)}
 								>
 									{#if shape.kind === 'line'}
+										{@const lineEnd = getLineDrawEnd(shape)}
 										{#if selectedShapeId === shape.id}
 											<line
 												x1={toSvgCoord(shape.start.x)}
@@ -2742,8 +2825,8 @@
 										<line
 											x1={toSvgCoord(shape.start.x)}
 											y1={toSvgCoord(shape.start.y)}
-											x2={toSvgCoord(shape.end.x)}
-											y2={toSvgCoord(shape.end.y)}
+											x2={toSvgCoord(lineEnd.x)}
+											y2={toSvgCoord(lineEnd.y)}
 											stroke={shape.color}
 											stroke-width={getShapeStrokeWidth(shape)}
 											stroke-dasharray={getSvgDashArray(shape.lineStyle, getShapeStrokeWidth(shape))}
@@ -2928,11 +3011,12 @@
 							{#if currentShape}
 								<g opacity="0.92">
 									{#if currentShape.kind === 'line'}
+										{@const previewLineEnd = getLineDrawEnd(currentShape)}
 										<line
 											x1={toSvgCoord(currentShape.start.x)}
 											y1={toSvgCoord(currentShape.start.y)}
-											x2={toSvgCoord(currentShape.end.x)}
-											y2={toSvgCoord(currentShape.end.y)}
+											x2={toSvgCoord(previewLineEnd.x)}
+											y2={toSvgCoord(previewLineEnd.y)}
 											stroke={currentShape.color}
 											stroke-width={getShapeStrokeWidth(currentShape)}
 											stroke-dasharray={getSvgDashArray(currentShape.lineStyle, getShapeStrokeWidth(currentShape))}
@@ -3251,6 +3335,48 @@
 							Join Room
 						</button>
 					</form>
+				{/if}
+
+				{#if room?.isHost && availableMaps.length > 1}
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						<label
+							for="map-switcher"
+							class="hud-eyebrow text-[10px] tracking-[0.22em] text-[var(--hud-muted)]"
+						>
+							Map
+						</label>
+						<select
+							id="map-switcher"
+							class="min-w-[10rem] rounded-sm bg-[var(--hud-panel)]/80 px-2 py-1.5 text-xs text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.3)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+							disabled={mapChangeBusy}
+							value={mapChangeSelection || mapSlug}
+							onchange={(event) => {
+								const next = (event.currentTarget as HTMLSelectElement).value;
+								mapChangeSelection = next;
+								if (next !== mapSlug) {
+									const confirmed =
+										typeof window === 'undefined' ||
+										window.confirm(
+											'Switching maps will clear the current drawings for everyone in this room. Continue?'
+										);
+									if (!confirmed) {
+										mapChangeSelection = mapSlug;
+										return;
+									}
+									void changeRoomMap(next);
+								}
+							}}
+						>
+							{#each availableMaps as option (option.slug)}
+								<option value={option.slug}>{option.name}</option>
+							{/each}
+						</select>
+						{#if mapChangeBusy}
+							<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-muted)]">
+								Switching…
+							</span>
+						{/if}
+					</div>
 				{/if}
 
 				{#if roomError}

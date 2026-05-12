@@ -17,9 +17,12 @@ export async function load({ params, locals }) {
 	const map = getMapBySlug(roomResult.room.map_slug);
 	if (!map) throw error(404, 'Map not found');
 
-	const otherMaps = getMaps()
-		.filter((entry) => entry.slug !== map.slug)
-		.slice(0, 4);
+	const allMaps = getMaps();
+	const otherMaps = allMaps.filter((entry) => entry.slug !== map.slug).slice(0, 4);
+	const availableMaps = allMaps.map((entry) => ({
+		slug: entry.slug,
+		name: entry.name
+	}));
 
 	const tanks = getGameSnapshot()
 		.tanks.filter((tank) => tank.selectable)
@@ -35,6 +38,7 @@ export async function load({ params, locals }) {
 	return {
 		map,
 		otherMaps,
+		availableMaps,
 		tanks,
 		room: {
 			token: roomResult.room.share_token,
