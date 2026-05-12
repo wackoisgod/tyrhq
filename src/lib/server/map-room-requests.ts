@@ -151,6 +151,21 @@ export const createMapRoomBodySchema = z
 		}
 	});
 
+export const updateMapRoomBodySchema = z
+	.object({
+		mapSlug: z.string().min(1).max(MAP_SLUG_MAX_LENGTH)
+	})
+	.strict()
+	.superRefine((body, ctx) => {
+		if (!getMapBySlug(body.mapSlug)) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['mapSlug'],
+				message: 'Unknown mapSlug'
+			});
+		}
+	});
+
 export const mapRoomEventBodySchema = z
 	.object({
 		eventId: idSchema,
@@ -206,4 +221,5 @@ export function parseRoomToken(token: string) {
 }
 
 export type CreateMapRoomBody = z.infer<typeof createMapRoomBodySchema>;
+export type UpdateMapRoomBody = z.infer<typeof updateMapRoomBodySchema>;
 export type MapRoomEventBody = z.infer<typeof mapRoomEventBodySchema>;

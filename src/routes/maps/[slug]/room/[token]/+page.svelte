@@ -69,6 +69,7 @@
 					mapName={data.map.name}
 					mapSlug={data.map.slug}
 					tanks={data.tanks}
+					availableMaps={data.availableMaps}
 					room={data.room}
 					currentUser={currentUser}
 				/>
