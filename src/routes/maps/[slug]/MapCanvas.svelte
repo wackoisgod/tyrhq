@@ -969,6 +969,7 @@
 	function hydrateActorIdentity() {
 		if (!room) return;
 		roomPresenceKey = roomPresenceKey || createPlannerId('event');
+		roomPresenceJoinedAt = roomPresenceJoinedAt || new Date().toISOString();
 		if (currentUser) {
 			actorId = currentUser.id;
 			actorName = currentUser.displayName;
@@ -2600,8 +2601,6 @@
 			},
 			global: { fetch }
 		});
-		roomPresenceJoinedAt = roomPresenceJoinedAt || new Date().toISOString();
-		roomPresenceKey = roomPresenceKey || createPlannerId('event');
 		roomConnectionState = 'connecting';
 		roomNotice = 'Connecting to live room…';
 		roomError = null;
@@ -2670,7 +2669,9 @@
 			participants = [];
 			roomConnectionState = 'disconnected';
 			roomChannel = null;
+			void channel.untrack();
 			void supabase.removeChannel(channel);
+			supabase.realtime.disconnect();
 		};
 	});
 
