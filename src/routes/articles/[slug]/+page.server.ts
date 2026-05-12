@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getPublishedArticle } from '$lib/server/articles';
+import { listArticleContributors } from '$lib/server/article-revisions';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
@@ -8,5 +9,6 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	});
 	const post = await getPublishedArticle('article', params.slug);
 	if (!post) throw error(404, 'Post not found');
-	return { post };
+	const contributors = await listArticleContributors(post.id);
+	return { post, contributors };
 };

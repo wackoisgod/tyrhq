@@ -3,11 +3,18 @@
 	import type { Snippet } from 'svelte';
 
 	type Vehicle = { slug: string; name: string };
+	type Contributor = {
+		userId: string;
+		displayName: string | null;
+		contributionCount: number;
+	};
 
 	let {
 		type,
 		article,
 		vehicles = [],
+		contributors = [],
+		historyHref,
 		backHref,
 		backLabel,
 		headerActions,
@@ -16,6 +23,8 @@
 	}: {
 		type: 'guide' | 'article' | 'patch';
 		article: {
+			id?: string;
+			slug?: string;
 			title: string;
 			summary: string | null;
 			tags: string[] | null;
@@ -28,6 +37,8 @@
 			version?: string | null;
 		};
 		vehicles?: Vehicle[];
+		contributors?: Contributor[];
+		historyHref?: string;
 		backHref: string;
 		backLabel: string;
 		headerActions?: Snippet;
@@ -117,6 +128,23 @@
 				</h1>
 				{#if article.authorDisplay}
 					<p class="mt-2 text-sm text-[var(--hud-dim)]">By {article.authorDisplay}</p>
+				{/if}
+				{#if contributors.length > 0}
+					<p class="mt-1 text-xs text-[var(--hud-dim)]">
+						<span class="font-semibold uppercase tracking-[0.18em]">Contributors:</span>
+						{#each contributors as contributor, i (contributor.userId)}
+							<span
+								title={contributor.contributionCount > 1
+									? `${contributor.contributionCount} edits`
+									: '1 edit'}
+							>{contributor.displayName ?? 'Anonymous'}</span>{#if i < contributors.length - 1}, {/if}
+						{/each}
+					</p>
+				{/if}
+				{#if historyHref}
+					<p class="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+						<a class="hud-link" href={historyHref}>View revision history</a>
+					</p>
 				{/if}
 			</div>
 			{#if headerActions}

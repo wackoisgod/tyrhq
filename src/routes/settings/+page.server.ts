@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { loadProfile } from '$lib/server/settings';
+import { countContributionsByUser } from '$lib/server/article-revisions';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { session, user, role } = await locals.safeGetSession();
@@ -9,8 +10,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const profile = await loadProfile(locals, user.id);
 	const isOnboarding = !profile.display_name;
+	const contributionCount = isOnboarding ? 0 : await countContributionsByUser(user.id);
 
-	return { profile, isOnboarding, role };
+	return { profile, isOnboarding, role, contributionCount };
 };
 
 export const actions: Actions = {

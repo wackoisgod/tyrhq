@@ -8,6 +8,8 @@
 <ArticlePageShell
 	type="article"
 	article={data.post}
+	contributors={data.contributors}
+	historyHref={`/articles/${data.post.slug}/history`}
 	backHref="/articles"
 	backLabel="Back To Articles"
 >

@@ -193,6 +193,12 @@
 					<p class="mt-2 text-sm text-[var(--hud-text)]">
 						Drafts, submissions in review, and reviewer notes.
 					</p>
+					<p class="mt-3 font-mono text-2xl text-[var(--hud-text)]">
+						{data.contributionCount}
+					</p>
+					<p class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+						approved edits to other authors' articles
+					</p>
 				</a>
 
 				{#if data.role === 'contributor' || data.role === 'admin'}

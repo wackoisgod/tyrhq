@@ -664,6 +664,7 @@ async function publishApprovedSubmission(
 	}
 
 	const author = await resolvePublishedAuthor(submission);
+	const submitterDisplay = await getProfileDisplayName(submission.submitter_id);
 
 	// 1. Upsert the article row.
 	let articleId = submission.parent_article_id;
@@ -743,6 +744,8 @@ async function publishApprovedSubmission(
 			vehicle_slugs: submission.vehicle_slugs,
 			author_display: author.authorDisplay,
 			created_by: reviewerId,
+			submitter_user_id: submission.submitter_id,
+			submitter_display: submitterDisplay,
 			hero_image_url: submission.hero_image_url
 		})
 		.select('id')

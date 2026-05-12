@@ -56,6 +56,8 @@
 	type="guide"
 	article={data.guide}
 	vehicles={data.vehicles}
+	contributors={data.contributors}
+	historyHref={`/guides/${data.guide.slug}/history`}
 	backHref="/guides"
 	backLabel="Back To Guides"
 >

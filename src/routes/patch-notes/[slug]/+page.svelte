@@ -55,6 +55,8 @@
 <ArticlePageShell
 	type="patch"
 	article={data.patch}
+	contributors={data.contributors}
+	historyHref={`/patch-notes/${data.patch.slug}/history`}
 	backHref="/patch-notes"
 	backLabel="Back To Patch Notes"
 >

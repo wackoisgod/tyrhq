@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getPublishedArticle } from '$lib/server/articles';
+import { listArticleContributors } from '$lib/server/article-revisions';
 import { getGameSnapshot } from '$lib/data/game-data';
 import type { PageServerLoad } from './$types';
 
@@ -31,5 +32,7 @@ export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
 		.filter((t): t is NonNullable<typeof t> => Boolean(t))
 		.map((t) => ({ slug: t.slug, name: t.name, classLabel: t.classLabel }));
 
-	return { guide, vehicles, userHasStarred };
+	const contributors = await listArticleContributors(guide.id);
+
+	return { guide, vehicles, userHasStarred, contributors };
 };

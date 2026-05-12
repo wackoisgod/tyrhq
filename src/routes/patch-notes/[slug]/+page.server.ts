@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getPublishedArticle } from '$lib/server/articles';
+import { listArticleContributors } from '$lib/server/article-revisions';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
@@ -24,5 +25,7 @@ export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
 		userHasStarred = !!starRow;
 	}
 
-	return { patch, userHasStarred };
+	const contributors = await listArticleContributors(patch.id);
+
+	return { patch, userHasStarred, contributors };
 };
