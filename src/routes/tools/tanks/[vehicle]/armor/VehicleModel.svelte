@@ -14,13 +14,16 @@
 		Object3D,
 		OrthographicCamera,
 		PlaneGeometry,
+		Quaternion,
 		Scene,
 		ShaderMaterial,
+		SkinnedMesh,
 		Vector2,
 		Vector3,
 		type Material
 	} from 'three';
 	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+	import type { VehicleDeploySpec, DeployAxis } from '$lib/data/vehicle-deploy-spec';
 
 	type ArmorData = {
 		vehicleId: string;
@@ -37,13 +40,17 @@
 		onhover,
 		onclick,
 		shellPenetration = 50,
-		showArmorVisualizer = true
+		showArmorVisualizer = true,
+		deploySpec = null,
+		deployed = false
 	}: {
 		vehicleId: string;
 		onhover: (info: ArmorHitInfo | null) => void;
 		onclick: (info: ArmorHitInfo | null) => void;
 		shellPenetration?: number;
 		showArmorVisualizer?: boolean;
+		deploySpec?: VehicleDeploySpec | null;
+		deployed?: boolean;
 	} = $props();
 
 	interactivity();
@@ -71,6 +78,15 @@
 	let armorFillMaterial: ShaderMaterial | null = null;
 	let armorMetaMaterial: ShaderMaterial | null = null;
 	let visualRoot: Object3D | null = $state(null);
+
+	type DeployBinding = {
+		joint: Object3D;
+		bindQuat: Quaternion;
+		deployedQuat: Quaternion;
+	};
+	let deployBindings: DeployBinding[] = [];
+	let skinnedMeshes: SkinnedMesh[] = [];
+	let deployProgress = 0;
 
 	const AUTO_BOUNCE_ANGLE = 80;
 	const OVERMATCH_MULTIPLIER = 4.0;
@@ -532,6 +548,68 @@
 		return root;
 	}
 
+	function axisVector(axis: DeployAxis) {
+		if (axis === 'x') return new Vector3(1, 0, 0);
+		if (axis === 'y') return new Vector3(0, 1, 0);
+		return new Vector3(0, 0, 1);
+	}
+
+	function collectSkinnedMeshes(root: Object3D | null) {
+		if (!root) return [] as SkinnedMesh[];
+		const found: SkinnedMesh[] = [];
+		root.traverse((child) => {
+			if ((child as SkinnedMesh).isSkinnedMesh) {
+				found.push(child as SkinnedMesh);
+			}
+		});
+		return found;
+	}
+
+	function findJointByName(root: Object3D | null, name: string): Object3D | null {
+		if (!root) return null;
+		let match: Object3D | null = null;
+		root.traverse((child) => {
+			if (match !== null) return;
+			if (child.name === name) match = child;
+		});
+		return match;
+	}
+
+	function buildDeployBindings(
+		spec: VehicleDeploySpec | null,
+		roots: (Object3D | null)[]
+	): DeployBinding[] {
+		if (!spec) return [];
+		const bindings: DeployBinding[] = [];
+		for (const config of spec.joints) {
+			const angleRad = (config.angleDeg * Math.PI) / 180;
+			const delta = new Quaternion().setFromAxisAngle(axisVector(config.axis), angleRad);
+			for (const root of roots) {
+				const joint = findJointByName(root, config.jointName);
+				if (!joint) continue;
+				const bindQuat = joint.quaternion.clone();
+				const deployedQuat = bindQuat.clone().multiply(delta);
+				bindings.push({ joint, bindQuat, deployedQuat });
+			}
+		}
+		return bindings;
+	}
+
+	function easeInOut(t: number) {
+		return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+	}
+
+	function applyDeployProgress(progress: number) {
+		if (!deployBindings.length) return;
+		const eased = easeInOut(Math.max(0, Math.min(1, progress)));
+		for (const binding of deployBindings) {
+			binding.joint.quaternion.slerpQuaternions(binding.bindQuat, binding.deployedQuat, eased);
+		}
+		for (const mesh of skinnedMeshes) {
+			mesh.skeleton.update();
+		}
+	}
+
 	function disposeMaterial(material: Material | Material[] | undefined) {
 		if (!material) return;
 		if (Array.isArray(material)) {
@@ -654,6 +732,21 @@
 			(overlayQuad.geometry as PlaneGeometry).dispose();
 			compositeMaterial.dispose();
 		};
+	});
+
+	useTask((delta) => {
+		if (!deployBindings.length) return;
+		const target = deployed ? 1 : 0;
+		if (deployProgress === target) return;
+
+		const durationSec = Math.max(0.05, (deploySpec?.durationMs ?? 600) / 1000);
+		const step = delta / durationSec;
+		if (target > deployProgress) {
+			deployProgress = Math.min(target, deployProgress + step);
+		} else {
+			deployProgress = Math.max(target, deployProgress - step);
+		}
+		applyDeployProgress(deployProgress);
 	});
 
 	useTask(
@@ -787,6 +880,17 @@
 				armorFillMaterial = builtArmor.fillMaterial;
 				armorMetaMaterial = builtArmor.metaMaterial;
 				visualRoot = localVisualRoot;
+
+				deployBindings = buildDeployBindings(deploySpec, [
+					localVisualRoot,
+					localArmorPickMesh
+				]);
+				skinnedMeshes = [
+					...collectSkinnedMeshes(localVisualRoot),
+					...collectSkinnedMeshes(localArmorPickMesh)
+				];
+				deployProgress = deployed ? 1 : 0;
+				applyDeployProgress(deployProgress);
 			})
 			.catch((error) => {
 				console.error('[ArmorViewer] Failed to load viewer assets for', currentVehicleId, error);
@@ -795,6 +899,8 @@
 		return () => {
 			cancelled = true;
 			onhover(null);
+			deployBindings = [];
+			skinnedMeshes = [];
 
 			if (localArmorMesh) {
 				armorScene.remove(localArmorMesh);

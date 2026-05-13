@@ -2,19 +2,24 @@
 	import { Canvas } from '@threlte/core';
 	import VehicleModel from './VehicleModel.svelte';
 	import type { ArmorHitInfo } from './types';
+	import type { VehicleDeploySpec } from '$lib/data/vehicle-deploy-spec';
 
 	let {
 		vehicleId,
 		onhover,
 		onclick,
 		shellPenetration = 90,
-		showArmorVisualizer = true
+		showArmorVisualizer = true,
+		deploySpec = null,
+		deployed = false
 	}: {
 		vehicleId: string;
 		onhover: (info: ArmorHitInfo | null) => void;
 		onclick: (info: ArmorHitInfo | null) => void;
 		shellPenetration?: number;
 		showArmorVisualizer?: boolean;
+		deploySpec?: VehicleDeploySpec | null;
+		deployed?: boolean;
 	} = $props();
 </script>
 
@@ -24,6 +29,14 @@
 	></div>
 
 	<Canvas>
-		<VehicleModel {vehicleId} {onhover} {onclick} {shellPenetration} {showArmorVisualizer} />
+		<VehicleModel
+			{vehicleId}
+			{onhover}
+			{onclick}
+			{shellPenetration}
+			{showArmorVisualizer}
+			{deploySpec}
+			{deployed}
+		/>
 	</Canvas>
 </div>

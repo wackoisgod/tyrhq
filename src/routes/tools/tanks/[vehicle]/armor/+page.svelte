@@ -2,6 +2,7 @@
 	import ArmorViewer from './ArmorViewer.svelte';
 	import ArmorInfoPanel from './ArmorInfoPanel.svelte';
 	import type { ArmorHitInfo } from './types';
+	import { getVehicleDeploySpec } from '$lib/data/vehicle-deploy-spec';
 
 	let { data } = $props();
 
@@ -9,10 +10,13 @@
 	let pinnedArmor: ArmorHitInfo | null = $state(null);
 	let selectedShooterId = $state('');
 	let showArmorVisualizer = $state(true);
+	let isDeployed = $state(false);
 
 	const selectedShooter = $derived(
 		data.shooters.find((entry) => entry.id === selectedShooterId) ?? data.tank
 	);
+
+	const deploySpec = $derived(getVehicleDeploySpec(data.tank.id));
 
 	function clearReadout() {
 		hoveredArmor = null;
@@ -105,6 +109,21 @@
 			>
 				{showArmorVisualizer ? 'Armor Viz On' : 'Armor Viz Off'}
 			</button>
+
+			{#if deploySpec}
+				<button
+					type="button"
+					aria-pressed={isDeployed}
+					class={`rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+						isDeployed
+							? 'border-[var(--hud-lime)] bg-[var(--hud-lime)]/12 text-[var(--hud-lime)]'
+							: 'border-[var(--hud-ghost)] bg-[var(--hud-panel-mid)] text-[var(--hud-muted)] hover:text-[var(--hud-text)]'
+					}`}
+					onclick={() => (isDeployed = !isDeployed)}
+				>
+					{isDeployed ? deploySpec.deployedLabel : deploySpec.stowedLabel}
+				</button>
+			{/if}
 		</div>
 	</div>
 
@@ -116,6 +135,8 @@
 				onclick={(info) => (pinnedArmor = info)}
 				shellPenetration={selectedShooter.stats.penetration}
 				showArmorVisualizer={showArmorVisualizer}
+				{deploySpec}
+				deployed={isDeployed}
 			/>
 		</div>
 
