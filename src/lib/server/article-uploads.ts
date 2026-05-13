@@ -5,7 +5,7 @@ import { getSupabaseAdminClient } from './supabase-admin';
 // `getArticleImageHostPrefix()` builds the public URL from the same name.
 export const ARTICLE_IMAGE_BUCKET = 'article-images';
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const MAX_UPLOAD_DIMENSION = 4000;
 export const MAX_UPLOADS_PER_DAY = 30;
 
