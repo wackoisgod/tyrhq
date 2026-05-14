@@ -51,7 +51,7 @@
 </svelte:head>
 
 <section class="flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
-	<div class="flex items-center gap-4 border-b border-[var(--hud-ghost)] bg-[var(--hud-surface)] px-6 py-3">
+	<div class="flex flex-wrap items-center gap-3 border-b border-[var(--hud-ghost)] bg-[var(--hud-surface)] px-4 py-3 md:gap-4 md:px-6">
 		<a
 			href="/tools/tanks/{data.tank.slug}"
 			class="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--hud-dim)] transition hover:text-[var(--hud-lime)]"
@@ -127,8 +127,8 @@
 		</div>
 	</div>
 
-	<div class="relative flex flex-1 overflow-hidden">
-		<div class="flex-1">
+	<div class="relative flex flex-1 flex-col overflow-hidden md:flex-row">
+		<div class="min-h-0 flex-1">
 			<ArmorViewer
 				vehicleId={data.tank.id}
 				onhover={(info) => (hoveredArmor = info)}

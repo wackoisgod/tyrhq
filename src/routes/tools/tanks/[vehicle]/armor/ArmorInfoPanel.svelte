@@ -31,7 +31,9 @@
 	};
 </script>
 
-<aside class="flex w-80 shrink-0 flex-col border-l border-[var(--hud-ghost)] bg-[var(--hud-panel-deep)]">
+<aside
+	class="flex max-h-[45vh] w-full shrink-0 flex-col overflow-y-auto border-t border-[var(--hud-ghost)] bg-[var(--hud-panel-deep)] md:max-h-none md:w-80 md:overflow-visible md:border-l md:border-t-0"
+>
 	<div class="border-b border-[var(--hud-ghost)] p-5">
 		<div class="text-xs uppercase tracking-[0.32em] text-[var(--hud-dim)]">Target</div>
 		<div class="mt-1 font-[var(--font-display)] text-2xl font-bold uppercase text-[var(--hud-text)]">
