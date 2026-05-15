@@ -1829,9 +1829,14 @@
 	function syncCanvasSize() {
 		if (!canvasEl || !containerEl) return;
 		const rect = containerEl.getBoundingClientRect();
+		if (rect.width <= 0 || rect.height <= 0) return;
 		const dpr = window.devicePixelRatio || 1;
-		canvasEl.width = Math.max(1, Math.round(rect.width * dpr));
-		canvasEl.height = Math.max(1, Math.round(rect.height * dpr));
+		const nextWidth = Math.max(1, Math.round(rect.width * dpr));
+		const nextHeight = Math.max(1, Math.round(rect.height * dpr));
+		if (canvasEl.width !== nextWidth || canvasEl.height !== nextHeight) {
+			canvasEl.width = nextWidth;
+			canvasEl.height = nextHeight;
+		}
 		redrawPlanner();
 		captureBaseHeight();
 	}
@@ -2677,9 +2682,39 @@
 
 	$effect(() => {
 		if (!containerEl) return;
-		const observer = new ResizeObserver(() => syncCanvasSize());
+		if (typeof window === 'undefined') return;
+
+		let frame = 0;
+		const scheduleSync = () => {
+			if (frame !== 0) return;
+			frame = window.requestAnimationFrame(() => {
+				frame = 0;
+				syncCanvasSize();
+			});
+		};
+
+		const observer = new ResizeObserver(scheduleSync);
 		observer.observe(containerEl);
-		return () => observer.disconnect();
+
+		window.addEventListener('resize', scheduleSync);
+		window.addEventListener('orientationchange', scheduleSync);
+
+		let dprMedia = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+		const onDprChange = () => {
+			dprMedia.removeEventListener('change', onDprChange);
+			dprMedia = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+			dprMedia.addEventListener('change', onDprChange);
+			scheduleSync();
+		};
+		dprMedia.addEventListener('change', onDprChange);
+
+		return () => {
+			if (frame !== 0) window.cancelAnimationFrame(frame);
+			observer.disconnect();
+			window.removeEventListener('resize', scheduleSync);
+			window.removeEventListener('orientationchange', scheduleSync);
+			dprMedia.removeEventListener('change', onDprChange);
+		};
 	});
 
 	const selectedStamp = $derived(
