@@ -1,5 +1,9 @@
 import runtimeData from '$gamedata/generated/runtime.json';
 
+import {
+	fillGeneratedComponentDescription,
+	type ComponentValueToken
+} from '$lib/game-engine/component-format';
 import type {
 	AmmoSummary,
 	ComponentSummary,
@@ -15,6 +19,23 @@ type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
 	ammo: Array<Omit<GameDataBundle['ammo'][number], 'displayName'> & { displayName?: string }>;
 };
 
+const componentValueTokens = new Map<string, ComponentValueToken>([
+	['agitator', 'LevelValuePercentMultiplyIncrease'],
+	['bulkheads', 'LevelValuePercentMultiplyIncrease'],
+	['camoweb', 'LevelValuePercentMultiplyIncrease'],
+	['coreinjector', 'LevelValuePercentMultiplyDecrease'],
+	['driftsparker', 'LevelValuePercentMultiplyIncrease'],
+	['energyexpander', 'LevelValuePercentMultiplyIncrease'],
+	['extendedgearing', 'LevelValuePercentMultiplyIncrease'],
+	['hotchamber', 'LevelValuePercentMultiplyIncrease'],
+	['powerconverter', 'LevelValuePercentMultiplyDecrease'],
+	['quickslot', 'LevelValuePercentMultiplyDecrease'],
+	['repairmechanism', 'LevelValuePercentMultiplyDecrease'],
+	['sensitivesights', 'LevelValuePercentMultiplyIncrease'],
+	['stablerangefinder', 'LevelValuePercentMultiplyDecrease'],
+	['synchronizer', 'LevelValuePercentMultiplyIncrease']
+]);
+
 function deriveAmmoDisplayName(key: string, fallbackName: string) {
 	const rawName = key.split('.').at(-1) ?? fallbackName;
 	return rawName
@@ -23,12 +44,24 @@ function deriveAmmoDisplayName(key: string, fallbackName: string) {
 		.trim();
 }
 
+function normalizeComponentDescription(component: GameDataBundle['components'][number]) {
+	return fillGeneratedComponentDescription(
+		component.description,
+		component.pointValues,
+		componentValueTokens.get(component.id)
+	);
+}
+
 function normalizeBundle(rawBundle: GameDataBundle): GameDataBundle {
 	return {
 		...rawBundle,
 		ammo: rawBundle.ammo.map((ammo) => ({
 			...ammo,
 			displayName: ammo.displayName || deriveAmmoDisplayName(ammo.key, ammo.name)
+		})),
+		components: rawBundle.components.map((component) => ({
+			...component,
+			description: normalizeComponentDescription(component)
 		}))
 	};
 }
