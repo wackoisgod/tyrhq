@@ -185,7 +185,37 @@ export interface UploadListing {
 	height: number | null;
 	byteSize: number;
 	createdAt: string;
+	uploaderId: string;
+	uploaderName: string | null;
 }
+
+interface UploadRow {
+	public_url: string;
+	mime: string;
+	width: number | null;
+	height: number | null;
+	byte_size: number;
+	created_at: string;
+	uploaded_by: string;
+	uploader: { display_name: string | null } | { display_name: string | null }[] | null;
+}
+
+function rowToListing(row: UploadRow): UploadListing {
+	const uploader = Array.isArray(row.uploader) ? row.uploader[0] : row.uploader;
+	return {
+		url: row.public_url,
+		mime: row.mime,
+		width: row.width,
+		height: row.height,
+		byteSize: row.byte_size,
+		createdAt: row.created_at,
+		uploaderId: row.uploaded_by,
+		uploaderName: uploader?.display_name ?? null
+	};
+}
+
+const LISTING_COLUMNS =
+	'public_url, mime, width, height, byte_size, created_at, uploaded_by, uploader:profiles(display_name)';
 
 export async function listUploadsForUser(
 	uploaderId: string,
@@ -196,7 +226,7 @@ export async function listUploadsForUser(
 
 	const { data, error } = await admin
 		.from('article_uploads')
-		.select('public_url, mime, width, height, byte_size, created_at')
+		.select(LISTING_COLUMNS)
 		.eq('uploaded_by', uploaderId)
 		.order('created_at', { ascending: false })
 		.limit(Math.min(Math.max(1, limit), 200));
@@ -206,21 +236,28 @@ export async function listUploadsForUser(
 		return [];
 	}
 
-	return ((data as Array<{
-		public_url: string;
-		mime: string;
-		width: number | null;
-		height: number | null;
-		byte_size: number;
-		created_at: string;
-	}>) ?? []).map((row) => ({
-		url: row.public_url,
-		mime: row.mime,
-		width: row.width,
-		height: row.height,
-		byteSize: row.byte_size,
-		createdAt: row.created_at
-	}));
+	return ((data as UploadRow[]) ?? []).map(rowToListing);
+}
+
+// Shared pool of uploads across all contributors. The storage bucket is
+// already public-read, so the discoverability change is only in the audit
+// table — gating happens at the API layer (contributor + admin only).
+export async function listSharedUploads(limit = 120): Promise<UploadListing[]> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) return [];
+
+	const { data, error } = await admin
+		.from('article_uploads')
+		.select(LISTING_COLUMNS)
+		.order('created_at', { ascending: false })
+		.limit(Math.min(Math.max(1, limit), 500));
+
+	if (error) {
+		console.error('[article-uploads] listSharedUploads failed', error);
+		return [];
+	}
+
+	return ((data as UploadRow[]) ?? []).map(rowToListing);
 }
 
 export interface SignedUploadTicket {

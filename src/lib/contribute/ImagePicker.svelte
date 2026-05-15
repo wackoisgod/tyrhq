@@ -8,6 +8,8 @@
 		height: number | null;
 		byteSize: number;
 		createdAt: string;
+		uploaderId: string;
+		uploaderName: string | null;
 	};
 
 	let {
@@ -19,6 +21,7 @@
 	} = $props();
 
 	let uploads = $state<Upload[]>([]);
+	let scope = $state<'shared' | 'own'>('own');
 	let loading = $state(false);
 	let loadError = $state('');
 	let loaded = false;
@@ -35,6 +38,7 @@
 			}
 			const data = await res.json();
 			uploads = data.uploads ?? [];
+			scope = data.scope === 'shared' ? 'shared' : 'own';
 			loaded = true;
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : 'Failed to load uploads.';
@@ -102,7 +106,9 @@
 						Image library
 					</div>
 					<h2 class="mt-1 text-sm text-[var(--hud-text)]">
-						Pick from your previous uploads
+						{scope === 'shared'
+							? 'Pick from shared contributor uploads'
+							: 'Pick from your previous uploads'}
 					</h2>
 				</div>
 				<button
@@ -121,7 +127,9 @@
 					<p class="text-xs text-[var(--hud-lime)]">{loadError}</p>
 				{:else if uploads.length === 0}
 					<p class="text-xs text-[var(--hud-dim)]">
-						You haven't uploaded any images yet. Use the Image button to upload one.
+						{scope === 'shared'
+							? 'No contributor uploads yet. Use the Image button to upload one.'
+							: "You haven't uploaded any images yet. Use the Image button to upload one."}
 					</p>
 				{:else}
 					<div
@@ -129,11 +137,12 @@
 						style="grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));"
 					>
 						{#each uploads as upload}
+							{@const uploaderLabel = upload.uploaderName?.trim() || 'Unknown'}
 							<button
 								type="button"
 								onclick={() => pick(upload)}
 								class="group flex flex-col gap-1 rounded-sm bg-[var(--hud-inset)] p-1.5 text-left transition hover:shadow-[inset_0_0_0_2px_var(--hud-teal)]"
-								title="{formatDate(upload.createdAt)} · {formatBytes(upload.byteSize)}{upload.width && upload.height ? ` · ${upload.width}×${upload.height}` : ''}"
+								title="{uploaderLabel} · {formatDate(upload.createdAt)} · {formatBytes(upload.byteSize)}{upload.width && upload.height ? ` · ${upload.width}×${upload.height}` : ''}"
 							>
 								<img
 									src={upload.url}
@@ -142,11 +151,24 @@
 									decoding="async"
 									class="aspect-square w-full rounded-sm bg-black/40 object-cover"
 								/>
-								<span
-									class="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--hud-dim)] group-hover:text-[var(--hud-teal)]"
-								>
-									{formatDate(upload.createdAt)}
-								</span>
+								{#if scope === 'shared'}
+									<span
+										class="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--hud-text)] group-hover:text-[var(--hud-teal)]"
+									>
+										{uploaderLabel}
+									</span>
+									<span
+										class="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--hud-dim)]"
+									>
+										{formatDate(upload.createdAt)}
+									</span>
+								{:else}
+									<span
+										class="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--hud-dim)] group-hover:text-[var(--hud-teal)]"
+									>
+										{formatDate(upload.createdAt)}
+									</span>
+								{/if}
 							</button>
 						{/each}
 					</div>
