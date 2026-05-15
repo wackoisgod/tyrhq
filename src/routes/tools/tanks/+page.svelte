@@ -34,7 +34,7 @@
 					'background: linear-gradient(140deg, rgba(102,218,190,0.12) 0%, rgba(24,28,37,0.92) 44%, rgba(10,14,23,0.98) 100%);',
 				accent: 'text-[var(--hud-teal)]',
 				chip: 'border-[var(--hud-teal)]/35 bg-[var(--hud-teal)]/10 text-[var(--hud-text)]',
-				line: 'bg-[var(--hud-lime)]',
+				line: 'bg-[var(--hud-teal)]',
 				glow: 'rgba(102, 218, 190, 0.15)'
 			};
 		}
@@ -103,7 +103,7 @@
 					{#each tanks as tank}
 						<a
 							href={`/tools/tanks/${tank.slug}`}
-							class="group relative block overflow-hidden rounded-sm bg-[var(--hud-panel-mid)] shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(69,73,50,0.2)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.3)] hover:brightness-110"
+							class="group relative flex h-full flex-col overflow-hidden rounded-sm bg-[var(--hud-panel-mid)] shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(69,73,50,0.2)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.3)] hover:brightness-110"
 						>
 							<div
 								class="relative aspect-[16/10] overflow-hidden bg-[var(--hud-surface)]"
@@ -152,7 +152,7 @@
 									</span>
 								</div>
 							{/if}
-							<div class={`h-1 ${getTankTheme(tank).line}`}></div>
+							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${getTankTheme(tank).line}`}></div>
 						</a>
 					{/each}
 				</div>
