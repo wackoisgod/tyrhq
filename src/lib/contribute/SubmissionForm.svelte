@@ -3,6 +3,7 @@
 	import ImagePicker from './ImagePicker.svelte';
 	import { goto } from '$app/navigation';
 	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
+	import { uploadArticleImage } from './upload-image';
 
 	type Submission = {
 		id: string;
@@ -94,15 +95,7 @@
 		heroError = '';
 		heroUploading = true;
 		try {
-			const form = new FormData();
-			form.append('file', file);
-			if (id) form.append('submissionId', id);
-			const res = await fetch('/api/contribute/images', { method: 'POST', body: form });
-			if (!res.ok) {
-				heroError = (await res.text()) || `Upload failed (${res.status}).`;
-				return;
-			}
-			const data = await res.json();
+			const data = await uploadArticleImage(file, { submissionId: id });
 			heroImageUrl = data.url;
 		} catch (err) {
 			heroError = err instanceof Error ? err.message : 'Upload failed.';

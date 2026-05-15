@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { registerArticleCustomElements } from './custom-elements';
 	import ImagePicker from './ImagePicker.svelte';
+	import { uploadArticleImage } from './upload-image';
 
 	/**
 	 * MVP editor: textarea + friendly toolbar + live preview.
@@ -123,15 +124,7 @@
 		uploadError = '';
 		uploadingImage = true;
 		try {
-			const form = new FormData();
-			form.append('file', file);
-			if (submissionId) form.append('submissionId', submissionId);
-			const res = await fetch('/api/contribute/images', { method: 'POST', body: form });
-			if (!res.ok) {
-				uploadError = (await res.text()) || `Upload failed (${res.status}).`;
-				return;
-			}
-			const data = await res.json();
+			const data = await uploadArticleImage(file, { submissionId: submissionId || null });
 			const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '');
 			insertBlock(`![${alt}](${data.url})`);
 		} catch (err) {

@@ -223,12 +223,24 @@ export async function listUploadsForUser(
 	}));
 }
 
-export async function uploadArticleImage(params: {
+export interface SignedUploadTicket {
+	storagePath: string;
+	token: string;
+	signedUrl: string;
+	bucket: string;
+	expectedMime: string;
+	maxBytes: number;
+	publicUrl: string;
+}
+
+// Issue a signed upload URL so the browser can PUT bytes directly to Supabase
+// Storage, bypassing the serverless function body cap. We pin the storage path
+// to the uploader's ID prefix so finalize can verify ownership without trusting
+// the client.
+export async function signArticleImageUpload(params: {
 	uploaderId: string;
-	submissionId?: string | null;
-	bytes: Uint8Array;
 	declaredMime: string;
-}): Promise<UploadResult> {
+}): Promise<SignedUploadTicket> {
 	const admin = getSupabaseAdminClient();
 	if (!admin) {
 		throw new UploadValidationError(
@@ -237,37 +249,9 @@ export async function uploadArticleImage(params: {
 		);
 	}
 
-	if (params.bytes.byteLength === 0) {
-		throw new UploadValidationError('Empty file.');
-	}
-	if (params.bytes.byteLength > MAX_UPLOAD_BYTES) {
+	if (!SUPPORTED_MIME.has(params.declaredMime)) {
 		throw new UploadValidationError(
-			`Image is too large. Max ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)}MB.`
-		);
-	}
-
-	const meta = readImageMetadata(params.bytes);
-	if (!meta) {
-		throw new UploadValidationError(
-			'Unrecognised image format. Allowed: PNG, JPEG, WebP, GIF.'
-		);
-	}
-	if (!SUPPORTED_MIME.has(meta.mime)) {
-		throw new UploadValidationError(`Unsupported image type: ${meta.mime}`);
-	}
-	// Browser-declared MIME must match the sniffed one; this catches the
-	// "renamed .txt to .png" trick and any honest mismatch.
-	if (params.declaredMime && params.declaredMime !== meta.mime) {
-		throw new UploadValidationError(
-			`Declared content-type ${params.declaredMime} doesn't match detected ${meta.mime}.`
-		);
-	}
-	if (
-		(meta.width !== null && meta.width > MAX_UPLOAD_DIMENSION) ||
-		(meta.height !== null && meta.height > MAX_UPLOAD_DIMENSION)
-	) {
-		throw new UploadValidationError(
-			`Image dimensions exceed ${MAX_UPLOAD_DIMENSION}px on a side.`
+			`Unsupported image type: ${params.declaredMime || '(none)'}`
 		);
 	}
 
@@ -291,33 +275,115 @@ export async function uploadArticleImage(params: {
 	const now = new Date();
 	const yyyy = String(now.getUTCFullYear());
 	const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-	const ext = EXT_BY_MIME[meta.mime];
-	const storagePath = `${yyyy}/${mm}/${randomUUID()}.${ext}`;
+	const ext = EXT_BY_MIME[params.declaredMime];
+	const storagePath = `${params.uploaderId}/${yyyy}/${mm}/${randomUUID()}.${ext}`;
 
-	const { error: uploadError } = await admin.storage
+	const { data, error: signError } = await admin.storage
 		.from(ARTICLE_IMAGE_BUCKET)
-		.upload(storagePath, params.bytes, {
-			contentType: meta.mime,
-			cacheControl: '31536000, immutable',
-			upsert: false
-		});
-	if (uploadError) {
-		console.error('[article-uploads] storage upload failed', uploadError);
-		throw new UploadValidationError('Image upload failed.', 500);
+		.createSignedUploadUrl(storagePath);
+
+	if (signError || !data) {
+		console.error('[article-uploads] signed-url creation failed', signError);
+		throw new UploadValidationError('Could not start upload.', 500);
 	}
 
 	const { data: urlData } = admin.storage.from(ARTICLE_IMAGE_BUCKET).getPublicUrl(storagePath);
+
+	return {
+		storagePath,
+		token: data.token,
+		signedUrl: data.signedUrl,
+		bucket: ARTICLE_IMAGE_BUCKET,
+		expectedMime: params.declaredMime,
+		maxBytes: MAX_UPLOAD_BYTES,
+		publicUrl: urlData.publicUrl
+	};
+}
+
+// Validate a client-uploaded object and write its audit row. The uploader-ID
+// prefix in `storagePath` is checked so callers can't finalize another user's
+// uploads. On any validation failure we delete the orphan.
+export async function finalizeArticleImageUpload(params: {
+	uploaderId: string;
+	submissionId?: string | null;
+	storagePath: string;
+}): Promise<UploadResult> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) {
+		throw new UploadValidationError(
+			'Image uploads are unavailable: Supabase admin client is not configured.',
+			500
+		);
+	}
+
+	const expectedPrefix = `${params.uploaderId}/`;
+	if (!params.storagePath.startsWith(expectedPrefix) || params.storagePath.includes('..')) {
+		throw new UploadValidationError('Invalid storage path.', 403);
+	}
+
+	const { data: blob, error: downloadError } = await admin.storage
+		.from(ARTICLE_IMAGE_BUCKET)
+		.download(params.storagePath);
+	if (downloadError || !blob) {
+		throw new UploadValidationError('Uploaded file not found.', 404);
+	}
+
+	const bytes = new Uint8Array(await blob.arrayBuffer());
+
+	const cleanup = async (reason: string, code = 400) => {
+		const { error: removeError } = await admin.storage
+			.from(ARTICLE_IMAGE_BUCKET)
+			.remove([params.storagePath]);
+		if (removeError) {
+			console.error('[article-uploads] orphan cleanup failed', removeError);
+		}
+		throw new UploadValidationError(reason, code);
+	};
+
+	if (bytes.byteLength === 0) {
+		await cleanup('Empty file.');
+	}
+	if (bytes.byteLength > MAX_UPLOAD_BYTES) {
+		await cleanup(`Image is too large. Max ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)}MB.`, 413);
+	}
+
+	const meta = readImageMetadata(bytes);
+	if (!meta) {
+		await cleanup('Unrecognised image format. Allowed: PNG, JPEG, WebP, GIF.');
+	}
+	if (!SUPPORTED_MIME.has(meta!.mime)) {
+		await cleanup(`Unsupported image type: ${meta!.mime}`);
+	}
+	// The path extension was chosen from the declared MIME at sign time, so a
+	// mismatch here means the client uploaded different content than they
+	// promised — reject and clean up.
+	const expectedExt = params.storagePath.split('.').pop();
+	if (expectedExt !== EXT_BY_MIME[meta!.mime]) {
+		await cleanup(
+			`Uploaded content (${meta!.mime}) doesn't match the requested type.`
+		);
+	}
+	if (
+		(meta!.width !== null && meta!.width > MAX_UPLOAD_DIMENSION) ||
+		(meta!.height !== null && meta!.height > MAX_UPLOAD_DIMENSION)
+	) {
+		await cleanup(`Image dimensions exceed ${MAX_UPLOAD_DIMENSION}px on a side.`);
+	}
+
+	const { data: urlData } = admin.storage
+		.from(ARTICLE_IMAGE_BUCKET)
+		.getPublicUrl(params.storagePath);
 	const publicUrl = urlData.publicUrl;
 
 	const { error: insertError } = await admin.from('article_uploads').insert({
 		uploaded_by: params.uploaderId,
 		submission_id: params.submissionId ?? null,
-		storage_path: `${ARTICLE_IMAGE_BUCKET}/${storagePath}`,
+		storage_path: `${ARTICLE_IMAGE_BUCKET}/${params.storagePath}`,
 		public_url: publicUrl,
-		mime: meta.mime,
-		byte_size: params.bytes.byteLength,
-		width: meta.width,
-		height: meta.height
+		mime: meta!.mime,
+		byte_size: bytes.byteLength,
+		width: meta!.width,
+		height: meta!.height
 	});
 	if (insertError) {
 		// Storage write succeeded but audit row failed — log & continue. The
@@ -327,10 +393,10 @@ export async function uploadArticleImage(params: {
 
 	return {
 		url: publicUrl,
-		storagePath,
-		mime: meta.mime,
-		width: meta.width,
-		height: meta.height,
-		byteSize: params.bytes.byteLength
+		storagePath: params.storagePath,
+		mime: meta!.mime,
+		width: meta!.width,
+		height: meta!.height,
+		byteSize: bytes.byteLength
 	};
 }
