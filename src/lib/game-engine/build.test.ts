@@ -276,6 +276,48 @@ describe('computeBuild aggregator math', () => {
 		expect(componentEntry?.delta).toBeCloseTo(22.5, 4);
 	});
 
+	it('component custom magnitude modifiers use the component point value for supported attributes', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const coreBoosterEffect = makeEffect(
+			'Components_BonusEnergyGainFlat',
+			'GlobalBonusResourceFlat',
+			'AddBase',
+			0,
+			{ magnitudeType: 'CustomCalculationClass' }
+		);
+		const coreBooster = makeComponent(
+			'corebooster',
+			'CORE BOOSTER',
+			['Components_BonusEnergyGainFlat'],
+			[0.5],
+			'Increases every instance of Energy gain by {LevelValue}'
+		);
+		const vehicle = makeVehicle('healer', { MaxAbilityResource: 100 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [coreBooster],
+			talents: [],
+			effects: [coreBoosterEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['corebooster', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.GlobalBonusResourceFlat).toBeCloseTo(0.5, 4);
+		expect(build!.breakdown.GlobalBonusResourceFlat?.[0]?.delta).toBeCloseTo(0.5, 4);
+	});
+
 	it('max health: percent buff applies to (base + Σflat), not just base (BULKHEADS case)', () => {
 		// Replicates the screenshot from feedback: BULKHEADS +8.5% should multiply against
 		// (base + flat talents + flat components), not only the base.

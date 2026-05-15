@@ -57,6 +57,7 @@ export const statDefinitions: StatDefinition[] = [
 	{ key: 'CamoPercentage', label: 'Camo', group: 'Vision', unit: '%' },
 	{ key: 'MaxAbilityResource', label: 'Max Energy', group: 'Ability' },
 	{ key: 'InitialAbilityResource', label: 'Starting Energy', group: 'Ability' },
+	{ key: 'GlobalBonusResourceFlat', label: 'Bonus Energy Gain', group: 'Ability' },
 	{ key: 'AbilityCooldown', label: 'Ability Cooldown', group: 'Ability', unit: 's', lowerBetter: true },
 	{ key: 'AbilityCost', label: 'Ability Cost', group: 'Ability', lowerBetter: true },
 	{

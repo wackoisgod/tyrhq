@@ -268,6 +268,16 @@ function getModifierValue(modifier: EffectRecord['modifiers'][number]) {
 	return extractScalableFloatValue(modifier.magnitude);
 }
 
+function getComponentModifierValue(
+	modifier: EffectRecord['modifiers'][number],
+	component: ComponentRecord
+) {
+	const explicitValue = getModifierValue(modifier);
+	if (explicitValue !== null) return explicitValue;
+	if (modifier.magnitudeType.toLowerCase() !== 'customcalculationclass') return null;
+	return component.pointValues.at(-1) ?? null;
+}
+
 type ContributionMode = 'add' | 'mult' | 'divide' | 'override';
 
 /**
@@ -733,7 +743,7 @@ export function computeBuild(
 			for (const modifier of effect.modifiers) {
 				const attribute = normalizeAttributeKey(modifier.attribute);
 				if (!attribute || !statKeySet.has(attribute)) continue;
-				const value = getModifierValue(modifier);
+				const value = getComponentModifierValue(modifier, component);
 				if (value === null) continue;
 
 				const mode = getModifierModeFromOp(modifier.op) as ContributionMode;
