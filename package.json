@@ -55,5 +55,18 @@
 			"cookie": "^0.7.2"
 		},
 		"picomatch": "^4.0.4"
-	}
+	},
+	"description": "Tyr HQ is an independent third-party companion site for Tyr. It combines site code in this repository with official game data and assets sourced through Stoke-controlled channels, along with build planning, armor viewing, map tools, community build sharing, an in-site contribution system for guides and articles, and a small public API.",
+	"main": "svelte.config.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wackoisgod/tyrhq.git"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/wackoisgod/tyrhq/issues"
+	},
+	"homepage": "https://github.com/wackoisgod/tyrhq#readme"
 }
