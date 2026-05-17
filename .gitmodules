@@ -1,3 +1,4 @@
 [submodule "GameData"]
 	path = GameData
 	url = https://github.com/StokeGames/GameData.git
+	branch = main
