@@ -705,7 +705,7 @@
 	<title>Tyr HQ | Build Planner</title>
 </svelte:head>
 
-<section class="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
+<section class="mx-auto max-w-[96rem] px-4 py-6 md:px-6 md:py-8">
 	{#if selection}
 		<div class="flex flex-col gap-4">
 			<section
@@ -713,7 +713,7 @@
 				style="box-shadow: var(--hud-notch-shadow);"
 			>
 				<div
-					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
 				>
 					<span>Command</span>
 					<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
@@ -762,12 +762,12 @@
 							bind:value={buildName}
 							maxlength={80}
 							placeholder="{currentVehicle.name} Build"
-							class="hud-input w-40 px-2 py-1.5 text-xs text-[var(--hud-text)] md:w-52"
+							class="hud-input w-44 px-3 py-2 text-sm text-[var(--hud-text)] md:w-56"
 						/>
 
 						{#if data.user}
 							<button
-								class="hud-cta-ghost px-4 py-2 text-xs"
+								class="hud-cta-ghost px-4 py-2 text-sm"
 								disabled={saving}
 								onclick={() => saveBuild(editingBuild?.isPublic ?? false)}
 							>
@@ -775,7 +775,7 @@
 							</button>
 							{#if editingBuild?.isPublic}
 							<button
-								class="hud-cta-outline px-4 py-2 text-xs"
+								class="hud-cta-outline px-4 py-2 text-sm"
 								onclick={async () => {
 									await navigator.clipboard.writeText(
 										getAbsoluteUrl(`/builds/${editingBuild!.slug}`, window.location.origin)
@@ -788,7 +788,7 @@
 							</button>
 						{:else}
 							<button
-								class="hud-cta-outline px-4 py-2 text-xs"
+								class="hud-cta-outline px-4 py-2 text-sm"
 								disabled={saving}
 								onclick={() => saveBuild(true)}
 							>
@@ -797,7 +797,7 @@
 						{/if}
 							{#if editingBuild}
 								<button
-									class="hud-cta-ghost px-4 py-2 text-xs"
+									class="hud-cta-ghost px-4 py-2 text-sm"
 									disabled={saving}
 									onclick={saveAsNew}
 								>
@@ -807,14 +807,14 @@
 						{:else}
 							<a
 								href="/auth"
-								class="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
+								class="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
 							>
 								Sign in to save builds
 							</a>
 						{/if}
 
 						<button
-							class="hud-cta-outline px-4 py-2 text-xs"
+							class="hud-cta-outline px-4 py-2 text-sm"
 							disabled={exporting}
 							onclick={exportBuild}
 						>
@@ -822,7 +822,7 @@
 						</button>
 
 						<button
-							class="px-3 py-2 text-xs text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
+							class="px-3 py-2 text-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
 							onclick={newBuild}
 						>
 							New Build
@@ -854,7 +854,7 @@
 
 				<div class="mt-5 grid gap-5">
 					<label class="grid gap-2">
-						<span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
 							>Vehicle</span
 						>
 						{#if isVehicleLocked}
@@ -911,7 +911,7 @@
 				style="box-shadow: var(--hud-notch-shadow);"
 			>
 				<div
-					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
 				>
 					<span>Telemetry</span>
 					<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
@@ -926,7 +926,7 @@
 						>
 							Talent tree
 						</h2>
-						<p class="mt-1 font-mono text-[11px] text-[var(--hud-muted)]">
+						<p class="mt-1 font-mono text-xs text-[var(--hud-muted)]">
 							{currentVehicle.key}
 						</p>
 					</div>
@@ -934,7 +934,7 @@
 						<div
 							class="rounded-sm bg-[var(--hud-inset)] px-3 py-2 text-sm shadow-[inset_0_0_0_1px_rgba(69,73,50,0.2)]"
 						>
-							<span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
+							<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
 								>Spent</span
 							>
 							<span class="ml-2 font-mono font-semibold tabular-nums text-[var(--hud-text)]"
@@ -943,7 +943,7 @@
 						</div>
 						<button
 							type="button"
-							class="rounded-sm border-2 border-[var(--hud-teal)] bg-transparent px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/10"
+							class="rounded-sm border-2 border-[var(--hud-teal)] bg-transparent px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/10"
 							onclick={resetAllTalentPoints}
 						>
 							Reset points
@@ -951,7 +951,7 @@
 					</div>
 				</div>
 
-				<p class="text-xs leading-relaxed text-[var(--hud-muted)]">
+				<p class="text-sm leading-relaxed text-[var(--hud-muted)]">
 					Tiers go left → right. Unlock a column after
 					<span class="text-[var(--hud-teal)]">{TALENT_POINTS_REQUIRED_PER_TIER_STEP}× tier index</span>
 					pts in lower tiers;
@@ -970,7 +970,7 @@
 					>
 						<div
 							class="grid gap-3"
-							style={`grid-template-columns: repeat(${talentGridDims.cols}, minmax(0, 1fr)); grid-template-rows: repeat(${talentGridDims.rows}, 1fr);`}
+							style={`grid-template-columns: repeat(${talentGridDims.cols}, minmax(10.5rem, 1fr)); grid-template-rows: repeat(${talentGridDims.rows}, 1fr);`}
 						>
 							{#each talentNodes as node}
 								{@const points = getTalentPoints(node.talent.id)}
@@ -988,18 +988,18 @@
 									spentTalentPoints
 								)}
 								<div
-									class={`relative flex flex-col p-2 ${talentTileTone(node, points, ruleLocked)}`}
+									class={`relative flex flex-col p-2.5 ${talentTileTone(node, points, ruleLocked)}`}
 									style={`grid-column: ${node.tier + 1}; grid-row: ${node.row + 1};`}
 								>
 									<div class="flex items-start justify-between gap-1">
 										<h3
-											class="min-w-0 text-[10px] font-bold uppercase leading-tight tracking-[0.04em] text-[var(--hud-text)]"
+											class="min-w-0 text-xs font-bold uppercase leading-tight tracking-[0.04em] text-[var(--hud-text)]"
 										>
 											{node.talent.name}
 										</h3>
 										{#if node.isKeystone}
 											<span
-												class="shrink-0 rounded-sm bg-[var(--hud-lime)] px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-[var(--hud-on-lime)]"
+												class="shrink-0 rounded-sm bg-[var(--hud-lime)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--hud-on-lime)]"
 											>
 												Key
 											</span>
@@ -1007,18 +1007,18 @@
 									</div>
 
 									<div
-										class="mt-1 inline-flex w-fit items-baseline gap-0.5 rounded-sm bg-[var(--hud-inset)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)]"
+										class="mt-1.5 inline-flex w-fit items-baseline gap-0.5 rounded-sm bg-[var(--hud-inset)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)]"
 									>
 										<span class="tabular-nums text-[var(--hud-text)]">{points}</span>
 										<span class="text-[#454932]">/</span>
 										<span class="tabular-nums text-[var(--hud-dim)]">{node.maxPoints}</span>
 									</div>
 
-									<p class="mt-1 flex-1 text-[10px] leading-snug text-[var(--hud-muted)] line-clamp-3">
+									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
 										{formatTalentDescription(node.talent.description, node.talent.pointValues, points)}
 									</p>
 									{#if node.talent.supplementalDescription}
-										<p class="mt-0.5 text-[9px] leading-snug text-[var(--hud-dim)] line-clamp-2">
+										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
 											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points)}
 										</p>
 									{/if}
@@ -1028,7 +1028,7 @@
 									>
 										<button
 											type="button"
-											class="flex h-6 w-6 items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-sm leading-none text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
+											class="flex h-7 w-7 items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-base leading-none text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
 											disabled={points <= 0}
 											onclick={() =>
 												setTalentPoints(node.talent.id, points - 1, node.maxPoints)}
@@ -1037,7 +1037,7 @@
 										</button>
 										<button
 											type="button"
-											class="flex h-6 w-6 items-center justify-center rounded-sm bg-[var(--hud-lime)] text-sm font-medium leading-none text-[var(--hud-on-lime)] transition hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
+											class="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--hud-lime)] text-base font-medium leading-none text-[var(--hud-on-lime)] transition hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
 											disabled={!canInc}
 											onclick={() =>
 												setTalentPoints(node.talent.id, points + 1, node.maxPoints)}
