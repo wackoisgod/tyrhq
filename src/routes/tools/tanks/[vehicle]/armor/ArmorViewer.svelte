@@ -8,13 +8,17 @@
 		onhover,
 		onclick,
 		shellPenetration = 90,
-		showArmorVisualizer = true
+		showArmorVisualizer = true,
+		hasDeployedAnimations = false,
+		deployedMode = false
 	}: {
 		vehicleId: string;
 		onhover: (info: ArmorHitInfo | null) => void;
 		onclick: (info: ArmorHitInfo | null) => void;
 		shellPenetration?: number;
 		showArmorVisualizer?: boolean;
+		hasDeployedAnimations?: boolean;
+		deployedMode?: boolean;
 	} = $props();
 </script>
 
@@ -24,6 +28,14 @@
 	></div>
 
 	<Canvas>
-		<VehicleModel {vehicleId} {onhover} {onclick} {shellPenetration} {showArmorVisualizer} />
+		<VehicleModel
+			{vehicleId}
+			{onhover}
+			{onclick}
+			{shellPenetration}
+			{showArmorVisualizer}
+			{hasDeployedAnimations}
+			{deployedMode}
+		/>
 	</Canvas>
 </div>

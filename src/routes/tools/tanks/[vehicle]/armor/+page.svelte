@@ -9,10 +9,12 @@
 	let pinnedArmor: ArmorHitInfo | null = $state(null);
 	let selectedShooterId = $state('');
 	let showArmorVisualizer = $state(true);
+	let deployedMode = $state(false);
 
 	const selectedShooter = $derived(
 		data.shooters.find((entry) => entry.id === selectedShooterId) ?? data.tank
 	);
+	const effectiveArmorVisualizer = $derived(showArmorVisualizer);
 
 	function clearReadout() {
 		hoveredArmor = null;
@@ -38,6 +40,7 @@
 
 	$effect(() => {
 		showArmorVisualizer;
+		deployedMode;
 		clearReadout();
 	});
 </script>
@@ -105,6 +108,21 @@
 			>
 				{showArmorVisualizer ? 'Armor Viz On' : 'Armor Viz Off'}
 			</button>
+
+			{#if data.hasDeployedAnimations}
+				<button
+					type="button"
+					aria-pressed={deployedMode}
+					class={`rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+						deployedMode
+							? 'border-[var(--hud-lime)] bg-[var(--hud-lime)]/12 text-[var(--hud-lime)]'
+							: 'border-[var(--hud-ghost)] bg-[var(--hud-panel-mid)] text-[var(--hud-muted)] hover:text-[var(--hud-text)]'
+					}`}
+					onclick={() => (deployedMode = !deployedMode)}
+				>
+					{deployedMode ? 'Deployed' : 'Stowed'}
+				</button>
+			{/if}
 		</div>
 	</div>
 
@@ -115,7 +133,9 @@
 				onhover={(info) => (hoveredArmor = info)}
 				onclick={(info) => (pinnedArmor = info)}
 				shellPenetration={selectedShooter.stats.penetration}
-				showArmorVisualizer={showArmorVisualizer}
+				showArmorVisualizer={effectiveArmorVisualizer}
+				hasDeployedAnimations={data.hasDeployedAnimations}
+				{deployedMode}
 			/>
 		</div>
 
@@ -124,7 +144,7 @@
 			shooter={selectedShooter}
 			hovered={hoveredArmor}
 			pinned={pinnedArmor}
-			visualizerEnabled={showArmorVisualizer}
+			visualizerEnabled={effectiveArmorVisualizer}
 			onClearPin={() => (pinnedArmor = null)}
 		/>
 	</div>

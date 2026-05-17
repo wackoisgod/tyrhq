@@ -6,8 +6,11 @@
 		BufferAttribute,
 		BufferGeometry,
 		Color,
+		AnimationMixer,
 		FrontSide,
 		LinearFilter,
+		LoopOnce,
+		LoopRepeat,
 		Mesh as ThreeMesh,
 		MeshStandardMaterial,
 		NearestFilter,
@@ -18,9 +21,13 @@
 		ShaderMaterial,
 		Vector2,
 		Vector3,
+		Quaternion,
+		type AnimationAction,
+		type AnimationClip,
 		type Material
 	} from 'three';
 	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+	import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 	type ArmorData = {
 		vehicleId: string;
@@ -32,23 +39,38 @@
 		sectionIds?: number[];
 	};
 
+	type DeployedClipName = 'enter' | 'idle' | 'exit';
+	type DeployedAnimationSet = Partial<Record<DeployedClipName, AnimationClip>>;
+	type DeployedBasePose = Map<
+		string,
+		{
+			position: Vector3;
+			quaternion: Quaternion;
+			scale: Vector3;
+		}
+	>;
+
 	let {
 		vehicleId,
 		onhover,
 		onclick,
 		shellPenetration = 50,
-		showArmorVisualizer = true
+		showArmorVisualizer = true,
+		hasDeployedAnimations = false,
+		deployedMode = false
 	}: {
 		vehicleId: string;
 		onhover: (info: ArmorHitInfo | null) => void;
 		onclick: (info: ArmorHitInfo | null) => void;
 		shellPenetration?: number;
 		showArmorVisualizer?: boolean;
+		hasDeployedAnimations?: boolean;
+		deployedMode?: boolean;
 	} = $props();
 
 	interactivity();
 
-	const { scene, renderer, camera, autoRender, renderStage } = useThrelte();
+	const { scene, renderer, camera, autoRender, renderStage, invalidate } = useThrelte();
 	const { addInteractiveObject, removeInteractiveObject } = useInteractivity();
 
 	const armorFillTarget = useFBO({
@@ -65,18 +87,27 @@
 	const overlayCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
 	overlayCamera.position.z = 1;
 
+	let armorRoot: Object3D | null = null;
 	let armorMesh: ThreeMesh | null = $state(null);
 	let armorPickMesh: Object3D | null = $state(null);
 	let armorData: ArmorData | null = $state(null);
 	let armorFillMaterial: ShaderMaterial | null = null;
 	let armorMetaMaterial: ShaderMaterial | null = null;
 	let visualRoot: Object3D | null = $state(null);
+	let deployedAnimationClips: DeployedAnimationSet | null = $state(null);
+	let deployedAnimationMixer: AnimationMixer | null = null;
+	let deployedAnimationAction: AnimationAction | null = null;
+	let deployedAnimationRunning = $state(false);
+	let deployedBasePose: DeployedBasePose | null = null;
+	let lastSyncedDeployedMode: boolean | null = null;
 
 	const AUTO_BOUNCE_ANGLE = 80;
 	const OVERMATCH_MULTIPLIER = 4.0;
 	const HALF_CHANCE_PEN_MULTIPLIER = 1.1;
 	const FALLBACK_VISUAL_COLOR = new Color(0x66746d);
 	const gltfLoader = new GLTFLoader();
+	const armorVisualizerActive = $derived(showArmorVisualizer);
+	let lastAnimationTime = performance.now();
 
 	const armorVertexShader = `
 		attribute float armorThickness;
@@ -93,14 +124,25 @@
 		varying vec3 vWorldNormal;
 		varying vec3 vWorldPos;
 
+		#include <skinning_pars_vertex>
+
 		void main() {
 			vThickness = armorThickness;
 			vIsModule = isModule;
 			vIsAbsorb = isAbsorb;
 			vIsFiftyFifty = isFiftyFifty;
 			vSectionKeyId = sectionKeyId;
-			vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-			vec4 worldPos = modelMatrix * vec4(position, 1.0);
+
+			#include <skinbase_vertex>
+
+			vec3 objectNormal = vec3(normal);
+			#include <skinnormal_vertex>
+
+			vec3 transformed = vec3(position);
+			#include <skinning_vertex>
+
+			vWorldNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);
+			vec4 worldPos = modelMatrix * vec4(transformed, 1.0);
 			vWorldPos = worldPos.xyz;
 			gl_Position = projectionMatrix * viewMatrix * worldPos;
 		}
@@ -345,23 +387,6 @@
 		return `${thickness}|${fiftyFifty}|${data.isModule?.[tri] ?? 0}`;
 	}
 
-	function cloneFirstMeshGeometry(root: Object3D) {
-		let found: BufferGeometry | null = null;
-
-		root.traverse((child) => {
-			if (found || !(child as any).isMesh) return;
-
-			const sourceGeometry = (child as any).geometry as BufferGeometry;
-			const geometry = sourceGeometry.index ? sourceGeometry.toNonIndexed() : sourceGeometry.clone();
-			if (!geometry.getAttribute('normal')) {
-				geometry.computeVertexNormals();
-			}
-			found = geometry;
-		});
-
-		return found;
-	}
-
 	function findFirstMesh(root: Object3D) {
 		let found: Object3D | null = null;
 
@@ -400,27 +425,28 @@
 	}
 
 	function loadArmorAsset(currentVehicleId: string) {
-		return new Promise<{ geometry: BufferGeometry; pickMesh: Object3D }>((resolve, reject) => {
+		return new Promise<{ root: Object3D; mesh: ThreeMesh }>((resolve, reject) => {
 			gltfLoader.load(
 				`/models/vehicles/${currentVehicleId}.glb`,
 				(gltf) => {
-					const pickMesh = findFirstMesh(gltf.scene) as Object3D | null;
-					const geometry = cloneFirstMeshGeometry(gltf.scene);
-					if (!pickMesh || !geometry) {
+					const root = cloneSkeleton(gltf.scene) as Object3D;
+					const mesh = findFirstMesh(root) as ThreeMesh | null;
+					if (!mesh) {
 						reject(new Error(`No mesh geometry found for ${currentVehicleId}`));
 						return;
 					}
 
-					const pickObject = pickMesh as Object3D;
-					configurePickMesh(pickObject);
-					pickObject.visible = false;
-					(pickObject as any).frustumCulled = false;
-					pickObject.updateMatrixWorld(true);
-					if ((pickObject as any).skeleton?.update) {
-						(pickObject as any).skeleton.update();
+					configurePickMesh(mesh);
+					root.traverse((child) => {
+						if (!(child as any).isMesh) return;
+						(child as any).frustumCulled = false;
+					});
+					root.updateMatrixWorld(true);
+					if ((mesh as any).skeleton?.update) {
+						(mesh as any).skeleton.update();
 					}
 
-					resolve({ geometry, pickMesh: pickObject });
+					resolve({ root, mesh });
 				},
 				undefined,
 				reject
@@ -439,6 +465,89 @@
 		});
 	}
 
+	function loadDeployedAnimationClip(currentVehicleId: string, clipName: DeployedClipName) {
+		return new Promise<AnimationClip | null>((resolve) => {
+			gltfLoader.load(
+				`/models/vehicles/${currentVehicleId}-deployed-${clipName}.glb`,
+				(gltf) => {
+					const clip = gltf.animations[0]?.clone() ?? null;
+					disposeObject(gltf.scene);
+					resolve(clip);
+				},
+				undefined,
+				() => resolve(null)
+			);
+		});
+	}
+
+	function normalizeDeployedAnimationClip(clip: AnimationClip | null, root: Object3D) {
+		if (!clip) return null;
+
+		const nodesByName = new Map<string, Object3D>();
+		root.traverse((child) => {
+			if (child.name) {
+				nodesByName.set(child.name, child);
+			}
+		});
+
+		const sanitizedClip = clip.clone();
+		sanitizedClip.tracks = sanitizedClip.tracks.filter((track) => {
+			const separatorIndex = track.name.lastIndexOf('.');
+			if (separatorIndex < 1) return true;
+
+			const targetName = track.name.slice(0, separatorIndex);
+			const propertyName = track.name.slice(separatorIndex + 1);
+			const target = nodesByName.get(targetName);
+			if (!target) return true;
+
+			if (propertyName === 'scale') {
+				return !track.values.every((value) => Math.abs(value) < 0.000001);
+			}
+
+			if (propertyName === 'position') {
+				for (let index = 0; index < track.values.length; index += 3) {
+					track.values[index] += target.position.x;
+					track.values[index + 1] += target.position.y;
+					track.values[index + 2] += target.position.z;
+				}
+			}
+
+			if (propertyName === 'quaternion') {
+				const baseRotation = target.quaternion.clone();
+				const deltaRotation = new Quaternion();
+				for (let index = 0; index < track.values.length; index += 4) {
+					deltaRotation.set(
+						track.values[index],
+						track.values[index + 1],
+						track.values[index + 2],
+						track.values[index + 3]
+					);
+					const combinedRotation = deltaRotation.clone().multiply(baseRotation).normalize();
+					track.values[index] = combinedRotation.x;
+					track.values[index + 1] = combinedRotation.y;
+					track.values[index + 2] = combinedRotation.z;
+					track.values[index + 3] = combinedRotation.w;
+				}
+			}
+
+			return true;
+		});
+		sanitizedClip.resetDuration();
+		return sanitizedClip;
+	}
+
+	async function loadDeployedAnimationClips(currentVehicleId: string) {
+		if (!hasDeployedAnimations) return null;
+
+		const [enter, idle, exit] = await Promise.all([
+			loadDeployedAnimationClip(currentVehicleId, 'enter'),
+			loadDeployedAnimationClip(currentVehicleId, 'idle'),
+			loadDeployedAnimationClip(currentVehicleId, 'exit')
+		]);
+
+		return { enter: enter ?? undefined, idle: idle ?? undefined, exit: exit ?? undefined };
+	}
+
 	function createArmorMaterial(fragmentShader: string) {
 		const material = new ShaderMaterial({
 			vertexShader: armorVertexShader,
@@ -455,8 +564,12 @@
 		return material;
 	}
 
-	function buildArmorMesh(sourceGeometry: BufferGeometry, data: ArmorData) {
-		const geometry = sourceGeometry.clone();
+	function buildArmorMesh(sourceMesh: ThreeMesh, data: ArmorData) {
+		const sourceGeometry = sourceMesh.geometry as BufferGeometry;
+		const geometry = sourceGeometry.index ? sourceGeometry.toNonIndexed() : sourceGeometry.clone();
+		if (!geometry.getAttribute('normal')) {
+			geometry.computeVertexNormals();
+		}
 		const vertexCount = geometry.attributes.position.count;
 		const triCount = vertexCount / 3;
 		const thickness = new Float32Array(vertexCount);
@@ -500,7 +613,10 @@
 
 		const fillMaterial = createArmorMaterial(armorFillFragmentShader);
 		const metaMaterial = createArmorMaterial(armorMetaFragmentShader);
-		const mesh = new ThreeMesh(geometry, fillMaterial);
+		disposeMaterial(sourceMesh.material as Material | Material[] | undefined);
+		sourceMesh.geometry = geometry;
+		sourceMesh.material = fillMaterial;
+		const mesh = sourceMesh;
 		mesh.frustumCulled = false;
 		mesh.userData.armorData = data;
 		mesh.userData.fillMaterial = fillMaterial;
@@ -530,6 +646,53 @@
 		});
 
 		return root;
+	}
+
+	function captureDeployedBasePose(root: Object3D): DeployedBasePose {
+		const pose: DeployedBasePose = new Map();
+		root.traverse((child) => {
+			if (!child.name) return;
+			pose.set(child.name, {
+				position: child.position.clone(),
+				quaternion: child.quaternion.clone(),
+				scale: child.scale.clone()
+			});
+		});
+		return pose;
+	}
+
+	function restoreDeployedBasePose(root: Object3D | null = visualRoot, pose = deployedBasePose) {
+		if (!root || !pose) return;
+		root.traverse((child) => {
+			const transform = child.name ? pose.get(child.name) : null;
+			if (!transform) return;
+			child.position.copy(transform.position);
+			child.quaternion.copy(transform.quaternion);
+			child.scale.copy(transform.scale);
+		});
+		root.updateMatrixWorld(true);
+		invalidate();
+	}
+
+	function copyPoseByName(sourceRoot: Object3D | null = armorRoot, targetRoot: Object3D | null = visualRoot) {
+		if (!sourceRoot || !targetRoot) return;
+
+		const sourceNodes = new Map<string, Object3D>();
+		sourceRoot.traverse((child) => {
+			if (child.name) {
+				sourceNodes.set(child.name, child);
+			}
+		});
+
+		targetRoot.traverse((target) => {
+			if (!target.name) return;
+			const source = sourceNodes.get(target.name);
+			if (!source) return;
+			target.position.copy(source.position);
+			target.quaternion.copy(source.quaternion);
+			target.scale.copy(source.scale);
+		});
+		targetRoot.updateMatrixWorld(true);
 	}
 
 	function disposeMaterial(material: Material | Material[] | undefined) {
@@ -630,7 +793,7 @@
 	}
 
 	function handlePointerMove(event: any) {
-		if (!showArmorVisualizer) return;
+		if (!armorVisualizerActive) return;
 		if (!isPrimaryIntersection(event)) return;
 		onhover(getHitInfo(event));
 	}
@@ -640,17 +803,111 @@
 	}
 
 	function handlePointerDown(event: any) {
-		if (!showArmorVisualizer) return;
+		if (!armorVisualizerActive) return;
 		if (!isPrimaryIntersection(event)) return;
 		onclick(getHitInfo(event));
 	}
 
+	function stopDeployedAnimationAction() {
+		if (!deployedAnimationAction) return;
+		deployedAnimationAction.stop();
+		deployedAnimationAction = null;
+		deployedAnimationRunning = false;
+	}
+
+	function resetDeployedAnimationTimer() {
+		lastAnimationTime = performance.now();
+	}
+
+	function getDeployedAnimationDelta() {
+		const now = performance.now();
+		const delta = (now - lastAnimationTime) / 1000;
+		lastAnimationTime = now;
+		return Math.min(delta, 0.1);
+	}
+
+	function restoreArmorAndCopyVisualPose() {
+		restoreDeployedBasePose(armorRoot, deployedBasePose);
+		copyPoseByName();
+	}
+
+	function playDeployedClip(clipName: DeployedClipName, loop = false, onFinished?: () => void) {
+		if (!deployedAnimationMixer || !deployedAnimationClips) return false;
+
+		const clip = deployedAnimationClips[clipName];
+		if (!clip) return false;
+
+		stopDeployedAnimationAction();
+		deployedAnimationMixer.stopAllAction();
+		if (clipName === 'enter') {
+			restoreArmorAndCopyVisualPose();
+		}
+
+		const action = deployedAnimationMixer.clipAction(clip);
+		action.reset();
+		action.enabled = true;
+		action.clampWhenFinished = !loop;
+		action.setLoop(loop ? LoopRepeat : LoopOnce, loop ? Infinity : 1);
+		action.play();
+		deployedAnimationAction = action;
+		deployedAnimationRunning = true;
+		resetDeployedAnimationTimer();
+		invalidate();
+
+		if (!loop) {
+			const mixer = deployedAnimationMixer;
+			const handleFinished = (event: any) => {
+				if (event.action !== action) return;
+				mixer.removeEventListener('finished', handleFinished);
+				if (deployedAnimationAction === action) {
+					deployedAnimationAction = null;
+					deployedAnimationRunning = false;
+				}
+				onFinished?.();
+				if (clipName === 'exit') {
+					restoreArmorAndCopyVisualPose();
+				}
+			};
+			mixer.addEventListener('finished', handleFinished);
+		}
+
+		return true;
+	}
+
+	function syncDeployedAnimationMode() {
+		if (!deployedAnimationMixer || !deployedAnimationClips) return;
+		if (lastSyncedDeployedMode === deployedMode) return;
+
+		if (deployedMode) {
+			lastSyncedDeployedMode = true;
+			if (!playDeployedClip('enter', false, () => playDeployedClip('idle', true))) {
+				playDeployedClip('idle', true);
+			}
+			return;
+		}
+
+		const shouldPlayExit = lastSyncedDeployedMode === true;
+		lastSyncedDeployedMode = false;
+		if (!shouldPlayExit) {
+			stopDeployedAnimationAction();
+			deployedAnimationMixer.stopAllAction();
+			restoreArmorAndCopyVisualPose();
+			return;
+		}
+
+		if (!playDeployedClip('exit')) {
+			stopDeployedAnimationAction();
+			deployedAnimationMixer.stopAllAction();
+			restoreArmorAndCopyVisualPose();
+		}
+	}
+
 	$effect(() => {
 		const previousAutoRender = autoRender.current;
-		autoRender.current = false;
+		autoRender.set(false);
 
 		return () => {
-			autoRender.current = previousAutoRender;
+			autoRender.set(previousAutoRender);
 			(overlayQuad.geometry as PlaneGeometry).dispose();
 			compositeMaterial.dispose();
 		};
@@ -658,6 +915,11 @@
 
 	useTask(
 		() => {
+			if (deployedAnimationMixer) {
+				deployedAnimationMixer.update(getDeployedAnimationDelta());
+				copyPoseByName();
+			}
+
 			const activeCamera = camera.current;
 			if (!activeCamera) return;
 
@@ -672,7 +934,7 @@
 
 			renderer.autoClear = false;
 
-			if (armorMesh && showArmorVisualizer) {
+			if (armorMesh && armorVisualizerActive) {
 				const previousMaterial = armorMesh.material;
 				armorMesh.visible = true;
 
@@ -696,7 +958,7 @@
 			renderer.clear(true, true, true);
 			renderer.render(scene, activeCamera);
 
-			if (armorMesh && showArmorVisualizer) {
+			if (armorMesh && armorVisualizerActive) {
 				renderer.clearDepth();
 				renderer.render(overlayScene, overlayCamera);
 			}
@@ -707,6 +969,16 @@
 		{
 			stage: renderStage,
 			autoInvalidate: false
+		}
+	);
+
+	useTask(
+		() => {
+			// This task exists to keep Threlte invalidating frames while a clip is playing.
+		},
+		{
+			running: () => deployedAnimationRunning,
+			autoInvalidate: true
 		}
 	);
 
@@ -738,19 +1010,29 @@
 
 	$effect(() => {
 		if (armorMesh) {
-			armorMesh.visible = showArmorVisualizer;
+			armorMesh.visible = armorVisualizerActive;
 		}
-		if (!showArmorVisualizer) {
+		if (!armorVisualizerActive) {
 			onhover(null);
 		}
+		invalidate();
+	});
+
+	$effect(() => {
+		deployedMode;
+		deployedAnimationClips;
+		syncDeployedAnimationMode();
 	});
 
 	$effect(() => {
 		const currentVehicleId = vehicleId;
 		let cancelled = false;
+		let localArmorRoot: Object3D | null = null;
 		let localArmorMesh: ThreeMesh | null = null;
 		let localArmorPickMesh: Object3D | null = null;
 		let localVisualRoot: Object3D | null = null;
+		let localAnimationMixer: AnimationMixer | null = null;
+		let localBasePose: DeployedBasePose | null = null;
 
 		onhover(null);
 		onclick(null);
@@ -758,35 +1040,52 @@
 		Promise.all([
 			loadArmorData(currentVehicleId),
 			loadArmorAsset(currentVehicleId),
-			loadVisualScene(currentVehicleId)
+			loadVisualScene(currentVehicleId),
+			loadDeployedAnimationClips(currentVehicleId)
 		])
-			.then(([nextArmorData, armorAsset, visualScene]) => {
+			.then(([nextArmorData, armorAsset, visualScene, animationClips]) => {
 				if (cancelled) {
-					armorAsset.geometry.dispose();
-					disposeObject(armorAsset.pickMesh);
+					disposeObject(armorAsset.root);
 					disposeObject(visualScene);
 					return;
 				}
 
-				const builtArmor = buildArmorMesh(armorAsset.geometry, nextArmorData);
+				const builtArmor = buildArmorMesh(armorAsset.mesh, nextArmorData);
+				localArmorRoot = armorAsset.root;
 				localArmorMesh = builtArmor.mesh;
-				localArmorMesh.visible = showArmorVisualizer;
-				localArmorPickMesh = armorAsset.pickMesh;
+				localArmorMesh.visible = armorVisualizerActive;
+				localArmorPickMesh = localArmorMesh;
 				localVisualRoot =
 					visualScene != null
 						? prepareVisualScene(visualScene)
-						: buildFallbackVisualMesh(armorAsset.geometry);
+						: buildFallbackVisualMesh(localArmorMesh.geometry as BufferGeometry);
+				localBasePose = captureDeployedBasePose(localArmorRoot);
+				const normalizedAnimationClips = animationClips
+					? {
+							enter: normalizeDeployedAnimationClip(animationClips.enter ?? null, localArmorRoot) ?? undefined,
+							idle: normalizeDeployedAnimationClip(animationClips.idle ?? null, localArmorRoot) ?? undefined,
+							exit: normalizeDeployedAnimationClip(animationClips.exit ?? null, localArmorRoot) ?? undefined
+						}
+					: null;
+				localAnimationMixer = normalizedAnimationClips ? new AnimationMixer(localArmorRoot) : null;
 
-				armorScene.add(localArmorMesh);
-				scene.add(localArmorPickMesh);
+				armorScene.add(localArmorRoot);
 				scene.add(localVisualRoot);
 
+				armorRoot = localArmorRoot;
 				armorMesh = localArmorMesh;
 				armorPickMesh = localArmorPickMesh;
 				armorData = nextArmorData;
 				armorFillMaterial = builtArmor.fillMaterial;
 				armorMetaMaterial = builtArmor.metaMaterial;
 				visualRoot = localVisualRoot;
+				deployedAnimationClips = normalizedAnimationClips;
+				deployedAnimationMixer = localAnimationMixer;
+				deployedBasePose = localBasePose;
+				copyPoseByName(localArmorRoot, localVisualRoot);
+				lastSyncedDeployedMode = null;
+				syncDeployedAnimationMode();
+				invalidate();
 			})
 			.catch((error) => {
 				console.error('[ArmorViewer] Failed to load viewer assets for', currentVehicleId, error);
@@ -796,22 +1095,20 @@
 			cancelled = true;
 			onhover(null);
 
-			if (localArmorMesh) {
-				armorScene.remove(localArmorMesh);
-				disposeArmorMesh(localArmorMesh);
+			if (localArmorRoot) {
+				armorScene.remove(localArmorRoot);
+				disposeObject(localArmorRoot);
 				if (armorMesh === localArmorMesh) {
 					armorMesh = null;
 					armorData = null;
 					armorFillMaterial = null;
 					armorMetaMaterial = null;
 				}
-			}
-
-			if (localArmorPickMesh) {
-				scene.remove(localArmorPickMesh);
-				disposeObject(localArmorPickMesh);
 				if (armorPickMesh === localArmorPickMesh) {
 					armorPickMesh = null;
+				}
+				if (armorRoot === localArmorRoot) {
+					armorRoot = null;
 				}
 			}
 
@@ -821,6 +1118,18 @@
 				if (visualRoot === localVisualRoot) {
 					visualRoot = null;
 				}
+			}
+
+			if (deployedAnimationMixer === localAnimationMixer) {
+				stopDeployedAnimationAction();
+				deployedAnimationMixer?.stopAllAction();
+				if (localArmorRoot) {
+					deployedAnimationMixer?.uncacheRoot(localArmorRoot);
+				}
+				deployedAnimationMixer = null;
+				deployedAnimationClips = null;
+				deployedBasePose = null;
+				lastSyncedDeployedMode = null;
 			}
 		};
 	});

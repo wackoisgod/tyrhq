@@ -32,7 +32,12 @@ function listVehicleArmorIds() {
 	const modelsDir = path.join(assetsRoot, 'models', 'vehicles');
 	const files = new Set(readdirSync(modelsDir));
 	return Array.from(files)
-		.filter((fileName) => fileName.endsWith('.glb') && !fileName.endsWith('-visual.glb'))
+		.filter(
+			(fileName) =>
+				fileName.endsWith('.glb') &&
+				!fileName.endsWith('-visual.glb') &&
+				!fileName.includes('-deployed-')
+		)
 		.map((fileName) => fileName.replace(/\.glb$/, ''))
 		.filter(
 			(vehicleId) =>
@@ -58,6 +63,17 @@ function listMapImageIds() {
 	return Array.from(lobbyIds)
 		.filter((mapId) => minimapIds.has(mapId))
 		.sort();
+}
+
+function listVehicleDeployedAnimationIds() {
+	const modelsDir = path.join(assetsRoot, 'models', 'vehicles');
+	return Array.from(
+		new Set(
+			readdirSync(modelsDir)
+				.filter((fileName) => fileName.endsWith('.glb') && fileName.includes('-deployed-'))
+				.map((fileName) => fileName.split('-deployed-', 1)[0])
+		)
+	).sort();
 }
 
 function listAbilityIconIds() {
@@ -107,6 +123,9 @@ describe('generated data integrity', () => {
 
 	it('keeps the generated asset manifest aligned with published static assets', () => {
 		expect(assetManifest.vehicleArmorIds).toEqual(listVehicleArmorIds());
+		expect(assetManifest.vehicleDeployedAnimationIds ?? []).toEqual(
+			listVehicleDeployedAnimationIds()
+		);
 		expect(assetManifest.mapImageIds).toEqual(listMapImageIds());
 	});
 

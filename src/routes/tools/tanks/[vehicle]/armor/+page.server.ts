@@ -1,7 +1,10 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getGameSnapshot } from '$lib/data/game-data';
-import { hasVehicleArmorAssets } from '$lib/server/game-assets';
+import {
+	hasVehicleArmorAssets,
+	hasVehicleDeployedAnimationAssets
+} from '$lib/server/game-assets';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const snapshot = getGameSnapshot();
@@ -19,6 +22,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	return {
 		tank,
-		shooters: snapshot.tanks.filter((entry) => entry.selectable)
+		shooters: snapshot.tanks.filter((entry) => entry.selectable),
+		hasDeployedAnimations: hasVehicleDeployedAnimationAssets(tank.id)
 	};
 };

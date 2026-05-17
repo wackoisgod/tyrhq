@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	type ImageKind = 'vehicle' | 'component' | 'ammo' | 'talent' | 'ability' | 'generic';
 
 	let {
@@ -24,6 +26,11 @@
 
 	let failed = $state(false);
 	let imageElement = $state<HTMLImageElement | null>(null);
+	let mounted = $state(false);
+
+	onMount(() => {
+		mounted = true;
+	});
 
 	const fallbackText = $derived.by(() => {
 		const source = (label || alt || title || kind).trim();
@@ -85,9 +92,28 @@
 			}
 		});
 	});
+
+	function imageStatus(node: HTMLImageElement) {
+		const handleLoad = () => {
+			failed = false;
+		};
+		const handleError = () => {
+			failed = true;
+		};
+
+		node.addEventListener('load', handleLoad);
+		node.addEventListener('error', handleError);
+
+		return {
+			destroy() {
+				node.removeEventListener('load', handleLoad);
+				node.removeEventListener('error', handleError);
+			}
+		};
+	}
 </script>
 
-{#if failed || forceFallback}
+{#if failed || forceFallback || !mounted}
 	<span
 		class={`ui-fallback-icon ${toneClass} ${className}`}
 		title={effectiveTitle}
@@ -106,12 +132,7 @@
 			class={className}
 			style={style}
 			{...rest}
-			onload={() => {
-				failed = false;
-			}}
-			onerror={() => {
-				failed = true;
-			}}
+			use:imageStatus
 		/>
 	{/key}
 {/if}
