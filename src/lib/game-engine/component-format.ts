@@ -25,6 +25,21 @@ function formatMagnitude(n: number): string {
 	return s === '-0' ? '0' : s;
 }
 
+function isPercentToken(token: ComponentValueToken): boolean {
+	return (
+		token === 'LevelValuePercent' ||
+		token === 'LevelValuePercentMultiplyIncrease' ||
+		token === 'LevelValuePercentMultiplyDecrease'
+	);
+}
+
+function formatTokenValue(token: ComponentValueToken, value: number): string {
+	if (isPercentToken(token)) {
+		return `${formatMagnitude(value * 100)}%`;
+	}
+	return formatMagnitude(value);
+}
+
 function resolveComponentToken(token: ComponentValueToken, value: number): number {
 	switch (token) {
 		case 'LevelValueAbs':
@@ -58,7 +73,9 @@ export function fillTemplatedComponentDescription(description: string, pointValu
 	return cleaned.replace(
 		/\{(LevelValue(?:Abs|Percent(?:Multiply(?:Decrease|Increase))?)?)\}/g,
 		(match: string, token: string) =>
-			isComponentValueToken(token) ? formatMagnitude(resolveComponentToken(token, value)) : match
+			isComponentValueToken(token)
+				? formatTokenValue(token, resolveComponentToken(token, value))
+				: match
 	);
 }
 
@@ -71,7 +88,7 @@ export function fillGeneratedComponentDescription(
 	if (!pointValues.length) return cleaned;
 	if (!/\bvalue\b/i.test(cleaned)) return cleaned;
 	const value = resolveComponentToken(token, pointValues[0]);
-	return cleaned.replace(/\bvalue\b/gi, () => formatMagnitude(value));
+	return cleaned.replace(/\bvalue\b/gi, () => formatTokenValue(token, value));
 }
 
 export function fillComponentDescription(description: string, pointValues: number[]): string {
