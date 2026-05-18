@@ -556,14 +556,23 @@
 		selection.ammoIds[slotIndex] = ammoId;
 	}
 
-	function formatTalentDescription(description: string, pointValues: number[], currentPoints: number) {
+	function formatTalentDescription(
+		description: string,
+		pointValues: number[],
+		currentPoints: number,
+		nodeMaxPoints: number
+	) {
 		const cleaned = plainComponentDescription(description);
 		if (!pointValues.length) return cleaned;
 
 		const perPoint = pointValues[0];
-		const levelValue = currentPoints > 0
-			? pointValues[Math.min(currentPoints, pointValues.length) - 1]
-			: pointValues[pointValues.length - 1];
+		// When unallocated, preview the value at the node's cap — pointValues may extend
+		// past the node's maxPoints (e.g. Sonar Max Energy: pointValues=[10,20,30,40,50]
+		// but the node only allows 3 points, so the previewed max should be 30, not 50).
+		const previewIndex = currentPoints > 0
+			? Math.min(currentPoints, pointValues.length)
+			: Math.min(nodeMaxPoints, pointValues.length);
+		const levelValue = pointValues[Math.max(1, previewIndex) - 1];
 
 		function fmt(n: number) {
 			const abs = Math.abs(n);
@@ -1015,11 +1024,11 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.description, node.talent.pointValues, points)}
+										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints)}
 									</p>
 									{#if node.talent.supplementalDescription}
 										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
-											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points)}
+											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints)}
 										</p>
 									{/if}
 	

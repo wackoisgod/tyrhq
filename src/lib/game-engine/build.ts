@@ -135,6 +135,9 @@ const componentEffectMappings = [
 	{ pattern: /MaxSpeedAndMaxReverseSpeedPercent/i, keys: ['MaxSpeed', 'MaxReverseSpeed'], mode: 'mult' },
 	{ pattern: /MaxSpeedPercent/i, key: 'MaxSpeed', mode: 'mult' },
 	{ pattern: /MaxSpeedFlat/i, key: 'MaxSpeed', mode: 'add' },
+	// ExtendedGearing's GE ships with empty modifiers, so the engine relies on the
+	// component's pointValue (e.g. 1.15) being applied as a Max Speed multiplier.
+	{ pattern: /ExtendedGearing/i, key: 'MaxSpeed', mode: 'mult' },
 	{ pattern: /MaxReverseSpeedPercent/i, key: 'MaxReverseSpeed', mode: 'mult' },
 	{ pattern: /MaxReverseSpeedFlat/i, key: 'MaxReverseSpeed', mode: 'add' },
 	{ pattern: /HullTraverse/i, key: 'HullTraverseSpeed', mode: 'add' },
