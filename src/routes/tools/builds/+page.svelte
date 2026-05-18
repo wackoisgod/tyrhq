@@ -690,8 +690,8 @@
 		if (node.isKeystone) {
 			const keystoneActive = points > 0
 				? ' ring-[var(--hud-lime)]/40 bg-[var(--hud-panel-high)] shadow-[inset_4px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(202,242,0,0.18)]'
-				: ' ring-[#454932]/18 bg-[var(--hud-panel-high)] shadow-[inset_4px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(202,242,0,0.12)]';
-			const locked = ruleLocked ? ' opacity-50' : ' hover:ring-[var(--hud-teal)]/25';
+				: ' ring-[#454932]/18 bg-[var(--hud-surface)] shadow-[inset_3px_0_0_0_rgba(202,242,0,0.28)]';
+			const locked = ruleLocked ? ' opacity-50' : ' hover:ring-[var(--hud-lime)]/25';
 			return `${shell}${keystoneActive}${locked}`;
 		}
 		if (points > 0) {
