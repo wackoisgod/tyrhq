@@ -512,4 +512,53 @@ describe('computeBuild aggregator math', () => {
 		expect(build!.breakdown.IntraClipReloadTime ?? []).toHaveLength(0);
 		expect(build!.breakdown.ShellSwapTime?.[0]?.delta).toBeCloseTo(-2.2, 4);
 	});
+
+	it('extended gearing applies its point value as a Max Speed multiplier, not a flat add', () => {
+		// ExtendedGearing's GE ships with empty modifiers, so the engine has nothing
+		// from the effect data to act on. The fallback must still treat 1.15 as a
+		// +15% multiplier, not "+1.15 kph" added to MaxSpeed.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const extendedGearingEffect: EffectRecord = {
+			id: 'ge-components-extendedgearing',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_ExtendedGearing.GE_Components_ExtendedGearing_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const extendedGearing = makeComponent(
+			'extendedgearing',
+			'EXTENDED GEARING',
+			['ge-components-extendedgearing'],
+			[1.149999976158142],
+			'Increases Max Speed by 0.15 after actively throttling for more than 10 continuous seconds'
+		);
+		const vehicle = makeVehicle('phantom', { MaxSpeed: 65 }, 'standard', 'tree_phantom');
+		const tree = makeTree('tree_phantom', 'phantom', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [extendedGearing],
+			talents: [],
+			effects: [extendedGearingEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['extendedgearing', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 65 × 1.15 = 74.75 (the +15% multiplier), NOT 65 + 1.15 = 66.15 (the old bug)
+		expect(build!.stats.MaxSpeed).toBeCloseTo(74.75, 4);
+		expect(build!.stats.MaxSpeed).not.toBeCloseTo(66.15, 2);
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('EXTENDED GEARING'));
+		expect(entry?.delta).toBeCloseTo(9.75, 4);
+	});
 });
