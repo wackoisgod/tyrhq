@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import Editor from '$lib/contribute/Editor.svelte';
+	import { computeBodySuggestionSegments, countChangeSegments } from '$lib/contribute/body-suggestions';
 	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 
 	let { data } = $props();
@@ -9,6 +11,21 @@
 	let busy = $state(false);
 	let error = $state('');
 	let diffView = $state<'inline' | 'side-by-side'>('inline');
+	let suggestOpen = $state(false);
+	// Reviewer's working copy of the body. Starts identical to what the author
+	// submitted; any edits ride along with a "Request changes" decision and reach
+	// the author as accept/reject diffs.
+	/* svelte-ignore state_referenced_locally */
+	let reviewerBody = $state(data.submission.body_markdown);
+	const hasInlineEdits = $derived(reviewerBody !== data.submission.body_markdown);
+	const suggestionSegments = $derived(
+		hasInlineEdits ? computeBodySuggestionSegments(data.submission.body_markdown, reviewerBody) : []
+	);
+	const inlineEditCount = $derived(countChangeSegments(suggestionSegments));
+
+	function resetSuggestion() {
+		reviewerBody = data.submission.body_markdown;
+	}
 	// Default the override fields to whatever the contributor proposed (or
 	// whatever the admin previously set). Admin can change before approving.
 	/* svelte-ignore state_referenced_locally */
@@ -21,8 +38,8 @@
 	async function decide(decision: 'approve' | 'changes_requested' | 'reject') {
 		if (busy) return;
 		if (decision === 'reject' && !window.confirm('Reject this submission permanently?')) return;
-		if (decision === 'changes_requested' && !notes.trim()) {
-			error = 'Please leave a note explaining what to change.';
+		if (decision === 'changes_requested' && !notes.trim() && !hasInlineEdits) {
+			error = 'Leave a note or suggest inline edits explaining what to change.';
 			return;
 		}
 		busy = true;
@@ -45,6 +62,9 @@
 			if (decision === 'approve') {
 				payload.flyoutSection = flyoutSection || null;
 				payload.flyoutOrder = flyoutSection ? orderNum : null;
+			}
+			if (decision === 'changes_requested' && hasInlineEdits) {
+				payload.reviewerBodyMarkdown = reviewerBody;
 			}
 			const res = await fetch(`/api/admin/submissions/${data.submission.id}/decision`, {
 				method: 'POST',
@@ -274,11 +294,60 @@
 	{/if}
 
 	<div class="mt-8 rounded-sm bg-[var(--hud-panel)] p-4" style="box-shadow: var(--hud-surface-ghost);">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+				Suggest inline edits
+				{#if inlineEditCount > 0}
+					<span class="ml-2 normal-case tracking-normal text-[var(--hud-teal)]">
+						{inlineEditCount} edit{inlineEditCount === 1 ? '' : 's'} pending
+					</span>
+				{/if}
+			</div>
+			<div class="flex gap-2">
+				{#if hasInlineEdits}
+					<button type="button" class="hud-cta-ghost px-3 py-1.5 text-xs" onclick={resetSuggestion}>
+						Reset
+					</button>
+				{/if}
+				<button
+					type="button"
+					class="hud-cta-ghost px-3 py-1.5 text-xs"
+					onclick={() => (suggestOpen = !suggestOpen)}
+				>
+					{suggestOpen ? 'Hide editor' : 'Edit body'}
+				</button>
+			</div>
+		</div>
+		<p class="mt-2 text-xs text-[var(--hud-muted)]">
+			Edit the body directly to propose changes. They ride along with "Request changes", and the
+			author can accept or reject each edit before resubmitting.
+		</p>
+
+		{#if suggestOpen}
+			<div class="mt-3">
+				<Editor bind:value={reviewerBody} submissionId={data.submission.id} />
+			</div>
+		{/if}
+
+		{#if hasInlineEdits}
+			<div class="mt-3">
+				<div class="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+					Preview (how the author sees it)
+				</div>
+				<pre class="diff-body"><!--
+				-->{#each suggestionSegments as seg, i (i)}{#if seg.kind === 'same'}{seg.value}{:else}{#if seg.before}<span
+									class="diff-del">{seg.before}</span
+								>{/if}{#if seg.after}<span class="diff-add">{seg.after}</span>{/if}{/if}{/each}</pre>
+			</div>
+		{/if}
+	</div>
+
+	<div class="mt-8 rounded-sm bg-[var(--hud-panel)] p-4" style="box-shadow: var(--hud-surface-ghost);">
 		<label
 			for="notes"
 			class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 		>
-			Reviewer notes (required for "Request changes"; optional otherwise)
+			Reviewer notes (required for "Request changes" unless you suggested inline edits)
 		</label>
 		<textarea
 			id="notes"

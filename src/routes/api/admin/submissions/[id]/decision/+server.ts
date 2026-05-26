@@ -25,7 +25,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				notes: body.notes ?? null,
 				flyoutSection: body.flyoutSection,
 				flyoutOrder: body.flyoutOrder,
-				expectedContentHash: body.expectedContentHash ?? null
+				expectedContentHash: body.expectedContentHash ?? null,
+				reviewerBodyMarkdown: body.reviewerBodyMarkdown ?? null
 			}
 		);
 		return json(submission);

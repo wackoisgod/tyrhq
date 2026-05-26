@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Editor from './Editor.svelte';
 	import ImagePicker from './ImagePicker.svelte';
+	import ReviewerSuggestions from './ReviewerSuggestions.svelte';
 	import { goto } from '$app/navigation';
 	import { FLYOUT_SECTIONS, type FlyoutSection } from '$lib/content/flyout-sections';
 	import { uploadArticleImage } from './upload-image';
@@ -20,6 +21,7 @@
 		flyout_section: FlyoutSection | null;
 		hero_image_url: string | null;
 		version: string | null;
+		reviewer_body_markdown?: string | null;
 	};
 
 	let {
@@ -57,6 +59,23 @@
 	let heroImageUrl = $state<string | null>(submission?.hero_image_url ?? null);
 	/* svelte-ignore state_referenced_locally */
 	let version = $state(submission?.version ?? '');
+	// The reviewer's inline-edit proposal (if any). The diff base stays pinned to
+	// the originally-submitted body via `suggestionBase` so editing the body
+	// doesn't shift the suggestions out from under the author.
+	/* svelte-ignore state_referenced_locally */
+	const suggestionBase = submission?.body_markdown ?? '';
+	/* svelte-ignore state_referenced_locally */
+	let reviewerBodyMarkdown = $state<string | null>(submission?.reviewer_body_markdown ?? null);
+	let suggestionsResolved = $state(false);
+	const showSuggestions = $derived(
+		!suggestionsResolved && !!reviewerBodyMarkdown && reviewerBodyMarkdown !== suggestionBase
+	);
+
+	function applySuggestions(mergedBody: string) {
+		bodyMarkdown = mergedBody;
+		reviewerBodyMarkdown = null;
+		suggestionsResolved = true;
+	}
 
 	let saving = $state(false);
 	let submittingForReview = $state(false);
@@ -87,7 +106,8 @@
 			vehicleSlugs: type === 'guide' ? parseList(vehicleSlugsInput) : null,
 			flyoutSection: type === 'patch' ? null : flyoutSection || null,
 			heroImageUrl: heroImageUrl || null,
-			version: type === 'patch' ? version.trim() || null : null
+			version: type === 'patch' ? version.trim() || null : null,
+			clearReviewerSuggestions: suggestionsResolved || undefined
 		};
 	}
 
@@ -260,7 +280,11 @@
 				<p class="mt-1 whitespace-pre-wrap">{reviewNotes}</p>
 			{/if}
 			<p class="mt-2 text-xs text-[var(--hud-muted)]">
-				Make your edits below and resubmit.
+				{#if showSuggestions}
+					Review the reviewer's suggested edits below, then make any further changes and resubmit.
+				{:else}
+					Make your edits below and resubmit.
+				{/if}
 			</p>
 		</div>
 	{:else if status === 'rejected'}
@@ -286,6 +310,15 @@
 			This article is live. To make further changes, head to the published page and use
 			"Suggest an edit".
 		</div>
+	{/if}
+
+	{#if showSuggestions && reviewerBodyMarkdown}
+		<ReviewerSuggestions
+			base={suggestionBase}
+			proposed={reviewerBodyMarkdown}
+			busy={saving || submittingForReview}
+			onApply={applySuggestions}
+		/>
 	{/if}
 
 	<fieldset disabled={!editable} class="flex flex-col gap-5 disabled:opacity-60">

@@ -16,7 +16,7 @@ The fastest way to publish an article or guide is the in-site editor:
 3. Fill in the title, summary, and tags. Use the editor toolbar to write your body — bold, italic, headings, lists, links, plus inserters for **YouTube embeds** (`▶ YouTube`) and **callout boxes** (`ⓘ Info` / `⚠ Warning` / `★ Tip`).
 4. Toggle **Show preview** in the toolbar to see exactly how the article will render. The preview uses the same server-side sanitizer the publish path does, so what you see is what readers will see.
 5. **Save Draft** at any time to come back later (find your drafts at `/contribute/mine`).
-6. **Submit For Review** when ready. A reviewer will approve, request changes, or reject the submission from `/admin/submissions`. You'll see status updates and any reviewer notes back at `/contribute/mine`.
+6. **Submit For Review** when ready. A reviewer will approve, request changes, or reject the submission from `/admin/submissions`. You'll see status updates and any reviewer notes back at `/contribute/mine`. When a reviewer requests changes they can also propose **inline edits** to your body — those come back to the editor as accept/reject suggestions you resolve hunk-by-hunk before resubmitting.
 
 ### Editing An Existing Article Or Guide
 
@@ -33,7 +33,7 @@ Any other raw HTML or unknown directive is rejected at submission time. The subm
 
 ### Becoming A Reviewer
 
-Reviewers (the `contributor` role) can approve other people's submissions, withdraw published articles, and restore withdrawn ones. To become one: ask an existing admin to promote you. Admins do this from `/admin/users` — search by email or callsign, change the role dropdown to "Reviewer".
+Reviewers (the `contributor` role) can approve other people's submissions, withdraw published articles, and restore withdrawn ones. On the review screen they can also edit the body directly to suggest inline changes; those ride along with "Request Changes" so the author can accept or reject each one. To become one: ask an existing admin to promote you. Admins do this from `/admin/users` — search by email or callsign, change the role dropdown to "Reviewer".
 
 The first admin on a fresh deployment has to be set with SQL (see the README's "Database Setup" section). After that, all role changes happen in the UI.
 
