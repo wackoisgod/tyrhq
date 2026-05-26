@@ -56,10 +56,11 @@ export interface SubmissionRecord {
 	flyout_order: number | null;
 	hero_image_url: string | null;
 	version: string | null;
+	reviewer_body_markdown: string | null;
 }
 
 const SUBMISSION_COLUMNS =
-	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order, hero_image_url, version';
+	'id, type, parent_article_id, submitter_id, title, summary, slug, body_markdown, body_html, tags, vehicle_slugs, status, reviewer_id, review_notes, content_hash, created_at, updated_at, submitted_at, decided_at, flyout_section, flyout_order, hero_image_url, version, reviewer_body_markdown';
 
 function requireAdmin() {
 	const admin = getSupabaseAdminClient();
@@ -93,6 +94,9 @@ export interface SubmissionDraftInput {
 	flyoutSection?: FlyoutSection | null;
 	heroImageUrl?: string | null;
 	version?: string | null;
+	// When true, drop any reviewer-suggested body stored on the row (the author
+	// has resolved the inline suggestions in the editor).
+	clearReviewerSuggestions?: boolean;
 }
 
 export interface SanitizedSubmissionPayload {
@@ -324,9 +328,11 @@ export async function updateDraftSubmission(
 	});
 
 	const incomingFlyout = input.flyoutSection ?? null;
+	const clearsSuggestions = Boolean(input.clearReviewerSuggestions && existing.reviewer_body_markdown);
 	if (
 		sanitized.contentHash === existing.content_hash &&
-		incomingFlyout === existing.flyout_section
+		incomingFlyout === existing.flyout_section &&
+		!clearsSuggestions
 	) {
 		return existing;
 	}
@@ -351,7 +357,8 @@ export async function updateDraftSubmission(
 			status: reopens ? 'draft' : existing.status,
 			flyout_section: input.flyoutSection ?? null,
 			hero_image_url: sanitized.heroImageUrl,
-			version: sanitized.frontmatter.type === 'patch' ? sanitized.frontmatter.version : null
+			version: sanitized.frontmatter.type === 'patch' ? sanitized.frontmatter.version : null,
+			reviewer_body_markdown: clearsSuggestions ? null : existing.reviewer_body_markdown
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)
@@ -426,7 +433,8 @@ export async function submitForReview(
 			submitted_at: new Date().toISOString(),
 			decided_at: null,
 			reviewer_id: null,
-			review_notes: null
+			review_notes: null,
+			reviewer_body_markdown: null
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)
@@ -454,6 +462,10 @@ export interface DecisionInput {
 	// is rejected if the row's content_hash no longer matches (the contributor
 	// edited the pending submission while the reviewer was reading it).
 	expectedContentHash?: string | null;
+	// Reviewer's inline-edited body, sent with a "changes_requested" decision.
+	// Stored verbatim (after validation) so the author can accept/reject the
+	// reviewer's edits hunk-by-hunk. Ignored for approve/reject.
+	reviewerBodyMarkdown?: string | null;
 }
 
 export async function decideSubmission(
@@ -518,7 +530,8 @@ export async function decideSubmission(
 				review_notes: reviewNotes,
 				decided_at: decidedAt,
 				flyout_section: finalSection,
-				flyout_order: finalOrder
+				flyout_order: finalOrder,
+				reviewer_body_markdown: null
 			})
 			.eq('id', submissionId)
 			.select(SUBMISSION_COLUMNS)
@@ -535,13 +548,27 @@ export async function decideSubmission(
 	const newStatus: SubmissionStatus =
 		input.decision === 'changes_requested' ? 'changes_requested' : 'rejected';
 
+	// Only "changes_requested" carries an inline-edit proposal back to the
+	// author. Store it only when it actually differs from what they submitted,
+	// and validate it through the same sanitiser so a malformed suggestion can't
+	// be persisted. Rejecting clears any prior suggestion.
+	let reviewerBodyToStore: string | null = null;
+	if (input.decision === 'changes_requested' && input.reviewerBodyMarkdown != null) {
+		const proposed = input.reviewerBodyMarkdown;
+		if (proposed.trim() && proposed !== existing.body_markdown) {
+			await sanitizeArticleBody(proposed);
+			reviewerBodyToStore = proposed;
+		}
+	}
+
 	const { data, error } = await admin
 		.from('article_submissions')
 		.update({
 			status: newStatus,
 			reviewer_id: reviewer.id,
 			review_notes: reviewNotes,
-			decided_at: decidedAt
+			decided_at: decidedAt,
+			reviewer_body_markdown: reviewerBodyToStore
 		})
 		.eq('id', submissionId)
 		.select(SUBMISSION_COLUMNS)

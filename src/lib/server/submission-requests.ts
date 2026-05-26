@@ -23,7 +23,10 @@ export const submissionDraftSchema = z
 		// shape-check here.
 		heroImageUrl: z.string().url().max(1024).nullable().optional(),
 		// Display label for patch notes (e.g. "v0.5.2"). Ignored for other types.
-		version: z.string().max(40).nullable().optional()
+		version: z.string().max(40).nullable().optional(),
+		// Set by the author once they've resolved a reviewer's inline suggested
+		// edits, so the server drops the stored proposal on the next save.
+		clearReviewerSuggestions: z.boolean().optional()
 	})
 	.strict();
 
@@ -48,7 +51,11 @@ export const decisionBodySchema = z
 		// looking at when they made the call. If the contributor edited the
 		// pending submission in the meantime, the hash on the row will differ
 		// and the decision is rejected so the reviewer can re-read.
-		expectedContentHash: z.string().max(128).nullable().optional()
+		expectedContentHash: z.string().max(128).nullable().optional(),
+		// Reviewer's inline-edited body. Only meaningful with a
+		// "changes_requested" decision; stored so the author can review it as
+		// accept/reject diffs. Validated through the same sanitiser as any body.
+		reviewerBodyMarkdown: z.string().max(60_000).nullable().optional()
 	})
 	.strict();
 

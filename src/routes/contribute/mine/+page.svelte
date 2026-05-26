@@ -171,6 +171,21 @@
 							<p class="mt-1 whitespace-pre-wrap">{submission.review_notes}</p>
 						</div>
 					{/if}
+					{#if submission.reviewer_body_markdown && submission.status === 'changes_requested'}
+						<a
+							href="/contribute/{submission.id}/edit"
+							class="mt-3 flex items-center gap-2 rounded-sm border-l-2 border-[var(--hud-teal)] bg-[var(--hud-teal)]/10 p-3 text-sm text-[var(--hud-text)] transition hover:bg-[var(--hud-teal)]/15"
+						>
+							<span
+								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+							>
+								Suggested edits
+							</span>
+							<span class="text-[var(--hud-muted)]"
+								>The reviewer proposed inline edits — open to accept or reject them.</span
+							>
+						</a>
+					{/if}
 				</li>
 			{/each}
 		</ul>
