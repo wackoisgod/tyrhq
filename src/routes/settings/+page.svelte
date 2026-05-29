@@ -160,6 +160,34 @@
 						All builds you've authored — open, share, or iterate.
 					</p>
 				</a>
+				<a
+					href="/teams"
+					class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						Teams
+					</p>
+					<p class="mt-2 text-sm text-[var(--hud-text)]">
+						Create a team, join a roster, and track tournament records.
+					</p>
+				</a>
+				{#if data.role === 'admin' || data.profile?.is_tournament_organizer}
+					<a
+						href="/tournaments/manage"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Tournament tools
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Create tournaments, seed brackets, and report match results.
+						</p>
+					</a>
+				{/if}
 			</div>
 		</div>
 

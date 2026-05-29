@@ -18,6 +18,7 @@ declare global {
 			session: Session | null;
 			user: User | null;
 			role?: 'user' | 'contributor' | 'admin';
+			isTournamentOrganizer?: boolean;
 		}
 		// interface PageState {}
 		// interface Platform {}

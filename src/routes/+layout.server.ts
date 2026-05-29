@@ -7,14 +7,22 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	depends('supabase:auth');
 	const { session, user, role } = await locals.safeGetSession();
 
-	let profile: { display_name: string } | null = null;
+	let profile: { display_name: string; is_tournament_organizer?: boolean | null } | null = null;
 	if (user && locals.supabase) {
-		const { data } = await locals.supabase
+		const { data, error } = await locals.supabase
 			.from('profiles')
-			.select('display_name')
+			.select('display_name, is_tournament_organizer')
 			.eq('id', user.id)
 			.single();
 		profile = data;
+		if (error?.message?.includes('is_tournament_organizer')) {
+			const fallback = await locals.supabase
+				.from('profiles')
+				.select('display_name')
+				.eq('id', user.id)
+				.single<{ display_name: string }>();
+			profile = fallback.data ? { ...fallback.data, is_tournament_organizer: false } : null;
+		}
 	}
 
 	// Redirect to settings if logged in but no display name set (first-time onboarding)
@@ -34,5 +42,13 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const pendingReviewCount =
 		role === 'contributor' || role === 'admin' ? await countPendingReviewSubmissions() : 0;
 
-	return { session, user, profile, role, flyoutEntries, pendingReviewCount };
+	return {
+		session,
+		user,
+		profile,
+		role,
+		isTournamentOrganizer: Boolean(profile?.is_tournament_organizer),
+		flyoutEntries,
+		pendingReviewCount
+	};
 };
