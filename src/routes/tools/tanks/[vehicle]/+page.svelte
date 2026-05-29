@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import DifficultyMeter from '$lib/components/DifficultyMeter.svelte';
 	import type { TankSummary } from '$lib/types/game';
 
 	let { data } = $props();
@@ -142,6 +143,12 @@
 						</div>
 					</div>
 				{/each}
+				<div
+					class="flex items-center justify-between gap-3 rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)] sm:col-span-3"
+				>
+					<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">Difficulty</div>
+					<DifficultyMeter value={data.tank.stats.difficulty} size="md" showValue />
+				</div>
 			</div>
 			{#if hasAbilityDetails}
 				<section class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.22)]">

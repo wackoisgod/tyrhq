@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import DifficultyMeter from '$lib/components/DifficultyMeter.svelte';
 	import type { TankSummary } from '$lib/types/game';
 
 	let { data } = $props();
@@ -25,6 +26,10 @@
 	function formatCardValue(value: number | undefined) {
 		if (value == null) return '0';
 		return Number.isInteger(value) ? `${value}` : value.toFixed(1).replace(/\.0$/, '');
+	}
+
+	function formatDifficulty(value: number | undefined) {
+		return `${formatCardValue(value)} / 5`;
 	}
 
 	function getTankTheme(tank: TankSummary) {
@@ -126,6 +131,13 @@
 									class="absolute right-2 top-2 rounded-sm bg-[var(--hud-surface)]/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--hud-muted)] backdrop-blur-sm"
 								>
 									{tank.classLabel}
+								</div>
+								<div
+									class="absolute left-2 top-2 flex items-center gap-1.5 rounded-sm bg-[var(--hud-surface)]/80 px-2 py-1 backdrop-blur-sm"
+									title="Difficulty rating: {formatDifficulty(tank.stats.difficulty)}"
+								>
+									<span class="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)]">Dif</span>
+									<DifficultyMeter value={tank.stats.difficulty} size="sm" />
 								</div>
 							</div>
 							<div class="px-3 py-2.5">

@@ -23,6 +23,7 @@ export type TankSummary = {
 		vision: number;
 		detection: number;
 		camo: number;
+		difficulty: number;
 	};
 	ability: VehicleAbility;
 };

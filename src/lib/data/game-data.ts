@@ -87,7 +87,8 @@ function toTankSummary(): TankSummary[] {
 			penetration: Number(vehicle.stats.ShellPenetration ?? 0),
 			vision: Number(vehicle.stats.VisionRadius ?? 0),
 			detection: Number(vehicle.stats.DetectionRadius ?? 0),
-			camo: Number(vehicle.stats.CamoPercentage ?? 0)
+			camo: Number(vehicle.stats.CamoPercentage ?? 0),
+			difficulty: Number(vehicle.stats.DifficultyRating ?? 0)
 		},
 		ability: vehicle.ability
 	}));
