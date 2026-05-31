@@ -713,7 +713,12 @@ export function computeBuild(
 			['TurretTraverseDispersionPenalty', m.dispersion],
 			['FiringDispersionPenalty', m.dispersion],
 			['DetectionRadius', m.detection],
-			['ShellVelocity', m.velocity]
+			['ShellVelocity', m.velocity],
+			// While-loaded vehicle speed effects from the ammo's equip effect
+			// (optional — only present on speed-altering rounds like Lightweight/Unstable).
+			['MaxSpeed', m.maxSpeed ?? 1],
+			['MaxReverseSpeed', m.reverseSpeed ?? 1],
+			['MaxStrafingSpeed', m.strafeSpeed ?? 1]
 		];
 		for (const [attribute, multiplier] of ammoTargets) {
 			if (!Number.isFinite(multiplier) || multiplier === 1) continue;

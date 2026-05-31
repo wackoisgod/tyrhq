@@ -1165,7 +1165,7 @@
 							{#each currentVehicle.loadout.defaultAmmoIds as _, index}
 								{@const pickedAmmo = catalog.ammoById.get(selection.ammoIds[index])}
 								{@const ammoMods = pickedAmmo?.modifiers}
-								{@const ammoHasStats = ammoMods && (ammoMods.damage !== 1 || ammoMods.penetration !== 1 || ammoMods.reload !== 1 || ammoMods.dispersion !== 1 || ammoMods.detection !== 1 || ammoMods.velocity !== 1)}
+								{@const ammoHasStats = ammoMods && (ammoMods.damage !== 1 || ammoMods.penetration !== 1 || ammoMods.reload !== 1 || ammoMods.dispersion !== 1 || ammoMods.detection !== 1 || ammoMods.velocity !== 1 || (ammoMods.maxSpeed ?? 1) !== 1 || (ammoMods.reverseSpeed ?? 1) !== 1 || (ammoMods.strafeSpeed ?? 1) !== 1)}
 								<div class="group/ammo relative flex items-stretch gap-0">
 									<div
 										class="relative flex h-[4.5rem] w-[8.75rem] flex-col rounded-sm ring-1 transition {selection.previewAmmoSlot === index
@@ -1245,7 +1245,10 @@
 														{ label: 'RLD', v: ammoMods.reload },
 														{ label: 'DSP', v: ammoMods.dispersion },
 														{ label: 'DET', v: ammoMods.detection },
-														{ label: 'VEL', v: ammoMods.velocity }
+														{ label: 'VEL', v: ammoMods.velocity },
+														{ label: 'SPD', v: ammoMods.maxSpeed ?? 1 },
+														{ label: 'REV', v: ammoMods.reverseSpeed ?? 1 },
+														{ label: 'STR', v: ammoMods.strafeSpeed ?? 1 }
 													] as m}
 														{#if m.v !== 1}
 															<span
@@ -1659,7 +1662,7 @@
 							{#each catalog.ammo.filter((a) => modalAmmoSlot !== 1 || a.canLoadSecondary) as ammo}
 								{@const isSelected = selection.ammoIds[modalAmmoSlot] === ammo.id}
 								{@const modifiers = ammo.modifiers}
-								{@const hasStatChanges = modifiers.damage !== 1 || modifiers.penetration !== 1 || modifiers.reload !== 1 || modifiers.dispersion !== 1 || modifiers.detection !== 1 || modifiers.velocity !== 1}
+								{@const hasStatChanges = modifiers.damage !== 1 || modifiers.penetration !== 1 || modifiers.reload !== 1 || modifiers.dispersion !== 1 || modifiers.detection !== 1 || modifiers.velocity !== 1 || (modifiers.maxSpeed ?? 1) !== 1 || (modifiers.reverseSpeed ?? 1) !== 1 || (modifiers.strafeSpeed ?? 1) !== 1}
 								<button
 									type="button"
 									class={`flex flex-col rounded-sm p-4 text-left ring-1 transition ${
@@ -1695,7 +1698,10 @@
 												{ label: 'RLD', value: modifiers.reload, tip: 'Reload Time' },
 												{ label: 'DSP', value: modifiers.dispersion, tip: 'Dispersion (all types)' },
 												{ label: 'DET', value: modifiers.detection, tip: 'Detection Radius' },
-												{ label: 'VEL', value: modifiers.velocity, tip: 'Shell Velocity' }
+												{ label: 'VEL', value: modifiers.velocity, tip: 'Shell Velocity' },
+												{ label: 'SPD', value: modifiers.maxSpeed ?? 1, tip: 'Top Speed (while loaded)' },
+												{ label: 'REV', value: modifiers.reverseSpeed ?? 1, tip: 'Reverse Speed (while loaded)' },
+												{ label: 'STR', value: modifiers.strafeSpeed ?? 1, tip: 'Strafing Speed (while loaded)' }
 											] as mod}
 												{#if mod.value !== 1}
 													<span

@@ -561,4 +561,74 @@ describe('computeBuild aggregator math', () => {
 		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('EXTENDED GEARING'));
 		expect(entry?.delta).toBeCloseTo(9.75, 4);
 	});
+
+	it('ammo equip-effect speed modifiers apply to vehicle Max/Reverse/Strafing speed', () => {
+		// Unstable restricts all three movement speeds to 65% while loaded — these live
+		// on the ammo's equip effect, surfaced via the optional speed modifiers.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const unstable = makeAmmo('unstable', 'Unstable', 1.1, {
+			maxSpeed: 0.65,
+			reverseSpeed: 0.65,
+			strafeSpeed: 0.65
+		});
+		const vehicle = makeVehicle(
+			'phantom',
+			{ MaxSpeed: 60, MaxReverseSpeed: 20, MaxStrafingSpeed: 40 },
+			'standard',
+			'tree_phantom'
+		);
+		const tree = makeTree('tree_phantom', 'phantom', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard, unstable],
+			components: [],
+			talents: [],
+			effects: [],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['unstable'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.MaxSpeed).toBeCloseTo(39, 4); // 60 × 0.65
+		expect(build!.stats.MaxReverseSpeed).toBeCloseTo(13, 4); // 20 × 0.65
+		expect(build!.stats.MaxStrafingSpeed).toBeCloseTo(26, 4); // 40 × 0.65
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.startsWith('Ammo:'));
+		expect(entry?.source).toContain('Unstable');
+		expect(entry?.delta).toBeCloseTo(-21, 4); // 39 − 60
+	});
+
+	it('ammo without speed modifiers leaves vehicle speed untouched', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const vehicle = makeVehicle('phantom', { MaxSpeed: 60 }, 'standard', 'tree_phantom');
+		const tree = makeTree('tree_phantom', 'phantom', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [],
+			effects: [],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build!.stats.MaxSpeed).toBeCloseTo(60, 4);
+		expect((build!.breakdown.MaxSpeed ?? []).some((e) => e.source.startsWith('Ammo:'))).toBe(false);
+	});
 });
