@@ -631,4 +631,137 @@ describe('computeBuild aggregator math', () => {
 		expect(build!.stats.MaxSpeed).toBeCloseTo(60, 4);
 		expect((build!.breakdown.MaxSpeed ?? []).some((e) => e.source.startsWith('Ammo:'))).toBe(false);
 	});
+
+	it('power converter applies its cooldown reduction as a multiplier on the AbilityCooldownTwo attribute', () => {
+		// POWER CONVERTER's GE drives the displayed Ability Cooldown through the engine-internal
+		// `AbilityCooldownTwo` attribute via a MultiplyAdditive op, with the point value (0.75) as
+		// the resulting multiplier — i.e. a 25% reduction. The old behaviour mis-read it as a flat
+		// −0.75s (from the effect-name "…AbilityCooldownReduction" fallback mapping).
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const powerConverterEffect = makeEffect(
+			'ge-components-powerconverterabilitycooldownreduction',
+			'AbilityCooldownTwo',
+			'MultiplyAdditive',
+			0.75,
+			{ magnitudeType: 'CustomCalculationClass', stackLimit: 999 }
+		);
+		const powerConverter = makeComponent(
+			'powerconverter',
+			'POWER CONVERTER',
+			['ge-components-powerconverterabilitycooldownreduction'],
+			[0.75],
+			'Activating your ability heals you and your Ability Cooldown is reduced by value'
+		);
+		const vehicle = makeVehicle('healer', { AbilityCooldown: 22 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [powerConverter],
+			talents: [],
+			effects: [powerConverterEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['powerconverter', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 22 × 0.75 = 16.5 (−25%), NOT 22 − 0.75 = 21.25 (the old flat-add bug).
+		expect(build!.stats.AbilityCooldown).toBeCloseTo(16.5, 4);
+		expect(build!.stats.AbilityCooldown).not.toBeCloseTo(21.25, 2);
+		const entry = build!.breakdown.AbilityCooldown?.find((e) => e.source.includes('POWER CONVERTER'));
+		expect(entry?.delta).toBeCloseTo(-5.5, 4);
+	});
+
+	it('tech-tree cooldown talents driven through AbilityCooldownTwo surface on Ability Cooldown', () => {
+		// The per-vehicle "Ability Cooldown" talents (e.g. Valor's) apply a flat AddBase to the
+		// engine-internal `AbilityCooldownTwo`. These must show on the displayed Ability Cooldown
+		// stat — previously they were dropped because the attribute wasn't recognised.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const cooldownEffect = makeEffect('ge-abilitycooldownflat', 'AbilityCooldownTwo', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const cooldownTalent = makeTalent(
+			'healer-talent019',
+			'Ability Cooldown',
+			['ge-abilitycooldownflat'],
+			[-2, -4]
+		);
+		const vehicle = makeVehicle('healer', { AbilityCooldown: 22 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', ['healer-talent019']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [cooldownTalent],
+			effects: [cooldownEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { 'healer-talent019': 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.AbilityCooldown).toBeCloseTo(18, 4); // 22 − 4 (max rank)
+		const entry = build!.breakdown.AbilityCooldown?.find((e) => e.source.includes('Ability Cooldown'));
+		expect(entry?.delta).toBeCloseTo(-4, 4);
+	});
+
+	it('catalytic reservoir does not leak its trigger wording ("penetration") into a stat bonus', () => {
+		// CATALYTIC RESERVOIR generates energy (CurrentAbilityResource) when you land a penetration.
+		// Because it has a concrete data-driven modifier — even though it targets an attribute we
+		// don't surface — the description-based fallback must NOT fire and mis-map the word
+		// "penetration" to a +3 ShellPenetration bonus.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const reservoirEffect = makeEffect(
+			'ge-components-catalyticreservoirinitial',
+			'CurrentAbilityResource',
+			'AddBase',
+			0,
+			{ magnitudeType: 'CustomCalculationClass' }
+		);
+		const reservoir = makeComponent(
+			'catalyticreservoir',
+			'CATALYTIC RESERVOIR',
+			['ge-components-catalyticreservoirinitial'],
+			[3],
+			'Generates value energy when you land a penetration while having above 50 Energy'
+		);
+		const vehicle = makeVehicle('healer', { ShellPenetration: 60 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [reservoir],
+			talents: [],
+			effects: [reservoirEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['catalyticreservoir', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.ShellPenetration).toBeCloseTo(60, 4); // unchanged; no phantom +3
+		expect(build!.breakdown.ShellPenetration).toBeUndefined();
+	});
 });
