@@ -126,7 +126,12 @@ export type ComputedBuild = {
 	}>;
 };
 
-const attributeAliasMap = new Map<string, string>();
+const attributeAliasMap = new Map<string, string>([
+	// The engine drives all ability-cooldown modifiers (Power Converter, the per-vehicle
+	// "Ability Cooldown" tech-tree talents, the Sonar keystone, …) through the internal
+	// `AbilityCooldownTwo` attribute. Surface them on the displayed `AbilityCooldown` stat.
+	['AbilityCooldownTwo', 'AbilityCooldown']
+]);
 
 const componentEffectMappings = [
 	{ pattern: /MaxAndStartingEnergyMultiply/i, key: 'MaxAbilityResource', mode: 'mult' },
@@ -737,6 +742,11 @@ export function computeBuild(
 		const conditional = isConditionalComponent(component);
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
+		// True once we see a concrete, data-driven modifier — even one targeting an attribute we
+		// don't surface as a stat card (e.g. Catalytic Reservoir's CurrentAbilityResource). Such a
+		// component is fully described by its GE data, so we must NOT fall back to fuzzy
+		// description parsing (which would misread trigger wording like "land a penetration").
+		let hasDataDrivenModifier = false;
 		const componentEffects = [...new Set(component.effectIds)]
 			.map((effectId) => catalog.effectById.get(effectId))
 			.filter((effect): effect is EffectRecord => Boolean(effect));
@@ -750,9 +760,11 @@ export function computeBuild(
 
 			for (const modifier of effect.modifiers) {
 				const attribute = normalizeAttributeKey(modifier.attribute);
-				if (!attribute || !statKeySet.has(attribute)) continue;
+				if (!attribute) continue;
 				const value = getComponentModifierValue(modifier, component);
 				if (value === null) continue;
+				hasDataDrivenModifier = true;
+				if (!statKeySet.has(attribute)) continue;
 
 				const mode = getModifierModeFromOp(modifier.op) as ContributionMode;
 				pushContribution(
@@ -777,7 +789,7 @@ export function computeBuild(
 			appliedAny ||= effectApplied;
 		}
 
-		if (!appliedAny) {
+		if (!appliedAny && !hasDataDrivenModifier) {
 			const fallbackStacks = getFallbackStackCount(
 				componentEffects,
 				description,
