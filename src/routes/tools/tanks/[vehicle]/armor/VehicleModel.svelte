@@ -480,6 +480,57 @@
 		});
 	}
 
+	// Deployed clips ship in two authoring formats: older exports store each track as an
+	// offset from the bind pose ("delta"), while newer exports bake the final local
+	// transform ("absolute"). Combining an absolute clip with the bind pose again doubles
+	// every joint and scatters the model apart, so we detect the format before normalizing.
+	// Heuristic: for joints that sit away from the origin, the average position over the
+	// clip lands near the bind pose for absolute clips and near zero for delta clips.
+	function isDeltaPoseClip(clip: AnimationClip, nodesByName: Map<string, Object3D>) {
+		let absoluteVotes = 0;
+		let deltaVotes = 0;
+
+		for (const track of clip.tracks) {
+			const separatorIndex = track.name.lastIndexOf('.');
+			if (separatorIndex < 1) continue;
+			if (track.name.slice(separatorIndex + 1) !== 'position') continue;
+
+			const target = nodesByName.get(track.name.slice(0, separatorIndex));
+			if (!target) continue;
+
+			const base = target.position;
+			// Joints sitting at the origin read the same in both formats, so they can't vote.
+			if (base.length() < 0.1) continue;
+
+			const frameCount = track.values.length / 3;
+			if (frameCount === 0) continue;
+
+			let meanX = 0;
+			let meanY = 0;
+			let meanZ = 0;
+			for (let index = 0; index < track.values.length; index += 3) {
+				meanX += track.values[index];
+				meanY += track.values[index + 1];
+				meanZ += track.values[index + 2];
+			}
+			meanX /= frameCount;
+			meanY /= frameCount;
+			meanZ /= frameCount;
+
+			const distanceToAbsolute = Math.hypot(meanX - base.x, meanY - base.y, meanZ - base.z);
+			const distanceToDelta = Math.hypot(meanX, meanY, meanZ);
+			if (distanceToDelta <= distanceToAbsolute) {
+				deltaVotes += 1;
+			} else {
+				absoluteVotes += 1;
+			}
+		}
+
+		// Default to delta when there is no usable signal so legacy offset-authored clips
+		// keep working unchanged.
+		return deltaVotes >= absoluteVotes;
+	}
+
 	function normalizeDeployedAnimationClip(clip: AnimationClip | null, root: Object3D) {
 		if (!clip) return null;
 
@@ -491,6 +542,7 @@
 		});
 
 		const sanitizedClip = clip.clone();
+		const treatAsDelta = isDeltaPoseClip(sanitizedClip, nodesByName);
 		sanitizedClip.tracks = sanitizedClip.tracks.filter((track) => {
 			const separatorIndex = track.name.lastIndexOf('.');
 			if (separatorIndex < 1) return true;
@@ -503,6 +555,10 @@
 			if (propertyName === 'scale') {
 				return !track.values.every((value) => Math.abs(value) < 0.000001);
 			}
+
+			// Absolute clips already hold the final local transform; only delta clips need
+			// to be combined with the bind pose.
+			if (!treatAsDelta) return true;
 
 			if (propertyName === 'position') {
 				for (let index = 0; index < track.values.length; index += 3) {
