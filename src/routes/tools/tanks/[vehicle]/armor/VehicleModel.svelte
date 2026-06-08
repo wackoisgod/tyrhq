@@ -164,13 +164,8 @@
 			mask = 0.0;
 
 			if (vIsModule > 0.5) {
-				if (vIsAbsorb > 0.5) {
-					fillColor = vec3(0.35, 0.01, 0.24);
-					outlineColor = vec3(1.00, 0.04, 0.68);
-				} else {
-					fillColor = vec3(0.09, 0.20, 0.75);
-					outlineColor = vec3(0.00, 0.23, 1.00);
-				}
+				fillColor = vec3(0.09, 0.20, 0.75);
+				outlineColor = vec3(0.00, 0.23, 1.00);
 				mask = 1.0;
 				return;
 			}
