@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getPublishedArticle } from '$lib/server/articles';
+import { getPublishedArticle, getWithdrawnArticle } from '$lib/server/articles';
 import { getGameSnapshot } from '$lib/data/game-data';
 import type { PageServerLoad } from './$types';
 
@@ -9,7 +9,19 @@ export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
 	});
 
 	const guide = await getPublishedArticle('guide', params.slug);
-	if (!guide) throw error(404, 'Guide not found');
+	if (!guide) {
+		const withdrawn = await getWithdrawnArticle('guide', params.slug);
+		if (withdrawn) {
+			throw error(410, {
+				message: 'This guide has been withdrawn',
+				withdrawn: true,
+				title: withdrawn.title,
+				backHref: '/guides',
+				backLabel: 'Back to Guides'
+			});
+		}
+		throw error(404, 'Guide not found');
+	}
 
 	const { user } = await locals.safeGetSession();
 	let userHasStarred = false;

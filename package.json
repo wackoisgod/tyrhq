@@ -36,6 +36,7 @@
 		"@threlte/core": "^8.5.9",
 		"@threlte/extras": "^9.14.9",
 		"@types/diff": "^7.0.2",
+		"@vercel/analytics": "^2.0.1",
 		"diff": "^9.0.0",
 		"fast-xml-parser": "^5.7.2",
 		"rehype-sanitize": "^6.0.0",
