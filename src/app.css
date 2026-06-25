@@ -759,6 +759,8 @@ input[type="radio"] {
 	color: var(--hud-text);
 	margin-top: 1.75rem;
 	margin-bottom: 0.5rem;
+	/* Leave breathing room when scrolled to via a TOC/permalink anchor. */
+	scroll-margin-top: 1.5rem;
 }
 
 /* Emphasis inside HUD-display headings: the display face has no real italic,
@@ -782,6 +784,178 @@ input[type="radio"] {
 	text-transform: uppercase;
 	color: var(--hud-muted);
 	margin-top: 1.5rem;
+	scroll-margin-top: 1.5rem;
+}
+
+/* ---- Linkable headings (permalink anchor injected by heading-anchors.ts) ---- */
+.prose-hud :is(h1, h2, h3, h4, h5, h6) {
+	position: relative;
+}
+
+.heading-anchor {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.4rem;
+	height: 1.4rem;
+	margin-left: 0.4rem;
+	vertical-align: middle;
+	color: var(--hud-dim);
+	border-radius: 2px;
+	opacity: 0;
+	transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.prose-hud :is(h1, h2, h3, h4, h5, h6):hover .heading-anchor,
+.heading-anchor:focus-visible {
+	opacity: 1;
+}
+
+.heading-anchor:hover {
+	color: var(--hud-teal);
+	background: rgba(153, 247, 255, 0.1);
+}
+
+/* Brief confirmation pip after the permalink is copied to the clipboard. */
+.heading-anchor--copied {
+	opacity: 1;
+	color: var(--hud-lime);
+}
+
+.heading-anchor--copied::after {
+	content: 'Copied';
+	position: absolute;
+	left: 100%;
+	margin-left: 0.4rem;
+	white-space: nowrap;
+	font-family: var(--font-mono);
+	font-size: 0.6rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--hud-lime);
+}
+
+@media (hover: none) {
+	/* Touch devices have no hover — keep anchors visible but subtle. */
+	.heading-anchor {
+		opacity: 0.5;
+	}
+}
+
+/* ---- Article table of contents ---- */
+.toc {
+	margin-top: 2rem;
+	padding: 1rem 1.15rem;
+	background: rgba(15, 21, 33, 0.6);
+	border-left: 2px solid var(--hud-teal);
+	box-shadow: inset 0 0 0 1px rgba(160, 170, 217, 0.12);
+	border-radius: 2px;
+}
+
+.toc__summary {
+	cursor: pointer;
+	list-style: none;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+	color: var(--hud-dim);
+	user-select: none;
+}
+
+.toc__summary::-webkit-details-marker {
+	display: none;
+}
+
+.toc__summary::before {
+	content: '▸';
+	display: inline-block;
+	margin-right: 0.5rem;
+	color: var(--hud-teal);
+	transition: transform 0.15s ease;
+}
+
+.toc__details[open] .toc__summary::before {
+	transform: rotate(90deg);
+}
+
+.toc__list {
+	list-style: none;
+	margin: 0.85rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.toc__item {
+	padding-left: calc(var(--toc-depth, 0) * 0.9rem);
+}
+
+.toc__link {
+	display: block;
+	padding: 0.25rem 0.5rem;
+	border-left: 2px solid transparent;
+	font-size: 0.85rem;
+	line-height: 1.4;
+	color: var(--hud-muted);
+	text-decoration: none;
+	transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.toc__link:hover {
+	color: var(--hud-teal);
+	background: rgba(153, 247, 255, 0.06);
+}
+
+.toc__link--active {
+	color: var(--hud-teal);
+	border-left-color: var(--hud-teal);
+	background: rgba(153, 247, 255, 0.08);
+}
+
+/* ---- Article + side-rail TOC layout ----
+   Below xl the article is just centred (max-w-3xl) and the TOC falls back to a
+   panel above the body. At xl we switch to a 3-column grid: an empty left
+   gutter mirrors the right gutter so the article stays optically centred while
+   the table of contents lives in the right margin and sticks while scrolling. */
+@media (min-width: 1280px) {
+	.article-grid {
+		display: grid;
+		grid-template-columns: 1fr minmax(0, 48rem) 1fr;
+		column-gap: 2.5rem;
+		align-items: start;
+	}
+
+	.article-grid__main {
+		grid-column: 2;
+	}
+
+	.article-grid__aside {
+		grid-column: 3;
+		min-width: 0;
+	}
+}
+
+.article-toc-rail {
+	position: sticky;
+	top: 1.5rem;
+	max-height: calc(100vh - 3rem);
+	max-width: 18rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+/* Rail variant: drop the boxed panel chrome — in the gutter a lighter divider
+   reads better than a framed card. */
+.toc--rail {
+	margin-top: 0;
+	padding: 0 0 0 0.9rem;
+	background: transparent;
+	border-left: 1px solid rgba(160, 170, 217, 0.18);
+	box-shadow: none;
+	border-radius: 0;
 }
 
 .prose-hud strong {

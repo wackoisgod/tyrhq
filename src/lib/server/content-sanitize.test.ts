@@ -17,7 +17,8 @@ const TEST_IMAGE_PREFIX = 'https://example.test/storage/v1/object/public/article
 describe('sanitizeArticleBody', () => {
 	it('renders ordinary markdown to safe HTML', async () => {
 		const { html } = await sanitizeArticleBody('## Heading\n\nA **bold** paragraph.');
-		expect(html).toContain('<h2>Heading</h2>');
+		// Headings carry an auto-generated slug id for deep-linking (see TOC feature).
+		expect(html).toContain('<h2 id="heading">Heading</h2>');
 		expect(html).toContain('<strong>bold</strong>');
 	});
 
@@ -107,6 +108,25 @@ describe('sanitizeArticleBody', () => {
 		const { html } = await sanitizeArticleBody('[click](javascript:alert(1))');
 		// rehype-sanitize defaultSchema drops javascript: from href
 		expect(html).not.toMatch(/href="javascript:/i);
+	});
+
+	it('assigns slug ids to headings for deep-linking', async () => {
+		const { html } = await sanitizeArticleBody('## Frontline Survival\n\nbody\n\n### Loadout');
+		expect(html).toContain('<h2 id="frontline-survival">Frontline Survival</h2>');
+		expect(html).toContain('<h3 id="loadout">Loadout</h3>');
+	});
+
+	it('dedupes ids for repeated heading text', async () => {
+		const { html } = await sanitizeArticleBody('## Setup\n\na\n\n## Setup\n\nb');
+		expect(html).toContain('id="setup"');
+		expect(html).toContain('id="setup-2"');
+	});
+
+	it('slugifies heading ids from sanitized text only (no markup leaks in)', async () => {
+		const { html } = await sanitizeArticleBody('## Armor *vs* Ammo');
+		expect(html).toContain('id="armor-vs-ammo"');
+		// the generated id must never contain raw HTML
+		expect(html).not.toMatch(/id="[^"]*[<>][^"]*"/);
 	});
 });
 

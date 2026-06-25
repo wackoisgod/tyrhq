@@ -1,5 +1,7 @@
 <script lang="ts">
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import TableOfContents from '$lib/contribute/TableOfContents.svelte';
+	import { extractHeadings } from '$lib/contribute/toc';
 	import type { Snippet } from 'svelte';
 
 	type Vehicle = { slug: string; name: string };
@@ -38,6 +40,8 @@
 	function formatDate(iso: string): string {
 		return iso.slice(0, 10);
 	}
+
+	const headings = $derived(extractHeadings(article.bodyHtml));
 </script>
 
 <svelte:head>
@@ -47,8 +51,9 @@
 	{/if}
 </svelte:head>
 
-<article class="mx-auto max-w-3xl px-4 py-8 md:px-6">
-	{#if banner}{@render banner()}{/if}
+<div class="article-grid mx-auto w-full max-w-[100rem] px-4 py-8 md:px-6">
+	<article class="article-grid__main mx-auto w-full min-w-0 max-w-3xl">
+		{#if banner}{@render banner()}{/if}
 
 	<a
 		href={backHref}
@@ -153,9 +158,26 @@
 		/>
 	{/if}
 
-	<div class="mt-8">
-		<ArticleBody html={article.bodyHtml} />
-	</div>
+		{#if headings.length > 1}
+			<!-- Narrow screens: collapsible TOC panel above the body. The sticky
+			     side rail (below) takes over once there's room for a gutter. -->
+			<div class="xl:hidden">
+				<TableOfContents {headings} />
+			</div>
+		{/if}
 
-	{#if footer}{@render footer()}{/if}
-</article>
+		<div class="mt-8">
+			<ArticleBody html={article.bodyHtml} />
+		</div>
+
+		{#if footer}{@render footer()}{/if}
+	</article>
+
+	{#if headings.length > 1}
+		<aside class="article-grid__aside hidden xl:block">
+			<div class="article-toc-rail">
+				<TableOfContents {headings} sidebar />
+			</div>
+		</aside>
+	{/if}
+</div>
