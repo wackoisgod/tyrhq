@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
 	import TableOfContents from '$lib/contribute/TableOfContents.svelte';
-	import { extractHeadings } from '$lib/contribute/toc';
+	import { ensureHeadingIds, extractHeadings } from '$lib/contribute/toc';
 	import type { Snippet } from 'svelte';
 
 	type Vehicle = { slug: string; name: string };
@@ -41,7 +41,11 @@
 		return iso.slice(0, 10);
 	}
 
-	const headings = $derived(extractHeadings(article.bodyHtml));
+	// Inject heading ids server-side so deep links resolve in the initial HTML —
+	// even for legacy articles stored before ids were baked in — then derive the
+	// TOC from the same id'd HTML so links and anchors always match.
+	const bodyHtml = $derived(ensureHeadingIds(article.bodyHtml));
+	const headings = $derived(extractHeadings(bodyHtml));
 </script>
 
 <svelte:head>
@@ -167,7 +171,7 @@
 		{/if}
 
 		<div class="mt-8">
-			<ArticleBody html={article.bodyHtml} />
+			<ArticleBody html={bodyHtml} />
 		</div>
 
 		{#if footer}{@render footer()}{/if}
