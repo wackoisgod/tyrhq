@@ -11,6 +11,7 @@ import { visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
 import type { Node } from 'unist';
 import { env as publicEnv } from '$env/dynamic/public';
+import { createHeadingSlugger } from '$lib/contribute/toc';
 
 export const CALLOUT_TYPES = ['info', 'warning', 'tip'] as const;
 export type CalloutType = (typeof CALLOUT_TYPES)[number];
@@ -160,6 +161,42 @@ function validateImageSources(allowedPrefix: string) {
 	};
 }
 
+const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+/** Recursively collect the visible text of a HAST element (skips comments). */
+function hastTextContent(node: Node): string {
+	const el = node as Node & { type: string; value?: string; children?: Node[] };
+	if (el.type === 'text') return el.value ?? '';
+	if (!el.children) return '';
+	return el.children.map(hastTextContent).join('');
+}
+
+/**
+ * Assign a stable, URL-safe `id` to every heading so articles can be deep-linked
+ * to a section (the "linkable headline" behaviour). Runs AFTER rehype-sanitize
+ * on purpose: the sanitizer clobbers/strips `id` by default, so injecting our
+ * own ids downstream keeps full control and avoids loosening the schema. The
+ * slugs come from the (already sanitized) heading text via the shared slugger,
+ * so the SSR table of contents and the client DOM enhancement agree on ids.
+ */
+function assignHeadingIds() {
+	return (tree: Root) => {
+		const slugger = createHeadingSlugger();
+		visit(tree as unknown as Node, 'element', (node: Node) => {
+			const el = node as Node & {
+				tagName?: string;
+				properties?: Record<string, unknown> | null;
+			};
+			if (!el.tagName || !HEADING_TAGS.has(el.tagName)) return;
+			const text = hastTextContent(el).replace(/\s+/g, ' ').trim();
+			if (!text) return;
+			const props = (el.properties ?? {}) as Record<string, unknown>;
+			props.id = slugger(text);
+			el.properties = props;
+		});
+	};
+}
+
 const ARTICLE_IMAGE_BUCKET_PATH = '/storage/v1/object/public/article-images/';
 
 /**
@@ -218,6 +255,8 @@ function buildProcessor(imageHostPrefix: string) {
 		.use(remarkRehype, { allowDangerousHtml: false })
 		.use(validateImageSources, imageHostPrefix)
 		.use(rehypeSanitize, sanitizeSchema)
+		// After sanitize so the generated heading ids survive untouched.
+		.use(assignHeadingIds)
 		.use(rehypeStringify);
 }
 

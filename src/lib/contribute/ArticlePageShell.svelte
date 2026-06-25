@@ -1,5 +1,7 @@
 <script lang="ts">
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import TableOfContents from '$lib/contribute/TableOfContents.svelte';
+	import { extractHeadings } from '$lib/contribute/toc';
 	import type { Snippet } from 'svelte';
 
 	type Vehicle = { slug: string; name: string };
@@ -38,6 +40,8 @@
 	function formatDate(iso: string): string {
 		return iso.slice(0, 10);
 	}
+
+	const headings = $derived(extractHeadings(article.bodyHtml));
 </script>
 
 <svelte:head>
@@ -151,6 +155,10 @@
 			decoding="async"
 			class="mt-8 w-full rounded-sm bg-[var(--hud-inset)] object-cover"
 		/>
+	{/if}
+
+	{#if headings.length > 1}
+		<TableOfContents {headings} />
 	{/if}
 
 	<div class="mt-8">
