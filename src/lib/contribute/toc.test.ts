@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { extractHeadings, slugifyHeadingText, createHeadingSlugger } from './toc';
+import {
+	extractHeadings,
+	slugifyHeadingText,
+	createHeadingSlugger,
+	ensureHeadingIds
+} from './toc';
 
 describe('slugifyHeadingText', () => {
 	it('lowercases and hyphenates', () => {
@@ -68,5 +73,43 @@ describe('extractHeadings', () => {
 
 	it('returns an empty list for empty input', () => {
 		expect(extractHeadings('')).toEqual([]);
+	});
+});
+
+describe('ensureHeadingIds', () => {
+	it('injects ids into headings that lack them', () => {
+		expect(ensureHeadingIds('<h2>Starting Energy</h2>')).toBe(
+			'<h2 id="starting-energy">Starting Energy</h2>'
+		);
+	});
+
+	it('preserves existing attributes when injecting', () => {
+		expect(ensureHeadingIds('<h3 class="x">Energy Zones</h3>')).toBe(
+			'<h3 class="x" id="energy-zones">Energy Zones</h3>'
+		);
+	});
+
+	it('leaves headings that already have an id untouched', () => {
+		const html = '<h2 id="custom">Title</h2>';
+		expect(ensureHeadingIds(html)).toBe(html);
+	});
+
+	it('dedupes repeated heading text', () => {
+		expect(ensureHeadingIds('<h2>Setup</h2><h2>Setup</h2>')).toBe(
+			'<h2 id="setup">Setup</h2><h2 id="setup-2">Setup</h2>'
+		);
+	});
+
+	it('produces ids that match what extractHeadings derives', () => {
+		const raw = '<h2>Starting Energy</h2><p>x</p><h3>Energy Zones</h3>';
+		const withIds = ensureHeadingIds(raw);
+		const toc = extractHeadings(raw);
+		for (const h of toc) {
+			expect(withIds).toContain(`id="${h.id}"`);
+		}
+	});
+
+	it('returns empty input unchanged', () => {
+		expect(ensureHeadingIds('')).toBe('');
 	});
 });

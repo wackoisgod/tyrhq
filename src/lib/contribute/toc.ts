@@ -113,3 +113,25 @@ export function extractHeadings(html: string, options: ExtractHeadingsOptions = 
 
 	return headings;
 }
+
+/**
+ * Inject a stable `id` into every heading that lacks one, walking the document
+ * with the shared slugger so the ids match `extractHeadings`. This runs at
+ * render time so that *legacy* article HTML — sanitized and stored before the
+ * server started baking heading ids in — is still deep-linkable straight from
+ * the server response, with no dependency on client JS. Headings that already
+ * carry an id (newer content) are left untouched.
+ */
+export function ensureHeadingIds(html: string): string {
+	if (!html) return html;
+	const slugger = createHeadingSlugger();
+	return html.replace(HEADING_RE, (full, level: string, attrs: string, inner: string) => {
+		const text = headingTextFromInnerHtml(inner ?? '');
+		// Advance the slugger for every heading so counters stay aligned with
+		// extractHeadings, even for empty or already-id'd headings.
+		const slug = slugger(text);
+		if (!text || ID_ATTR_RE.test(attrs ?? '')) return full;
+		return `<h${level}${attrs ?? ''} id="${slug}">${inner}</h${level}>`;
+	});
+}
+
