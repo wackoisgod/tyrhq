@@ -915,6 +915,49 @@ input[type="radio"] {
 	background: rgba(153, 247, 255, 0.08);
 }
 
+/* ---- Article + side-rail TOC layout ----
+   Below xl the article is just centred (max-w-3xl) and the TOC falls back to a
+   panel above the body. At xl we switch to a 3-column grid: an empty left
+   gutter mirrors the right gutter so the article stays optically centred while
+   the table of contents lives in the right margin and sticks while scrolling. */
+@media (min-width: 1280px) {
+	.article-grid {
+		display: grid;
+		grid-template-columns: 1fr minmax(0, 48rem) 1fr;
+		column-gap: 2.5rem;
+		align-items: start;
+	}
+
+	.article-grid__main {
+		grid-column: 2;
+	}
+
+	.article-grid__aside {
+		grid-column: 3;
+		min-width: 0;
+	}
+}
+
+.article-toc-rail {
+	position: sticky;
+	top: 1.5rem;
+	max-height: calc(100vh - 3rem);
+	max-width: 18rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+/* Rail variant: drop the boxed panel chrome — in the gutter a lighter divider
+   reads better than a framed card. */
+.toc--rail {
+	margin-top: 0;
+	padding: 0 0 0 0.9rem;
+	background: transparent;
+	border-left: 1px solid rgba(160, 170, 217, 0.18);
+	box-shadow: none;
+	border-radius: 0;
+}
+
 .prose-hud strong {
 	color: var(--hud-text);
 }

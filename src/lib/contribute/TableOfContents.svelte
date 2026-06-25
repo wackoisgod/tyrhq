@@ -2,7 +2,10 @@
 	import { onMount } from 'svelte';
 	import type { TocHeading } from './toc';
 
-	let { headings = [] }: { headings?: TocHeading[] } = $props();
+	let {
+		headings = [],
+		sidebar = false
+	}: { headings?: TocHeading[]; sidebar?: boolean } = $props();
 
 	let activeId = $state('');
 
@@ -51,7 +54,7 @@
 </script>
 
 {#if headings.length > 1}
-	<nav class="toc" aria-label="Table of contents">
+	<nav class="toc" class:toc--rail={sidebar} aria-label="Table of contents">
 		<details class="toc__details" open>
 			<summary class="toc__summary">Contents</summary>
 			<ul class="toc__list">
