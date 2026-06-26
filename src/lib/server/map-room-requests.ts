@@ -15,7 +15,9 @@ const MAX_STROKE_POINTS = 512;
 const MAX_ROOM_STROKES = 500;
 const MAX_ROOM_STAMPS = 200;
 const MAX_ROOM_SHAPES = 300;
+const MAX_ROOM_LAYERS = 12;
 const MAX_STROKE_WIDTH = 64;
+const LAYER_NAME_MAX_LENGTH = 48;
 
 const idSchema = z.string().min(1).max(ID_MAX_LENGTH);
 const colorSchema = z
@@ -36,6 +38,18 @@ const pointSchema = z
 
 const lineStyleSchema = z.enum(['solid', 'dashed', 'dotted']);
 const lineEndSchema = z.enum(['none', 'arrow', 'stop']);
+const layerNameSchema = z.string().trim().min(1).max(LAYER_NAME_MAX_LENGTH);
+const opacitySchema = z.number().finite().min(0).max(1);
+
+const layerSchema = z
+	.object({
+		id: idSchema,
+		name: layerNameSchema,
+		visible: z.boolean(),
+		locked: z.boolean(),
+		opacity: opacitySchema
+	})
+	.strict();
 
 const strokeSchema = z
 	.object({
@@ -45,7 +59,8 @@ const strokeSchema = z
 		width: strokeWidthSchema,
 		tool: z.enum(['pen', 'eraser']),
 		lineStyle: lineStyleSchema,
-		endType: lineEndSchema
+		endType: lineEndSchema,
+		layerId: idSchema.optional()
 	})
 	.strict();
 
@@ -56,7 +71,8 @@ const stampSchema = z
 		stamp: z.enum(['tank', 'zone']),
 		side: z.enum(['friendly', 'enemy']),
 		vehicleId: z.string().min(1).max(VEHICLE_ID_MAX_LENGTH).optional(),
-		showVision: z.boolean().optional()
+		showVision: z.boolean().optional(),
+		layerId: idSchema.optional()
 	})
 	.strict();
 
@@ -69,7 +85,8 @@ const shapeSchema = z
 		color: colorSchema,
 		width: strokeWidthSchema,
 		lineStyle: lineStyleSchema,
-		endType: lineEndSchema
+		endType: lineEndSchema,
+		layerId: idSchema.optional()
 	})
 	.strict();
 
@@ -83,7 +100,8 @@ const compactStrokeSchema = z
 		w: strokeWidthSchema.optional(),
 		t: z.enum(['e', 'p']).optional(),
 		l: z.enum(['s', 'd', 'o']).optional(),
-		e: z.enum(['n', 'a', 't', 'b']).optional()
+		e: z.enum(['n', 'a', 't', 'b']).optional(),
+		g: idSchema.optional()
 	})
 	.strict();
 
@@ -95,7 +113,8 @@ const compactStampSchema = z
 		s: z.enum(['t', 'z']).optional(),
 		d: z.enum(['f', 'e']).optional(),
 		v: z.string().min(1).max(VEHICLE_ID_MAX_LENGTH).optional(),
-		r: z.literal(1).optional()
+		r: z.literal(1).optional(),
+		g: idSchema.optional()
 	})
 	.strict();
 
@@ -110,7 +129,18 @@ const compactShapeSchema = z
 		c: colorSchema.optional(),
 		w: strokeWidthSchema.optional(),
 		l: z.enum(['s', 'd', 'o']).optional(),
-		e: z.enum(['n', 'a', 't', 'b']).optional()
+		e: z.enum(['n', 'a', 't', 'b']).optional(),
+		g: idSchema.optional()
+	})
+	.strict();
+
+const compactLayerSchema = z
+	.object({
+		i: idSchema.optional(),
+		n: layerNameSchema.optional(),
+		v: z.literal(0).optional(),
+		k: z.literal(1).optional(),
+		o: opacitySchema.optional()
 	})
 	.strict();
 
@@ -118,7 +148,8 @@ export const compactStateSchema = z
 	.object({
 		s: z.array(compactStrokeSchema).max(MAX_ROOM_STROKES).optional(),
 		t: z.array(compactStampSchema).max(MAX_ROOM_STAMPS).optional(),
-		h: z.array(compactShapeSchema).max(MAX_ROOM_SHAPES).optional()
+		h: z.array(compactShapeSchema).max(MAX_ROOM_SHAPES).optional(),
+		y: z.array(compactLayerSchema).max(MAX_ROOM_LAYERS).optional()
 	})
 	.strict();
 
@@ -131,6 +162,19 @@ export const plannerOperationSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('add_stamp'), stamp: stampSchema }).strict(),
 	z.object({ type: z.literal('update_stamp'), stamp: stampSchema }).strict(),
 	z.object({ type: z.literal('delete_stamp'), stampId: idSchema }).strict(),
+	z.object({ type: z.literal('add_layer'), layer: layerSchema }).strict(),
+	z.object({ type: z.literal('update_layer'), layer: layerSchema }).strict(),
+	z.object({ type: z.literal('delete_layer'), layerId: idSchema }).strict(),
+	z
+		.object({ type: z.literal('reorder_layers'), order: z.array(idSchema).max(MAX_ROOM_LAYERS) })
+		.strict(),
+	z
+		.object({
+			type: z.literal('move_to_layer'),
+			targetLayerId: idSchema,
+			objectIds: z.array(idSchema).max(MAX_ROOM_STROKES + MAX_ROOM_STAMPS + MAX_ROOM_SHAPES)
+		})
+		.strict(),
 	z.object({ type: z.literal('clear_room') }).strict()
 ]);
 
