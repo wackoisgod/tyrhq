@@ -212,20 +212,6 @@
 		};
 	}
 
-	function formatSvgNumber(value: number) {
-		const rounded = Math.round(value * 1000) / 1000;
-		return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(3).replace(/\.?0+$/, '');
-	}
-
-	function escapeSvgText(value: string) {
-		return value
-			.replaceAll('&', '&amp;')
-			.replaceAll('<', '&lt;')
-			.replaceAll('>', '&gt;')
-			.replaceAll('"', '&quot;')
-			.replaceAll("'", '&#39;');
-	}
-
 	function withAlpha(hex: string, alpha: number) {
 		const normalized = hex.replace('#', '');
 		const expanded =
@@ -337,6 +323,67 @@
 			}
 		}
 		return null;
+	}
+
+	function svgStrokeCoord(value: number) {
+		return Math.round(value * 10000) / 10;
+	}
+
+	// Mirrors drawStrokePath's midpoint-quadratic smoothing, but emits an SVG
+	// path string in the 0–1000 overlay coordinate space so brush strokes can
+	// live in the same stacking context as shapes and obey layer order.
+	function buildStrokePathD(points: Point[]): string {
+		if (points.length === 0) return '';
+		let d = `M ${svgStrokeCoord(points[0].x)} ${svgStrokeCoord(points[0].y)}`;
+		if (points.length === 1) return d;
+		if (points.length === 2) {
+			return `${d} L ${svgStrokeCoord(points[1].x)} ${svgStrokeCoord(points[1].y)}`;
+		}
+		for (let i = 1; i < points.length - 2; i += 1) {
+			const current = points[i];
+			const next = points[i + 1];
+			const midX = (current.x + next.x) / 2;
+			const midY = (current.y + next.y) / 2;
+			d += ` Q ${svgStrokeCoord(current.x)} ${svgStrokeCoord(current.y)} ${svgStrokeCoord(midX)} ${svgStrokeCoord(midY)}`;
+		}
+		const penultimate = points[points.length - 2];
+		const last = points[points.length - 1];
+		d += ` Q ${svgStrokeCoord(penultimate.x)} ${svgStrokeCoord(penultimate.y)} ${svgStrokeCoord(last.x)} ${svgStrokeCoord(last.y)}`;
+		return d;
+	}
+
+	// Trims `back` units of length off the tail so a drawn arrowhead sits flush
+	// with the stroke end — the unit-space analogue of trimPointsForArrowEnd.
+	function trimStrokePointsForArrow(points: Point[], back: number): Point[] {
+		if (points.length < 2 || back <= 0) return points;
+		let remaining = back;
+		for (let i = points.length - 1; i > 0; i -= 1) {
+			const next = points[i];
+			const prev = points[i - 1];
+			const segLen = distanceBetween(next, prev);
+			if (segLen <= 0) continue;
+			if (segLen >= remaining) {
+				const t = remaining / segLen;
+				const trimmed = {
+					x: next.x - (next.x - prev.x) * t,
+					y: next.y - (next.y - prev.y) * t
+				};
+				return [...points.slice(0, i), trimmed];
+			}
+			remaining -= segLen;
+		}
+		return [points[0]];
+	}
+
+	function getStrokeSvgPathD(stroke: Stroke): string {
+		if (stroke.tool === 'pen' && stroke.endType === 'arrow') {
+			const terminal = getStrokeTerminalSegment(stroke.points);
+			const geometry = terminal ? getArrowGeometry(terminal.from, terminal.to, stroke.width) : null;
+			if (geometry) {
+				return buildStrokePathD(trimStrokePointsForArrow(stroke.points, geometry.back));
+			}
+		}
+		return buildStrokePathD(stroke.points);
 	}
 
 	function getPointerPos(e: PointerEvent | MouseEvent): Point {
@@ -695,17 +742,6 @@
 
 	function getSvgDashArray(style: LineStyle, width: number) {
 		const segments = getDashSegments(style, width);
-		return segments.length > 0 ? segments.join(' ') : undefined;
-	}
-
-	function toExportSvgLength(px: number, displayWidth: number) {
-		return (px * 1000) / Math.max(displayWidth, 1);
-	}
-
-	function getExportSvgDashArray(style: LineStyle, width: number, displayWidth: number) {
-		const segments = getDashSegments(style, width).map((segment) =>
-			formatSvgNumber(toExportSvgLength(segment, displayWidth))
-		);
 		return segments.length > 0 ? segments.join(' ') : undefined;
 	}
 
@@ -1732,182 +1768,6 @@
 		drawZoneToCanvas(ctx, cx, cy, size, col);
 	}
 
-	function buildExportOverlaySvg(displayWidth: number) {
-		const elements: string[] = [];
-		// Emit an opacity wrapper only when the owning layer is faded, so opaque
-		// layers keep producing the exact same markup as before.
-		const pushGroup = (layerId: string | undefined, ...items: string[]) => {
-			const op = layerOpacity(layerId);
-			if (op >= 1) {
-				elements.push(...items);
-				return;
-			}
-			elements.push(`<g opacity="${formatSvgNumber(op)}">`, ...items, '</g>');
-		};
-
-		for (const stamp of visibleStamps) {
-			const tankInfo =
-				stamp.stamp === 'tank' && stamp.vehicleId
-					? tanks.find((tank) => tank.id === stamp.vehicleId)
-					: null;
-			if (!stamp.showVision || !tankInfo) continue;
-
-			const cx = toSvgCoord(stamp.pos.x);
-			const cy = toSvgCoord(stamp.pos.y);
-			const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR;
-			const radius = formatSvgNumber(getVisionRadiusSvg(tankInfo.vision));
-			const innerRadius = formatSvgNumber(Math.max(getVisionRadiusSvg(tankInfo.vision) * 0.5, 12));
-			const labelPos = getVisionLabelPosition(stamp);
-			const labelX = toSvgCoord(labelPos.x);
-			const labelY = toSvgCoord(labelPos.y);
-			const labelFontSize = formatSvgNumber(toExportSvgLength(10, displayWidth));
-			const outerStroke = formatSvgNumber(toExportSvgLength(5, displayWidth));
-			const midStroke = formatSvgNumber(toExportSvgLength(2.5, displayWidth));
-			const innerStroke = formatSvgNumber(toExportSvgLength(1.25, displayWidth));
-			const ringDash = `${formatSvgNumber(toExportSvgLength(16, displayWidth))} ${formatSvgNumber(toExportSvgLength(12, displayWidth))}`;
-
-			pushGroup(
-				stamp.layerId,
-				`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="rgba(8,12,18,0.42)" stroke-width="${outerStroke}" stroke-dasharray="${ringDash}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${withAlpha(ringColor, 0.035)}" stroke="${ringColor}" stroke-opacity="0.94" stroke-width="${midStroke}" stroke-dasharray="${ringDash}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="none" stroke="rgba(8,12,18,0.35)" stroke-width="${midStroke}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="none" stroke="${ringColor}" stroke-opacity="0.45" stroke-width="${innerStroke}"/>`,
-				`<text x="${labelX}" y="${labelY}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="${labelFontSize}" font-weight="700" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="rgba(8,12,18,0.82)" stroke-width="${formatSvgNumber(toExportSvgLength(3, displayWidth))}">${escapeSvgText(getVisionLabel(tankInfo.vision))}</text>`
-			);
-		}
-
-		for (const shape of visibleShapes) {
-			const strokeWidth = formatSvgNumber(toExportSvgLength(getShapeStrokeWidth(shape), displayWidth));
-			const dashArray = getExportSvgDashArray(shape.lineStyle, getShapeStrokeWidth(shape), displayWidth);
-			const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
-
-			if (shape.kind === 'line') {
-				const lineParts = [
-					`<line x1="${toSvgCoord(shape.start.x)}" y1="${toSvgCoord(shape.start.y)}" x2="${toSvgCoord(shape.end.x)}" y2="${toSvgCoord(shape.end.y)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr} stroke-linecap="round" stroke-linejoin="round"/>`
-				];
-
-				if (shape.endType === 'arrow') {
-					const arrowPoints = getArrowHeadPoints(shape.start, shape.end, shape.width);
-					if (arrowPoints) {
-						lineParts.push(`<polygon points="${arrowPoints}" fill="${shape.color}"/>`);
-					}
-				} else if (shape.endType === 'stop') {
-					const stopCap = getStopCapSegment(shape.start, shape.end, shape.width);
-					if (stopCap) {
-						lineParts.push(
-							`<line x1="${toSvgCoord(stopCap.x1)}" y1="${toSvgCoord(stopCap.y1)}" x2="${toSvgCoord(stopCap.x2)}" y2="${toSvgCoord(stopCap.y2)}" stroke="${shape.color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`
-						);
-					}
-				}
-
-				pushGroup(shape.layerId, ...lineParts);
-				continue;
-			}
-
-			if (shape.kind === 'measure') {
-				const radius = getMeasureRadius(shape);
-				const labelPos = getMeasureLabelPosition(shape);
-				const labelFontSize = formatSvgNumber(
-					toExportSvgLength(Math.max(14, getShapeStrokeWidth(shape) * 2.5), displayWidth)
-				);
-				pushGroup(
-					shape.layerId,
-					`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius)}" fill="none" stroke="${shape.color}" stroke-width="${strokeWidth}"/>`,
-					`<line x1="${toSvgCoord(shape.start.x)}" y1="${toSvgCoord(shape.start.y)}" x2="${toSvgCoord(shape.end.x)}" y2="${toSvgCoord(shape.end.y)}" stroke="${shape.color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`,
-					`<text x="${toSvgCoord(labelPos.x)}" y="${toSvgCoord(labelPos.y)}" fill="${shape.color}" font-family="system-ui, sans-serif" font-size="${labelFontSize}" font-weight="700" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="rgba(18,22,30,0.78)" stroke-width="${formatSvgNumber(toExportSvgLength(Math.max(3, getShapeStrokeWidth(shape) * 0.42), displayWidth))}">${escapeSvgText(getMeasureLabel(shape))}</text>`
-				);
-				continue;
-			}
-
-			if (shape.kind === 'circle') {
-				const bounds = getShapeBounds(shape);
-				pushGroup(
-					shape.layerId,
-					`<ellipse cx="${toSvgCoord(bounds.centerX)}" cy="${toSvgCoord(bounds.centerY)}" rx="${toSvgCoord(Math.max(bounds.width / 2, 0.015))}" ry="${toSvgCoord(Math.max(bounds.height / 2, 0.015))}" fill="${withAlpha(shape.color, 0.12)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`
-				);
-				continue;
-			}
-
-			if (shape.kind === 'rectangle') {
-				const bounds = getShapeBounds(shape);
-				pushGroup(
-					shape.layerId,
-					`<rect x="${toSvgCoord(bounds.left)}" y="${toSvgCoord(bounds.top)}" width="${toSvgCoord(Math.max(bounds.width, 0.02))}" height="${toSvgCoord(Math.max(bounds.height, 0.02))}" fill="${withAlpha(shape.color, 0.1)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`
-				);
-				continue;
-			}
-
-			const radius = Math.max(distanceBetween(shape.start, shape.end), 0.026);
-			pushGroup(
-				shape.layerId,
-				`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius * 1.35)}" fill="${withAlpha(shape.color, 0.12)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`,
-				`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius * 0.44)}" fill="none" stroke="${shape.color}" stroke-opacity="0.55" stroke-width="${formatSvgNumber(toExportSvgLength(Math.max(1, getShapeStrokeWidth(shape) * 0.6), displayWidth))}"/>`
-			);
-		}
-
-		for (const stamp of visibleStamps) {
-			if (stamp.stamp !== 'zone') continue;
-			const col = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR;
-			const cx = toSvgCoord(stamp.pos.x);
-			const cy = toSvgCoord(stamp.pos.y);
-			const outerRadius = formatSvgNumber(toExportSvgLength(18, displayWidth));
-			const innerRadius = formatSvgNumber(toExportSvgLength(12, displayWidth));
-			const outerStroke = formatSvgNumber(toExportSvgLength(2.5, displayWidth));
-			const innerStroke = formatSvgNumber(toExportSvgLength(1, displayWidth));
-			const stemStroke = formatSvgNumber(toExportSvgLength(2, displayWidth));
-			const arrowX = formatSvgNumber(toExportSvgLength(4, displayWidth));
-			const arrowY = formatSvgNumber(toExportSvgLength(10, displayWidth));
-			const arrowTipX = formatSvgNumber(toExportSvgLength(8, displayWidth));
-
-			elements.push(
-				`<g transform="translate(${cx} ${cy})" opacity="${formatSvgNumber(layerOpacity(stamp.layerId))}">`,
-				`<circle cx="0" cy="0" r="${outerRadius}" fill="${col}" opacity="0.2"/>`,
-				`<circle cx="0" cy="0" r="${outerRadius}" fill="none" stroke="${col}" stroke-width="${outerStroke}" stroke-dasharray="${formatSvgNumber(toExportSvgLength(6, displayWidth))} ${formatSvgNumber(toExportSvgLength(4, displayWidth))}"/>`,
-				`<circle cx="0" cy="0" r="${innerRadius}" fill="none" stroke="${col}" stroke-width="${innerStroke}" opacity="0.5"/>`,
-				`<line x1="-${arrowX}" y1="-${arrowY}" x2="-${arrowX}" y2="${arrowY}" stroke="${col}" stroke-width="${stemStroke}" stroke-linecap="round"/>`,
-				`<polygon points="-${arrowX},-${arrowY} ${arrowTipX},-${formatSvgNumber(toExportSvgLength(6, displayWidth))} -${arrowX},-${formatSvgNumber(toExportSvgLength(2, displayWidth))}" fill="${col}"/>`,
-				`<line x1="-${formatSvgNumber(toExportSvgLength(8, displayWidth))}" y1="${arrowY}" x2="0" y2="${arrowY}" stroke="${col}" stroke-width="${stemStroke}" stroke-linecap="round"/>`,
-				`</g>`
-			);
-		}
-
-		if (elements.length === 0) return null;
-
-		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">${elements.join('')}</svg>`;
-	}
-
-	function loadImage(src: string): Promise<HTMLImageElement> {
-		return new Promise((resolve, reject) => {
-			const image = new Image();
-			image.onload = () => resolve(image);
-			image.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-			image.src = src;
-		});
-	}
-
-	async function drawExportOverlay(
-		ctx: CanvasRenderingContext2D,
-		w: number,
-		h: number,
-		displayWidth: number
-	) {
-		const svg = buildExportOverlaySvg(displayWidth);
-		if (!svg) return false;
-
-		const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-
-		try {
-			const image = await loadImage(url);
-			ctx.drawImage(image, 0, 0, w, h);
-			return true;
-		} catch {
-			return false;
-		} finally {
-			URL.revokeObjectURL(url);
-		}
-	}
-
 	function buildPreviewStroke(points: Point[]): Stroke {
 		return {
 			id: createPlannerId('stroke'),
@@ -1928,13 +1788,12 @@
 		const h = canvasEl.height;
 		ctx.clearRect(0, 0, w, h);
 
-		for (const stroke of visibleStrokes) {
-			ctx.globalAlpha = layerOpacity(stroke.layerId);
-			drawStroke(ctx, stroke, w, h);
-		}
-		ctx.globalAlpha = 1;
+		// Committed strokes render in the SVG overlay (so they interleave with
+		// shapes by layer); the canvas only paints the in-progress brush preview.
 		if (preview?.stroke) {
+			ctx.globalAlpha = layerOpacity(activeLayerId);
 			drawStroke(ctx, preview.stroke, w, h);
+			ctx.globalAlpha = 1;
 		}
 	}
 
@@ -2651,52 +2510,38 @@
 		const exportScale = w / displayWidth;
 		const dpr = window.devicePixelRatio || 1;
 
-		for (const stroke of visibleStrokes) {
-			ctx.globalAlpha = layerOpacity(stroke.layerId);
-			drawStroke(
-				ctx,
-				{
-					...stroke,
-					width: (stroke.width / dpr) * exportScale
-				},
-				w,
-				h
-			);
-		}
-		ctx.globalAlpha = 1;
-
-		const overlayDrawn = await drawExportOverlay(ctx, w, h, displayWidth);
-		if (!overlayDrawn) {
-			for (const shape of visibleShapes) {
-				ctx.globalAlpha = layerOpacity(shape.layerId);
+		// Strokes and shapes are drawn interleaved in layer order so the export
+		// matches the on-screen stacking instead of forcing every stroke beneath
+		// every shape.
+		for (const item of orderedDrawables) {
+			ctx.globalAlpha = layerOpacity(item.layerId);
+			if (item.type === 'stroke') {
+				drawStroke(ctx, { ...item.stroke, width: (item.stroke.width / dpr) * exportScale }, w, h);
+			} else {
 				drawShapeToCanvas(
 					ctx,
-					{
-						...shape,
-						width: (shape.width / dpr) * exportScale
-					},
+					{ ...item.shape, width: (item.shape.width / dpr) * exportScale },
 					w,
 					h
 				);
 			}
-			ctx.globalAlpha = 1;
-
-			for (const stamp of visibleStamps) {
-				const tankInfo =
-					stamp.stamp === 'tank' && stamp.vehicleId
-						? tanks.find((tank) => tank.id === stamp.vehicleId)
-						: null;
-				if (stamp.showVision && tankInfo) {
-					ctx.globalAlpha = layerOpacity(stamp.layerId);
-					drawVisionRingToCanvas(ctx, stamp, tankInfo, w, h);
-				}
-			}
-			ctx.globalAlpha = 1;
 		}
+		ctx.globalAlpha = 1;
+
+		for (const stamp of visibleStamps) {
+			const tankInfo =
+				stamp.stamp === 'tank' && stamp.vehicleId
+					? tanks.find((tank) => tank.id === stamp.vehicleId)
+					: null;
+			if (stamp.showVision && tankInfo) {
+				ctx.globalAlpha = layerOpacity(stamp.layerId);
+				drawVisionRingToCanvas(ctx, stamp, tankInfo, w, h);
+			}
+		}
+		ctx.globalAlpha = 1;
 
 		const stampScale = exportScale * 1.2;
 		for (const stamp of visibleStamps) {
-			if (overlayDrawn && stamp.stamp === 'zone') continue;
 			ctx.globalAlpha = layerOpacity(stamp.layerId);
 			drawStampToCanvas(ctx, stamp, w, h, stampScale);
 		}
@@ -2989,9 +2834,21 @@
 	// The layer panel reads top-to-bottom (front layer first), the inverse of the
 	// bottom-to-top render order.
 	const layersTopFirst = $derived([...layers].slice().reverse());
-	const visibleStrokes = $derived(orderByLayer(strokes.filter((s) => isLayerVisible(s.layerId))));
 	const visibleShapes = $derived(orderByLayer(shapes.filter((s) => isLayerVisible(s.layerId))));
 	const visibleStamps = $derived(orderByLayer(stamps.filter((s) => isLayerVisible(s.layerId))));
+	// Brush strokes and vector shapes share one SVG stacking context so layer
+	// order — not the medium they render in — decides what sits on top. Within a
+	// single layer strokes paint first (under shapes), matching the prior look.
+	const orderedDrawables = $derived(
+		orderByLayer([
+			...strokes
+				.filter((s) => isLayerVisible(s.layerId) && s.tool === 'pen')
+				.map((stroke) => ({ type: 'stroke' as const, id: stroke.id, layerId: stroke.layerId, stroke })),
+			...shapes
+				.filter((s) => isLayerVisible(s.layerId))
+				.map((shape) => ({ type: 'shape' as const, id: shape.id, layerId: shape.layerId, shape }))
+		])
+	);
 	const layerObjectCounts = $derived.by(() => {
 		const counts = new Map<string, number>();
 		for (const layer of layers) counts.set(layer.id, 0);
@@ -3138,20 +2995,59 @@
 								{/if}
 							{/each}
 
-							{#each visibleShapes as shape (shape.id)}
-								<g
-									opacity={layerOpacity(shape.layerId)}
-									class={toolMode === 'eraser' || isLayerLocked(shape.layerId)
-										? 'pointer-events-none'
-										: 'pointer-events-auto'}
-									role="button"
-									tabindex="-1"
-									onpointerdown={(e) => onShapePointerDown(e, shape)}
-									onpointermove={onShapePointerMove}
-									onpointerup={onShapePointerUp}
-									onpointercancel={onShapePointerUp}
-									oncontextmenu={(e) => deleteShape(e, shape.id)}
-								>
+							{#each orderedDrawables as item (item.type + ':' + item.id)}
+								{#if item.type === 'stroke'}
+									{@const stroke = item.stroke}
+									{@const strokeWidth = getDisplayStrokeWidth(stroke.width)}
+									{@const terminal =
+										stroke.endType !== 'none' ? getStrokeTerminalSegment(stroke.points) : null}
+									<g opacity={layerOpacity(stroke.layerId)} class="pointer-events-none">
+										<path
+											d={getStrokeSvgPathD(stroke)}
+											fill="none"
+											stroke={stroke.color}
+											stroke-width={strokeWidth}
+											stroke-dasharray={getSvgDashArray(stroke.lineStyle, strokeWidth)}
+											stroke-linecap={stroke.endType === 'arrow' ? 'butt' : 'round'}
+											stroke-linejoin="round"
+											vector-effect="non-scaling-stroke"
+										/>
+										{#if stroke.endType === 'arrow' && terminal}
+											<polygon
+												points={getArrowHeadPoints(terminal.from, terminal.to, stroke.width)}
+												fill={stroke.color}
+											/>
+										{:else if stroke.endType === 'stop' && terminal}
+											{@const stopCap = getStopCapSegment(terminal.from, terminal.to, stroke.width)}
+											{#if stopCap}
+												<line
+													x1={toSvgCoord(stopCap.x1)}
+													y1={toSvgCoord(stopCap.y1)}
+													x2={toSvgCoord(stopCap.x2)}
+													y2={toSvgCoord(stopCap.y2)}
+													stroke={stroke.color}
+													stroke-width={strokeWidth}
+													vector-effect="non-scaling-stroke"
+													stroke-linecap="round"
+												/>
+											{/if}
+										{/if}
+									</g>
+								{:else}
+									{@const shape = item.shape}
+									<g
+										opacity={layerOpacity(shape.layerId)}
+										class={toolMode === 'eraser' || isLayerLocked(shape.layerId)
+											? 'pointer-events-none'
+											: 'pointer-events-auto'}
+										role="button"
+										tabindex="-1"
+										onpointerdown={(e) => onShapePointerDown(e, shape)}
+										onpointermove={onShapePointerMove}
+										onpointerup={onShapePointerUp}
+										onpointercancel={onShapePointerUp}
+										oncontextmenu={(e) => deleteShape(e, shape.id)}
+									>
 									{#if shape.kind === 'line'}
 										{@const lineEnd = getLineDrawEnd(shape)}
 										{@const visibleCap = shape.endType === 'arrow' ? 'butt' : 'round'}
@@ -3361,6 +3257,7 @@
 										/>
 									{/if}
 								</g>
+								{/if}
 							{/each}
 
 							{#if currentShape}
