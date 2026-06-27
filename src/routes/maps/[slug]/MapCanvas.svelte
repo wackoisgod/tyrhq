@@ -32,7 +32,7 @@
 
 	type TankInfo = { id: string; name: string; classId: string; vision: number };
 	type ToolMode = 'pen' | 'eraser' | 'stamp' | 'shape';
-	type DrawerSection = 'style' | 'markers' | 'layers' | 'actions' | null;
+	type DrawerSection = 'style' | 'markers' | 'actions' | null;
 	type PlannerSnapshot = PlannerState;
 	type MapRoomConfig = {
 		token: string;
@@ -2345,7 +2345,6 @@
 		};
 		commitPlannerOperation({ type: 'add_layer', layer }, { remember: true });
 		activeLayerId = layer.id;
-		activeDrawer = 'layers';
 	}
 
 	function deleteLayer(layerId: string) {
@@ -2876,12 +2875,13 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div>
-	<div
-		bind:this={viewportEl}
-		class="overflow-auto"
-		style={viewportBaseH > 0 && zoom > 1 ? `max-height: ${viewportBaseH}px;` : ''}
-		onwheel={onZoomWheel}
-	>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-start">
+		<div
+			bind:this={viewportEl}
+			class="min-w-0 flex-1 overflow-auto"
+			style={viewportBaseH > 0 && zoom > 1 ? `max-height: ${viewportBaseH}px;` : ''}
+			onwheel={onZoomWheel}
+		>
 		<div style={zoom > 1 ? `width: ${zoom * 100}%;` : ''}>
 			<div class="flex">
 				<div class="flex min-w-0 flex-1 flex-col">
@@ -3427,6 +3427,180 @@
 				</div>
 			</div>
 		</div>
+		</div>
+
+		<aside
+			class="flex shrink-0 flex-col gap-2 rounded-sm bg-[var(--hud-panel-mid)] p-2 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.18)] lg:w-52"
+			aria-label="Layers"
+		>
+			<div class="flex items-center justify-between gap-2">
+				<p class="hud-eyebrow tracking-[0.18em]">Layers</p>
+				<div class="flex items-center gap-1.5">
+					<span class="hud-numeric text-[10px] text-[var(--hud-muted)]">
+						{layers.length}/{MAX_PLANNER_LAYERS}
+					</span>
+					<button
+						class="{tbtn} {tIdle} disabled:opacity-30"
+						onclick={addLayer}
+						disabled={layers.length >= MAX_PLANNER_LAYERS}
+						title="Add a new layer on top"
+					>
+						+ Add
+					</button>
+				</div>
+			</div>
+
+			<ul class="flex max-h-[55vh] flex-col gap-1 overflow-y-auto lg:max-h-[60vh]">
+				{#each layersTopFirst as layer (layer.id)}
+					{@const renderIndex = layerRankOf(layer.id)}
+					{@const count = layerObjectCounts.get(layer.id) ?? 0}
+					{@const isActive = layer.id === activeLayerId}
+					<li
+						class="rounded-sm shadow-[inset_0_0_0_1px_rgba(69,73,50,0.18)] {isActive
+							? 'bg-[var(--hud-teal)]/12 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.18)]'
+							: 'bg-[var(--hud-panel)]/55'}"
+					>
+						<div class="flex items-center gap-1.5 px-1.5 py-1">
+							<button
+								class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-text)]"
+								onclick={() => toggleLayerVisible(layer.id)}
+								title={layer.visible ? 'Hide layer' : 'Show layer'}
+								aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
+							>
+								{#if layer.visible}
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+										<circle cx="8" cy="8" r="2" />
+									</svg>
+								{:else}
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M1.5 8S4 3.5 8 3.5c1 0 1.9.3 2.7.6M14.5 8s-1 1.8-2.9 3" />
+										<path d="M6.3 6.3a2 2 0 0 0 2.8 2.8" />
+										<path d="M2.5 2.5l11 11" />
+									</svg>
+								{/if}
+							</button>
+
+							{#if renamingLayerId === layer.id}
+								<input
+									type="text"
+									bind:value={renameDraft}
+									maxlength="48"
+									class="min-w-0 flex-1 rounded-sm bg-[var(--hud-panel)]/80 px-1.5 py-0.5 text-xs text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.3)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+									onblur={commitLayerRename}
+									onkeydown={(e) => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											commitLayerRename();
+										} else if (e.key === 'Escape') {
+											e.preventDefault();
+											renamingLayerId = null;
+										}
+									}}
+								/>
+							{:else}
+								<button
+									class="min-w-0 flex-1 truncate text-left text-xs font-semibold {isActive
+										? 'text-[var(--hud-teal)]'
+										: 'text-[var(--hud-text)]'} {layer.visible ? '' : 'opacity-50'}"
+									onclick={() => selectActiveLayer(layer.id)}
+									ondblclick={() => startLayerRename(layer)}
+									title="Click to make active · double-click to rename"
+								>
+									{layer.name}
+								</button>
+							{/if}
+
+							<span class="hud-numeric shrink-0 text-[10px] text-[var(--hud-muted)]">{count}</span>
+						</div>
+
+						{#if isActive}
+							<div class="flex items-center gap-0.5 border-t border-[var(--hud-outline-variant)]/30 px-1.5 py-1">
+								<button
+									class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm transition {layer.locked
+										? 'text-[var(--hud-teal)]'
+										: 'text-[var(--hud-dim)] hover:text-[var(--hud-text)]'}"
+									onclick={() => toggleLayerLocked(layer.id)}
+									title={layer.locked ? 'Unlock layer' : 'Lock layer'}
+									aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+								>
+									{#if layer.locked}
+										<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<rect x="3.5" y="7" width="9" height="6" rx="1" />
+											<path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+										</svg>
+									{:else}
+										<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<rect x="3.5" y="7" width="9" height="6" rx="1" />
+											<path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" />
+										</svg>
+									{/if}
+								</button>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => reorderLayer(layer.id, 1)}
+									disabled={renderIndex >= layers.length - 1}
+									title="Move layer forward"
+									aria-label="Move layer forward"
+								>
+									↑
+								</button>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => reorderLayer(layer.id, -1)}
+									disabled={renderIndex <= 0}
+									title="Move layer back"
+									aria-label="Move layer back"
+								>
+									↓
+								</button>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									step="5"
+									value={Math.round(layer.opacity * 100)}
+									class="ml-1 min-w-0 flex-1 accent-[var(--hud-teal)]"
+									title="Layer opacity"
+									aria-label="Layer opacity"
+									onchange={(e) =>
+										setLayerOpacity(layer.id, Number((e.currentTarget as HTMLInputElement).value) / 100)}
+								/>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => deleteLayer(layer.id)}
+									disabled={layers.length <= 1}
+									title="Delete layer and its contents"
+									aria-label="Delete layer"
+								>
+									✕
+								</button>
+							</div>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+
+			{#if selectedShape || selectedStamp}
+				<button
+					class="{tbtn} {tIdle} disabled:opacity-30"
+					onclick={moveSelectionToActiveLayer}
+					title="Move the selected shape or marker onto the active layer"
+				>
+					Move Selection Here
+				</button>
+			{/if}
+
+			{#if layerNotice}
+				<p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ffd166]">
+					{layerNotice}
+				</p>
+			{:else}
+				<p class="text-[10px] leading-snug text-[var(--hud-dim)]">
+					Click a layer to draw on it. Drag the stack to change what sits on top.
+				</p>
+			{/if}
+		</aside>
 	</div>
 
 	<div
@@ -3725,27 +3899,6 @@
 						<span>Markers</span>
 					</button>
 					<button
-						class="{tbtnTool} {activeDrawer === 'layers' ? tActive : tIdle}"
-						onclick={() => toggleDrawer('layers')}
-						title="Open layers drawer"
-					>
-						<svg
-							class={toolGlyph}
-							viewBox="0 0 16 16"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.5"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M8 2 14 5 8 8 2 5z" />
-							<path d="M2 8l6 3 6-3" />
-							<path d="M2 11l6 3 6-3" />
-						</svg>
-						<span>Layers</span>
-					</button>
-					<button
 						class="{tbtnTool} {activeDrawer === 'actions' ? tActive : tIdle}"
 						onclick={() => toggleDrawer('actions')}
 						title="Open actions drawer"
@@ -3778,11 +3931,9 @@
 								? `Style · ${lineStyle} · ${lineEnd} · ${lineWidth}`
 								: activeDrawer === 'markers'
 									? 'Marker Drawer Open'
-									: activeDrawer === 'layers'
-										? `Layer · ${activeLayer?.name ?? '—'}`
-										: activeDrawer === 'actions'
-											? 'Action Drawer Open'
-											: 'Drawer Collapsed'}
+									: activeDrawer === 'actions'
+										? 'Action Drawer Open'
+										: 'Drawer Collapsed'}
 						</span>
 					</div>
 				</div>
@@ -3893,165 +4044,6 @@
 								</div>
 							{/if}
 						</div>
-					{:else if activeDrawer === 'layers'}
-						<div class="mb-2 flex items-center justify-between gap-3">
-							<p class="hud-eyebrow tracking-[0.22em]">Layer Drawer</p>
-							<span class="hud-numeric text-[10px] text-[var(--hud-muted)]">
-								{layers.length}/{MAX_PLANNER_LAYERS} layers
-							</span>
-						</div>
-						<div class="flex flex-wrap items-center gap-2">
-							<div class={toolbarGroup}>
-								<button
-									class="{tbtn} {tIdle} disabled:opacity-30"
-									onclick={addLayer}
-									disabled={layers.length >= MAX_PLANNER_LAYERS}
-									title="Add a new layer on top"
-								>
-									+ Layer
-								</button>
-								<button
-									class="{tbtn} {tIdle} disabled:opacity-30"
-									onclick={moveSelectionToActiveLayer}
-									disabled={!selectedShape && !selectedStamp}
-									title="Move the selected shape or marker onto the active layer"
-								>
-									Move Selection Here
-								</button>
-							</div>
-						</div>
-						<ul class="mt-2 flex flex-col gap-1">
-							{#each layersTopFirst as layer (layer.id)}
-								{@const renderIndex = layerRankOf(layer.id)}
-								{@const count = layerObjectCounts.get(layer.id) ?? 0}
-								{@const isActive = layer.id === activeLayerId}
-								<li
-									class="flex flex-wrap items-center gap-2 rounded-sm px-2 py-1.5 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.18)] {isActive
-										? 'bg-[var(--hud-teal)]/12 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.18)]'
-										: 'bg-[var(--hud-panel)]/60'}"
-								>
-									<button
-										class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-text)]"
-										onclick={() => toggleLayerVisible(layer.id)}
-										title={layer.visible ? 'Hide layer' : 'Show layer'}
-										aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
-									>
-										{#if layer.visible}
-											<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-												<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
-												<circle cx="8" cy="8" r="2" />
-											</svg>
-										{:else}
-											<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-												<path d="M1.5 8S4 3.5 8 3.5c1 0 1.9.3 2.7.6M14.5 8s-1 1.8-2.9 3" />
-												<path d="M6.3 6.3a2 2 0 0 0 2.8 2.8" />
-												<path d="M2.5 2.5l11 11" />
-											</svg>
-										{/if}
-									</button>
-									<button
-										class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm transition {layer.locked
-											? 'text-[var(--hud-teal)]'
-											: 'text-[var(--hud-dim)] hover:text-[var(--hud-text)]'}"
-										onclick={() => toggleLayerLocked(layer.id)}
-										title={layer.locked ? 'Unlock layer' : 'Lock layer'}
-										aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
-									>
-										{#if layer.locked}
-											<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-												<rect x="3.5" y="7" width="9" height="6" rx="1" />
-												<path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-											</svg>
-										{:else}
-											<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-												<rect x="3.5" y="7" width="9" height="6" rx="1" />
-												<path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" />
-											</svg>
-										{/if}
-									</button>
-
-									{#if renamingLayerId === layer.id}
-										<input
-											type="text"
-											bind:value={renameDraft}
-											maxlength="48"
-											class="min-w-0 flex-1 rounded-sm bg-[var(--hud-panel)]/80 px-2 py-1 text-xs text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.3)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
-											onblur={commitLayerRename}
-											onkeydown={(e) => {
-												if (e.key === 'Enter') {
-													e.preventDefault();
-													commitLayerRename();
-												} else if (e.key === 'Escape') {
-													e.preventDefault();
-													renamingLayerId = null;
-												}
-											}}
-										/>
-									{:else}
-										<button
-											class="min-w-0 flex-1 truncate text-left text-xs font-semibold {isActive
-												? 'text-[var(--hud-teal)]'
-												: 'text-[var(--hud-text)]'}"
-											onclick={() => selectActiveLayer(layer.id)}
-											ondblclick={() => startLayerRename(layer)}
-											title="Click to make active · double-click to rename"
-										>
-											{layer.name}
-										</button>
-									{/if}
-
-									<span class="hud-numeric shrink-0 text-[10px] text-[var(--hud-muted)]">{count}</span>
-
-									<input
-										type="range"
-										min="0"
-										max="100"
-										step="5"
-										value={Math.round(layer.opacity * 100)}
-										class="w-16 shrink-0 accent-[var(--hud-teal)]"
-										title="Layer opacity"
-										aria-label="Layer opacity"
-										onchange={(e) =>
-											setLayerOpacity(layer.id, Number((e.currentTarget as HTMLInputElement).value) / 100)}
-									/>
-
-									<div class="flex shrink-0 items-center gap-0.5">
-										<button
-											class="{tbtn} {tIdle} px-1.5 disabled:opacity-25"
-											onclick={() => reorderLayer(layer.id, 1)}
-											disabled={renderIndex >= layers.length - 1}
-											title="Move layer forward"
-											aria-label="Move layer forward"
-										>
-											↑
-										</button>
-										<button
-											class="{tbtn} {tIdle} px-1.5 disabled:opacity-25"
-											onclick={() => reorderLayer(layer.id, -1)}
-											disabled={renderIndex <= 0}
-											title="Move layer back"
-											aria-label="Move layer back"
-										>
-											↓
-										</button>
-										<button
-											class="{tbtn} {tIdle} px-1.5 disabled:opacity-25"
-											onclick={() => deleteLayer(layer.id)}
-											disabled={layers.length <= 1}
-											title="Delete layer and its contents"
-											aria-label="Delete layer"
-										>
-											✕
-										</button>
-									</div>
-								</li>
-							{/each}
-						</ul>
-						{#if layerNotice}
-							<p class="mt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ffd166]">
-								{layerNotice}
-							</p>
-						{/if}
 					{:else}
 						<div class="mb-2 flex items-center justify-between gap-3">
 							<p class="hud-eyebrow tracking-[0.22em]">Action Drawer</p>
@@ -4132,7 +4124,7 @@
 				{:else if isRoomMode}
 					Live room sync publishes each completed action. In-progress brush strokes stay local until release.
 				{:else}
-					Active layer: {activeLayer?.name ?? '—'}. Open Layers to add, hide, lock, or reorder.
+					Drawing on “{activeLayer?.name ?? '—'}”. Use the Layers panel to add, hide, lock, or reorder.
 				{/if}
 			</span>
 			<span>
