@@ -67,6 +67,10 @@
 	const colors = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#ffffff'];
 	const FRIENDLY_COLOR = '#22c55e';
 	const ENEMY_COLOR = '#ef4444';
+	// Marker sizes in the 0–1000 overlay coordinate space (markers now live in
+	// the SVG so they obey layer order, scaling with the map like the drawings).
+	const STAMP_TANK_RADIUS_SVG = 28;
+	const STAMP_ZONE_SCALE = 1.4;
 	const HISTORY_LIMIT = 80;
 	const ZOOM_MIN = 1;
 	const ZOOM_MAX = 4;
@@ -2510,40 +2514,32 @@
 		const exportScale = w / displayWidth;
 		const dpr = window.devicePixelRatio || 1;
 
-		// Strokes and shapes are drawn interleaved in layer order so the export
-		// matches the on-screen stacking instead of forcing every stroke beneath
-		// every shape.
+		// Strokes, shapes, and markers are drawn interleaved in layer order so the
+		// export matches the on-screen stacking instead of forcing every stroke
+		// beneath every shape and every marker on top.
+		const stampScale = exportScale * 1.2;
 		for (const item of orderedDrawables) {
 			ctx.globalAlpha = layerOpacity(item.layerId);
 			if (item.type === 'stroke') {
 				drawStroke(ctx, { ...item.stroke, width: (item.stroke.width / dpr) * exportScale }, w, h);
-			} else {
+			} else if (item.type === 'shape') {
 				drawShapeToCanvas(
 					ctx,
 					{ ...item.shape, width: (item.shape.width / dpr) * exportScale },
 					w,
 					h
 				);
+			} else {
+				const stamp = item.stamp;
+				const tankInfo =
+					stamp.stamp === 'tank' && stamp.vehicleId
+						? tanks.find((tank) => tank.id === stamp.vehicleId)
+						: null;
+				if (stamp.showVision && tankInfo) {
+					drawVisionRingToCanvas(ctx, stamp, tankInfo, w, h);
+				}
+				drawStampToCanvas(ctx, stamp, w, h, stampScale);
 			}
-		}
-		ctx.globalAlpha = 1;
-
-		for (const stamp of visibleStamps) {
-			const tankInfo =
-				stamp.stamp === 'tank' && stamp.vehicleId
-					? tanks.find((tank) => tank.id === stamp.vehicleId)
-					: null;
-			if (stamp.showVision && tankInfo) {
-				ctx.globalAlpha = layerOpacity(stamp.layerId);
-				drawVisionRingToCanvas(ctx, stamp, tankInfo, w, h);
-			}
-		}
-		ctx.globalAlpha = 1;
-
-		const stampScale = exportScale * 1.2;
-		for (const stamp of visibleStamps) {
-			ctx.globalAlpha = layerOpacity(stamp.layerId);
-			drawStampToCanvas(ctx, stamp, w, h, stampScale);
 		}
 		ctx.globalAlpha = 1;
 
@@ -2835,10 +2831,10 @@
 	// bottom-to-top render order.
 	const layersTopFirst = $derived([...layers].slice().reverse());
 	const visibleShapes = $derived(orderByLayer(shapes.filter((s) => isLayerVisible(s.layerId))));
-	const visibleStamps = $derived(orderByLayer(stamps.filter((s) => isLayerVisible(s.layerId))));
-	// Brush strokes and vector shapes share one SVG stacking context so layer
-	// order — not the medium they render in — decides what sits on top. Within a
-	// single layer strokes paint first (under shapes), matching the prior look.
+	// Brush strokes, vector shapes, and markers all share one SVG stacking
+	// context so layer order — not the medium they render in — decides what sits
+	// on top. Within a single layer they paint strokes → shapes → markers,
+	// matching the prior top-to-bottom look.
 	const orderedDrawables = $derived(
 		orderByLayer([
 			...strokes
@@ -2846,7 +2842,10 @@
 				.map((stroke) => ({ type: 'stroke' as const, id: stroke.id, layerId: stroke.layerId, stroke })),
 			...shapes
 				.filter((s) => isLayerVisible(s.layerId))
-				.map((shape) => ({ type: 'shape' as const, id: shape.id, layerId: shape.layerId, shape }))
+				.map((shape) => ({ type: 'shape' as const, id: shape.id, layerId: shape.layerId, shape })),
+			...stamps
+				.filter((s) => isLayerVisible(s.layerId))
+				.map((stamp) => ({ type: 'stamp' as const, id: stamp.id, layerId: stamp.layerId, stamp }))
 		])
 	);
 	const layerObjectCounts = $derived.by(() => {
@@ -2945,56 +2944,6 @@
 							viewBox="0 0 1000 1000"
 							preserveAspectRatio="none"
 						>
-							{#each visibleStamps as stamp (stamp.id)}
-								{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
-								{@const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
-								{#if stamp.stamp === 'tank' && stamp.showVision && tankInfo}
-									{@const visionRadius = getVisionRadiusSvg(tankInfo.vision)}
-									<g opacity={layerOpacity(stamp.layerId)}>
-										<circle
-											cx={toSvgCoord(stamp.pos.x)}
-											cy={toSvgCoord(stamp.pos.y)}
-											r={visionRadius}
-											fill="none"
-											stroke="rgba(8,12,18,0.42)"
-											stroke-width="5"
-											stroke-dasharray="16 12"
-											vector-effect="non-scaling-stroke"
-										/>
-										<circle
-											cx={toSvgCoord(stamp.pos.x)}
-											cy={toSvgCoord(stamp.pos.y)}
-											r={visionRadius}
-											fill={withAlpha(ringColor, 0.035)}
-											stroke={ringColor}
-											stroke-opacity="0.94"
-											stroke-width="2.5"
-											stroke-dasharray="16 12"
-											vector-effect="non-scaling-stroke"
-										/>
-										<circle
-											cx={toSvgCoord(stamp.pos.x)}
-											cy={toSvgCoord(stamp.pos.y)}
-											r={Math.max(visionRadius * 0.5, 12)}
-											fill="none"
-											stroke="rgba(8,12,18,0.35)"
-											stroke-width="2.5"
-											vector-effect="non-scaling-stroke"
-										/>
-										<circle
-											cx={toSvgCoord(stamp.pos.x)}
-											cy={toSvgCoord(stamp.pos.y)}
-											r={Math.max(visionRadius * 0.5, 12)}
-											fill="none"
-											stroke={ringColor}
-											stroke-opacity="0.45"
-											stroke-width="1.25"
-											vector-effect="non-scaling-stroke"
-										/>
-									</g>
-								{/if}
-							{/each}
-
 							{#each orderedDrawables as item (item.type + ':' + item.id)}
 								{#if item.type === 'stroke'}
 									{@const stroke = item.stroke}
@@ -3033,7 +2982,7 @@
 											{/if}
 										{/if}
 									</g>
-								{:else}
+								{:else if item.type === 'shape'}
 									{@const shape = item.shape}
 									<g
 										opacity={layerOpacity(shape.layerId)}
@@ -3257,6 +3206,67 @@
 										/>
 									{/if}
 								</g>
+								{:else}
+									{@const stamp = item.stamp}
+									{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
+									{@const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
+									{@const cx = toSvgCoord(stamp.pos.x)}
+									{@const cy = toSvgCoord(stamp.pos.y)}
+									<g opacity={layerOpacity(stamp.layerId)}>
+										{#if stamp.stamp === 'tank' && stamp.showVision && tankInfo}
+											{@const visionRadius = getVisionRadiusSvg(tankInfo.vision)}
+											<g class="pointer-events-none">
+												<circle cx={cx} cy={cy} r={visionRadius} fill="none" stroke="rgba(8,12,18,0.42)" stroke-width="5" stroke-dasharray="16 12" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={visionRadius} fill={withAlpha(ringColor, 0.035)} stroke={ringColor} stroke-opacity="0.94" stroke-width="2.5" stroke-dasharray="16 12" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={Math.max(visionRadius * 0.5, 12)} fill="none" stroke="rgba(8,12,18,0.35)" stroke-width="2.5" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={Math.max(visionRadius * 0.5, 12)} fill="none" stroke={ringColor} stroke-opacity="0.45" stroke-width="1.25" vector-effect="non-scaling-stroke" />
+											</g>
+										{/if}
+										<g
+											class={toolMode === 'eraser' || isLayerLocked(stamp.layerId)
+												? 'pointer-events-none'
+												: 'pointer-events-auto'}
+											style="cursor: {draggingStamp?.id === stamp.id ? 'grabbing' : 'grab'};"
+											role="button"
+											tabindex="-1"
+											onpointerdown={(e) => onStampPointerDown(e, stamp)}
+											onpointermove={onStampPointerMove}
+											onpointerup={onStampPointerUp}
+											onpointercancel={onStampPointerUp}
+											oncontextmenu={(e) => deleteStamp(e, stamp.id)}
+										>
+											{#if stamp.stamp === 'tank'}
+												<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} fill="#1a1d23" />
+												{#if stamp.vehicleId}
+													<clipPath id={`stamp-clip-${stamp.id}`}>
+														<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} />
+													</clipPath>
+													<image
+														href={`/images/vehicles/${stamp.vehicleId}.png`}
+														x={cx - STAMP_TANK_RADIUS_SVG}
+														y={cy - STAMP_TANK_RADIUS_SVG}
+														width={STAMP_TANK_RADIUS_SVG * 2}
+														height={STAMP_TANK_RADIUS_SVG * 2}
+														preserveAspectRatio="xMidYMid slice"
+														clip-path={`url(#stamp-clip-${stamp.id})`}
+													/>
+												{/if}
+												<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} fill="none" stroke={ringColor} stroke-width="3" vector-effect="non-scaling-stroke" />
+												{#if stamp.showVision && tankInfo}
+													<text x={cx + STAMP_TANK_RADIUS_SVG + 8} y={cy} fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="700" dominant-baseline="middle" paint-order="stroke" stroke="rgba(8,12,18,0.78)" stroke-width="4" vector-effect="non-scaling-stroke">{getVisionLabel(tankInfo.vision)}</text>
+												{/if}
+											{:else}
+												<g transform={`translate(${cx} ${cy}) scale(${STAMP_ZONE_SCALE})`}>
+													<circle cx="0" cy="0" r="18" fill={ringColor} opacity="0.2" />
+													<circle cx="0" cy="0" r="18" fill="none" stroke={ringColor} stroke-width="2.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" />
+													<circle cx="0" cy="0" r="12" fill="none" stroke={ringColor} stroke-width="1" opacity="0.5" vector-effect="non-scaling-stroke" />
+													<line x1="-4" y1="-10" x2="-4" y2="10" stroke={ringColor} stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+													<polygon points="-4,-10 8,-6 -4,-2" fill={ringColor} />
+													<line x1="-8" y1="10" x2="0" y2="10" stroke={ringColor} stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+												</g>
+											{/if}
+										</g>
+									</g>
 								{/if}
 							{/each}
 
@@ -3388,113 +3398,6 @@
 								{getMeasureLabel(currentShape)}
 							</div>
 						{/if}
-
-						{#each visibleStamps as stamp (stamp.id)}
-							{@const col = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
-							{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
-							<div
-								class="stamp-overlay absolute {toolMode === 'eraser' || isLayerLocked(stamp.layerId) ? 'pointer-events-none' : ''}"
-								style="
-									left: {stamp.pos.x * 100}%;
-									top: {stamp.pos.y * 100}%;
-									transform: translate(-50%, -50%);
-									cursor: {draggingStamp?.id === stamp.id ? 'grabbing' : 'grab'};
-									touch-action: none;
-									opacity: {layerOpacity(stamp.layerId)};
-									z-index: {draggingStamp?.id === stamp.id ? 20 : 10};
-								"
-								role="button"
-								tabindex="-1"
-								onpointerdown={(e) => onStampPointerDown(e, stamp)}
-								onpointermove={onStampPointerMove}
-								onpointerup={onStampPointerUp}
-								onpointercancel={onStampPointerUp}
-								oncontextmenu={(e) => deleteStamp(e, stamp.id)}
-							>
-								{#if stamp.stamp === 'tank'}
-									<div
-										class="pointer-events-none relative"
-										style="width: 44px; height: 44px;"
-										title={tankInfo?.name ?? 'Tank'}
-									>
-										<div
-											class="absolute inset-0 overflow-hidden rounded-full"
-											style="
-												border: 3px solid {col};
-												box-shadow: 0 2px 6px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.1);
-												background: #1a1d23;
-											"
-										>
-											{#if stamp.vehicleId}
-												<img
-													src="/images/vehicles/{stamp.vehicleId}.png"
-													alt={tankInfo?.name ?? ''}
-													class="absolute h-[130%] w-[130%] object-cover object-top"
-													style="top: -5%; left: -15%;"
-													draggable="false"
-												/>
-											{/if}
-										</div>
-										{#if stamp.showVision && tankInfo}
-											<div
-												class="absolute left-[calc(100%+0.4rem)] top-1/2 rounded-sm bg-[rgba(8,12,18,0.78)] px-1.5 py-0.5 text-[10px] font-bold tracking-[0.08em] text-white shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
-												style="transform: translateY(-50%);"
-											>
-												{getVisionLabel(tankInfo.vision)}
-											</div>
-										{/if}
-									</div>
-								{:else}
-									<svg
-										width="38"
-										height="38"
-										viewBox="-22 -22 44 44"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-										class="pointer-events-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
-									>
-										<circle cx="0" cy="0" r="18" fill={col} opacity="0.2" />
-										<circle
-											cx="0"
-											cy="0"
-											r="18"
-											fill="none"
-											stroke={col}
-											stroke-width="2.5"
-											stroke-dasharray="6 4"
-										/>
-										<circle
-											cx="0"
-											cy="0"
-											r="12"
-											fill="none"
-											stroke={col}
-											stroke-width="1"
-											opacity="0.5"
-										/>
-										<line
-											x1="-4"
-											y1="-10"
-											x2="-4"
-											y2="10"
-											stroke={col}
-											stroke-width="2"
-											stroke-linecap="round"
-										/>
-										<polygon points="-4,-10 8,-6 -4,-2" fill={col} />
-										<line
-											x1="-8"
-											y1="10"
-											x2="0"
-											y2="10"
-											stroke={col}
-											stroke-width="2"
-											stroke-linecap="round"
-										/>
-									</svg>
-								{/if}
-							</div>
-						{/each}
 					</div>
 
 					<div class="flex h-5 bg-[var(--hud-surface)]">
