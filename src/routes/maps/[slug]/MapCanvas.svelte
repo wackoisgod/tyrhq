@@ -164,6 +164,17 @@
 	let redoStack = $state<PlannerSnapshot[]>([]);
 	let currentStroke = $state<Point[] | null>(null);
 	let currentShape = $state<ShapeDraft | null>(null);
+	// Two-finger pinch-to-zoom tracking. Active touch pointers are stored by id so
+	// a second finger landing on the map turns the gesture into a zoom rather than
+	// a stray brush stroke. Mouse and pen pointers are left untouched.
+	const activePointers = new Map<number, { x: number; y: number }>();
+	let pinch: {
+		startDist: number;
+		startZoom: number;
+		startScrollLeft: number;
+		startScrollTop: number;
+		startMid: Point;
+	} | null = null;
 	let draggingStamp = $state<{
 		id: string;
 		offsetX: number;
@@ -571,8 +582,79 @@
 		}
 	}
 
+	function clampZoom(next: number) {
+		return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+	}
+
 	function setZoom(next: number) {
-		zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 2) / 2));
+		// Button and wheel zooming snap to the 0.5 increments shown in the HUD;
+		// pinch zooming sets `zoom` directly through clampZoom for a smooth ramp.
+		zoom = clampZoom(Math.round(next * 2) / 2);
+	}
+
+	function beginPinch() {
+		// A second finger cancels whatever the first finger was drawing so the
+		// gesture reads as a zoom instead of leaving a stray stroke or shape.
+		currentStroke = null;
+		currentShape = null;
+		const pts = [...activePointers.values()];
+		const a = pts[0];
+		const b = pts[1];
+		pinch = {
+			startDist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+			startZoom: zoom,
+			startScrollLeft: viewportEl.scrollLeft,
+			startScrollTop: viewportEl.scrollTop,
+			startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+		};
+		// Capture both pointers so their moves keep flowing to the canvas even if a
+		// finger drifts over a marker or the toolbar mid-gesture.
+		for (const id of activePointers.keys()) {
+			try {
+				canvasEl.setPointerCapture(id);
+			} catch {
+				// setPointerCapture can throw if the pointer is already gone; ignore.
+			}
+		}
+		// Make sure the zoomed viewport keeps its scrollable height once we cross 1x.
+		captureBaseHeight();
+		redrawAll();
+	}
+
+	function updatePinch() {
+		if (!pinch || activePointers.size < 2) return;
+		const pts = [...activePointers.values()];
+		const a = pts[0];
+		const b = pts[1];
+		const dist = Math.hypot(a.x - b.x, a.y - b.y);
+		const midX = (a.x + b.x) / 2;
+		const midY = (a.y + b.y) / 2;
+		const targetZoom = clampZoom(pinch.startZoom * (dist / pinch.startDist));
+		zoom = targetZoom;
+
+		// Keep the content under the initial finger midpoint pinned beneath the
+		// fingers as they spread, pan, and pinch — same anchoring the wheel zoom
+		// does, generalised to a moving midpoint. Content pixels scale linearly
+		// with zoom, so a point at `local + scroll` in start-zoom pixels lands at
+		// `(local + scroll) * ratio` once the wrapper width grows.
+		const rect = viewportEl.getBoundingClientRect();
+		const ratio = targetZoom / pinch.startZoom;
+		const targetLeft =
+			(pinch.startMid.x - rect.left + pinch.startScrollLeft) * ratio - (midX - rect.left);
+		const targetTop =
+			(pinch.startMid.y - rect.top + pinch.startScrollTop) * ratio - (midY - rect.top);
+		tick().then(() => {
+			if (!pinch || !viewportEl) return;
+			viewportEl.scrollLeft = targetLeft;
+			viewportEl.scrollTop = targetTop;
+		});
+	}
+
+	function endPinch() {
+		pinch = null;
+		currentStroke = null;
+		currentShape = null;
+		redrawAll();
 	}
 
 	function onZoomWheel(e: WheelEvent) {
@@ -1960,6 +2042,13 @@
 
 	function onCanvasPointerDown(e: PointerEvent) {
 		if (e.button !== 0) return;
+		if (e.pointerType === 'touch') {
+			activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+			if (activePointers.size >= 2) {
+				beginPinch();
+				return;
+			}
+		}
 		if (room && !actorIdentityReady) return;
 		if (movingLayerId) {
 			beginLayerMove(e, movingLayerId);
@@ -2032,6 +2121,13 @@
 	}
 
 	function onCanvasPointerMove(e: PointerEvent) {
+		if (e.pointerType === 'touch' && activePointers.has(e.pointerId)) {
+			activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		}
+		if (pinch) {
+			updatePinch();
+			return;
+		}
 		if (layerMoveDrag) {
 			updateLayerMove(e);
 			return;
@@ -2064,6 +2160,15 @@
 	}
 
 	function onCanvasPointerUp(e?: PointerEvent) {
+		if (e && e.pointerType === 'touch') {
+			activePointers.delete(e.pointerId);
+		}
+		if (pinch) {
+			// Stay in pinch mode until both fingers lift; resuming a stroke from the
+			// lone remaining finger would draw an unwanted line out of the gesture.
+			if (activePointers.size < 2) endPinch();
+			return;
+		}
 		if (layerMoveDrag) {
 			endLayerMove();
 			return;
