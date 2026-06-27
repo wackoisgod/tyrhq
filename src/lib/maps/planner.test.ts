@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	applyPlannerOperation,
 	buildCompactState,
+	createDefaultLayer,
 	createEmptyPlannerState,
+	DEFAULT_LAYER_ID,
 	parseCompactState,
+	type Layer,
 	type PlannerState
 } from './planner';
 
@@ -21,7 +24,8 @@ function createState(): PlannerState {
 				width: 3,
 				tool: 'pen',
 				lineStyle: 'solid',
-				endType: 'arrow'
+				endType: 'arrow',
+				layerId: DEFAULT_LAYER_ID
 			}
 		],
 		stamps: [
@@ -31,7 +35,8 @@ function createState(): PlannerState {
 				stamp: 'tank',
 				side: 'friendly',
 				vehicleId: 'blink',
-				showVision: true
+				showVision: true,
+				layerId: DEFAULT_LAYER_ID
 			}
 		],
 		shapes: [
@@ -43,9 +48,11 @@ function createState(): PlannerState {
 				color: '#22c55e',
 				width: 4,
 				lineStyle: 'dashed',
-				endType: 'none'
+				endType: 'none',
+				layerId: DEFAULT_LAYER_ID
 			}
-		]
+		],
+		layers: [createDefaultLayer()]
 	};
 }
 
@@ -96,5 +103,129 @@ describe('planner operations', () => {
 
 		const cleared = applyPlannerOperation(withoutStroke, { type: 'clear_room' });
 		expect(cleared).toEqual(createEmptyPlannerState());
+	});
+});
+
+function makeLayer(id: string, overrides: Partial<Layer> = {}): Layer {
+	return { id, name: id, visible: true, locked: false, opacity: 1, ...overrides };
+}
+
+describe('planner layers', () => {
+	it('round-trips a multi-layer state, including hidden/locked/opacity and object assignment', () => {
+		const overlay = makeLayer('layer_overlay', {
+			name: 'Overlay',
+			visible: false,
+			locked: true,
+			opacity: 0.5
+		});
+		const state: PlannerState = {
+			...createState(),
+			shapes: [{ ...createState().shapes[0], layerId: overlay.id }],
+			layers: [createDefaultLayer(), overlay]
+		};
+
+		const restored = parseCompactState(buildCompactState(state));
+		expect(restored).toEqual(state);
+		expect(restored.shapes[0].layerId).toBe('layer_overlay');
+	});
+
+	it('keeps the legacy single-layer format compact (no layer table or refs)', () => {
+		const compact = buildCompactState(createState());
+		expect(compact.y).toBeUndefined();
+		expect(compact.h?.[0].g).toBeUndefined();
+	});
+
+	it('migrates a pre-layers payload onto the base layer', () => {
+		const restored = parseCompactState({
+			h: [{ i: 'shape_legacy', k: 'r', x1: 0.1, y1: 0.1, x2: 0.2, y2: 0.2, c: '#ffffff', w: 2 }]
+		});
+		expect(restored.layers).toEqual([createDefaultLayer()]);
+		expect(restored.shapes[0].layerId).toBe(DEFAULT_LAYER_ID);
+	});
+
+	it('adds, reorders, and deletes layers along with their contents', () => {
+		const base = createState();
+		const extra = makeLayer('layer_2', { name: 'Tactics' });
+
+		const withLayer = applyPlannerOperation(base, { type: 'add_layer', layer: extra });
+		expect(withLayer.layers.map((layer) => layer.id)).toEqual([DEFAULT_LAYER_ID, 'layer_2']);
+
+		const reordered = applyPlannerOperation(withLayer, {
+			type: 'reorder_layers',
+			order: ['layer_2', DEFAULT_LAYER_ID]
+		});
+		expect(reordered.layers.map((layer) => layer.id)).toEqual(['layer_2', DEFAULT_LAYER_ID]);
+
+		const moved = applyPlannerOperation(reordered, {
+			type: 'move_to_layer',
+			targetLayerId: 'layer_2',
+			objectIds: ['shape_1']
+		});
+		expect(moved.shapes[0].layerId).toBe('layer_2');
+
+		const deleted = applyPlannerOperation(moved, { type: 'delete_layer', layerId: 'layer_2' });
+		expect(deleted.layers.map((layer) => layer.id)).toEqual([DEFAULT_LAYER_ID]);
+		// The shape lived on the deleted layer, so it is gone too.
+		expect(deleted.shapes).toHaveLength(0);
+		// Strokes and stamps on the base layer survive.
+		expect(deleted.strokes).toHaveLength(1);
+		expect(deleted.stamps).toHaveLength(1);
+	});
+
+	it('refuses to delete the final remaining layer', () => {
+		const base = createState();
+		const result = applyPlannerOperation(base, { type: 'delete_layer', layerId: DEFAULT_LAYER_ID });
+		expect(result).toEqual(base);
+	});
+
+	it('translates only the targeted layer’s objects, clamped to bounds', () => {
+		const base = createState();
+		const extra = makeLayer('layer_2', { name: 'Tactics' });
+		const withLayer = applyPlannerOperation(base, { type: 'add_layer', layer: extra });
+		const moved = applyPlannerOperation(withLayer, {
+			type: 'move_to_layer',
+			targetLayerId: 'layer_2',
+			objectIds: ['stamp_1']
+		});
+
+		const translated = applyPlannerOperation(moved, {
+			type: 'translate_layer',
+			layerId: DEFAULT_LAYER_ID,
+			dx: 0.1,
+			dy: -0.05
+		});
+
+		// Base-layer objects shift…
+		expect(translated.shapes[0].start.x).toBeCloseTo(0.3);
+		expect(translated.shapes[0].start.y).toBeCloseTo(0.15);
+		expect(translated.strokes[0].points[0].x).toBeCloseTo(0.2);
+		expect(translated.strokes[0].points[0].y).toBeCloseTo(0.15);
+		// …while the stamp on layer_2 stays put.
+		expect(translated.stamps[0].pos).toEqual({ x: 0.5, y: 0.6 });
+	});
+
+	it('clamps a layer translation so objects never leave the field', () => {
+		const base = createState();
+		const translated = applyPlannerOperation(base, {
+			type: 'translate_layer',
+			layerId: DEFAULT_LAYER_ID,
+			dx: 1,
+			dy: 1
+		});
+		for (const point of translated.strokes[0].points) {
+			expect(point.x).toBeLessThanOrEqual(1);
+			expect(point.y).toBeLessThanOrEqual(1);
+		}
+		expect(translated.stamps[0].pos).toEqual({ x: 1, y: 1 });
+	});
+
+	it('updates layer visibility without touching objects', () => {
+		const base = createState();
+		const hidden = applyPlannerOperation(base, {
+			type: 'update_layer',
+			layer: { ...createDefaultLayer(), visible: false }
+		});
+		expect(hidden.layers[0].visible).toBe(false);
+		expect(hidden.strokes).toEqual(base.strokes);
 	});
 });
