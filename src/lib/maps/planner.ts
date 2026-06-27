@@ -130,6 +130,7 @@ export type PlannerOperation =
 	| { type: 'delete_layer'; layerId: string }
 	| { type: 'reorder_layers'; order: string[] }
 	| { type: 'move_to_layer'; targetLayerId: string; objectIds: string[] }
+	| { type: 'translate_layer'; layerId: string; dx: number; dy: number }
 	| { type: 'clear_room' };
 
 export type PlannerOperationEnvelope = {
@@ -539,6 +540,30 @@ export function applyPlannerOperation(state: PlannerState, operation: PlannerOpe
 				strokes: reassign(state.strokes),
 				stamps: reassign(state.stamps),
 				shapes: reassign(state.shapes)
+			};
+		}
+		case 'translate_layer': {
+			const belongsToLayer = (layerId: string | undefined) =>
+				(layerId ?? DEFAULT_LAYER_ID) === operation.layerId;
+			const shift = (point: Point): Point => ({
+				x: Math.min(1, Math.max(0, point.x + operation.dx)),
+				y: Math.min(1, Math.max(0, point.y + operation.dy))
+			});
+			return {
+				...state,
+				strokes: state.strokes.map((stroke) =>
+					belongsToLayer(stroke.layerId)
+						? { ...stroke, points: stroke.points.map(shift) }
+						: stroke
+				),
+				shapes: state.shapes.map((shape) =>
+					belongsToLayer(shape.layerId)
+						? { ...shape, start: shift(shape.start), end: shift(shape.end) }
+						: shape
+				),
+				stamps: state.stamps.map((stamp) =>
+					belongsToLayer(stamp.layerId) ? { ...stamp, pos: shift(stamp.pos) } : stamp
+				)
 			};
 		}
 		case 'clear_room':

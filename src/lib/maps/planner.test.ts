@@ -178,6 +178,47 @@ describe('planner layers', () => {
 		expect(result).toEqual(base);
 	});
 
+	it('translates only the targeted layer’s objects, clamped to bounds', () => {
+		const base = createState();
+		const extra = makeLayer('layer_2', { name: 'Tactics' });
+		const withLayer = applyPlannerOperation(base, { type: 'add_layer', layer: extra });
+		const moved = applyPlannerOperation(withLayer, {
+			type: 'move_to_layer',
+			targetLayerId: 'layer_2',
+			objectIds: ['stamp_1']
+		});
+
+		const translated = applyPlannerOperation(moved, {
+			type: 'translate_layer',
+			layerId: DEFAULT_LAYER_ID,
+			dx: 0.1,
+			dy: -0.05
+		});
+
+		// Base-layer objects shift…
+		expect(translated.shapes[0].start.x).toBeCloseTo(0.3);
+		expect(translated.shapes[0].start.y).toBeCloseTo(0.15);
+		expect(translated.strokes[0].points[0].x).toBeCloseTo(0.2);
+		expect(translated.strokes[0].points[0].y).toBeCloseTo(0.15);
+		// …while the stamp on layer_2 stays put.
+		expect(translated.stamps[0].pos).toEqual({ x: 0.5, y: 0.6 });
+	});
+
+	it('clamps a layer translation so objects never leave the field', () => {
+		const base = createState();
+		const translated = applyPlannerOperation(base, {
+			type: 'translate_layer',
+			layerId: DEFAULT_LAYER_ID,
+			dx: 1,
+			dy: 1
+		});
+		for (const point of translated.strokes[0].points) {
+			expect(point.x).toBeLessThanOrEqual(1);
+			expect(point.y).toBeLessThanOrEqual(1);
+		}
+		expect(translated.stamps[0].pos).toEqual({ x: 1, y: 1 });
+	});
+
 	it('updates layer visibility without touching objects', () => {
 		const base = createState();
 		const hidden = applyPlannerOperation(base, {

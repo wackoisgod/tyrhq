@@ -175,6 +175,14 @@ export const plannerOperationSchema = z.discriminatedUnion('type', [
 			objectIds: z.array(idSchema).max(MAX_ROOM_STROKES + MAX_ROOM_STAMPS + MAX_ROOM_SHAPES)
 		})
 		.strict(),
+	z
+		.object({
+			type: z.literal('translate_layer'),
+			layerId: idSchema,
+			dx: z.number().finite().min(-1).max(1),
+			dy: z.number().finite().min(-1).max(1)
+		})
+		.strict(),
 	z.object({ type: z.literal('clear_room') }).strict()
 ]);
 

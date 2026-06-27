@@ -143,6 +143,21 @@
 	let activeLayerId = $state<string>(DEFAULT_LAYER_ID);
 	let renamingLayerId = $state<string | null>(null);
 	let renameDraft = $state('');
+	let movingLayerId = $state<string | null>(null);
+	let layerMoveDrag: {
+		layerId: string;
+		anchor: Point;
+		minDx: number;
+		maxDx: number;
+		minDy: number;
+		maxDy: number;
+		lastDx: number;
+		lastDy: number;
+		moved: boolean;
+		strokes: Map<string, Point[]>;
+		shapes: Map<string, { start: Point; end: Point }>;
+		stamps: Map<string, Point>;
+	} | null = null;
 	let layerNotice = $state<string | null>(null);
 	let layerNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 	let undoStack = $state<PlannerSnapshot[]>([]);
@@ -1946,6 +1961,10 @@
 	function onCanvasPointerDown(e: PointerEvent) {
 		if (e.button !== 0) return;
 		if (room && !actorIdentityReady) return;
+		if (movingLayerId) {
+			beginLayerMove(e, movingLayerId);
+			return;
+		}
 		const pos = getCanvasPointerPos(e);
 		selectedShapeId = null;
 
@@ -2013,6 +2032,10 @@
 	}
 
 	function onCanvasPointerMove(e: PointerEvent) {
+		if (layerMoveDrag) {
+			updateLayerMove(e);
+			return;
+		}
 		if (currentShape) {
 			currentShape = {
 				...currentShape,
@@ -2041,6 +2064,10 @@
 	}
 
 	function onCanvasPointerUp(e?: PointerEvent) {
+		if (layerMoveDrag) {
+			endLayerMove();
+			return;
+		}
 		if (currentShape) {
 			if (currentShape.kind === 'measure') {
 				currentShape = null;
@@ -2290,6 +2317,11 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		const mod = e.ctrlKey || e.metaKey;
+		if (e.key === 'Escape' && movingLayerId && !layerMoveDrag) {
+			e.preventDefault();
+			movingLayerId = null;
+			return;
+		}
 		if (!room && mod && e.key === 'z' && !e.shiftKey) {
 			e.preventDefault();
 			undo();
@@ -2329,6 +2361,7 @@
 
 	function selectActiveLayer(layerId: string) {
 		activeLayerId = layerId;
+		movingLayerId = null;
 	}
 
 	function addLayer() {
@@ -2361,6 +2394,7 @@
 			if (!confirmed) return;
 		}
 		if (renamingLayerId === layerId) renamingLayerId = null;
+		if (movingLayerId === layerId) movingLayerId = null;
 		commitPlannerOperation({ type: 'delete_layer', layerId }, { remember: true });
 	}
 
@@ -2434,6 +2468,134 @@
 		);
 	}
 
+	function layerHasItems(layerId: string) {
+		return (layerObjectCounts.get(layerId) ?? 0) > 0;
+	}
+
+	function toggleMoveLayer(layerId: string) {
+		movingLayerId = movingLayerId === layerId ? null : layerId;
+	}
+
+	// Snapshot every object on the layer plus the slack it has before any of them
+	// would cross the map edge, so the whole group drags as one without deforming.
+	function beginLayerMove(e: PointerEvent, layerId: string) {
+		const belongs = (entryLayerId: string | undefined) =>
+			(entryLayerId ?? DEFAULT_LAYER_ID) === layerId;
+		const strokeMap = new Map<string, Point[]>();
+		const shapeMap = new Map<string, { start: Point; end: Point }>();
+		const stampMap = new Map<string, Point>();
+		let minX = 1;
+		let minY = 1;
+		let maxX = 0;
+		let maxY = 0;
+		const include = (point: Point) => {
+			if (point.x < minX) minX = point.x;
+			if (point.x > maxX) maxX = point.x;
+			if (point.y < minY) minY = point.y;
+			if (point.y > maxY) maxY = point.y;
+		};
+		for (const stroke of strokes) {
+			if (!belongs(stroke.layerId)) continue;
+			const points = stroke.points.map((point) => ({ ...point }));
+			strokeMap.set(stroke.id, points);
+			points.forEach(include);
+		}
+		for (const shape of shapes) {
+			if (!belongs(shape.layerId)) continue;
+			shapeMap.set(shape.id, { start: { ...shape.start }, end: { ...shape.end } });
+			include(shape.start);
+			include(shape.end);
+		}
+		for (const stamp of stamps) {
+			if (!belongs(stamp.layerId)) continue;
+			stampMap.set(stamp.id, { ...stamp.pos });
+			include(stamp.pos);
+		}
+		if (strokeMap.size + shapeMap.size + stampMap.size === 0) return;
+
+		canvasEl.setPointerCapture(e.pointerId);
+		layerMoveDrag = {
+			layerId,
+			anchor: getCanvasPointerPos(e),
+			minDx: -minX,
+			maxDx: 1 - maxX,
+			minDy: -minY,
+			maxDy: 1 - maxY,
+			lastDx: 0,
+			lastDy: 0,
+			moved: false,
+			strokes: strokeMap,
+			shapes: shapeMap,
+			stamps: stampMap
+		};
+	}
+
+	function updateLayerMove(e: PointerEvent) {
+		const drag = layerMoveDrag;
+		if (!drag) return;
+		const pos = getCanvasPointerPos(e);
+		const dx = Math.min(drag.maxDx, Math.max(drag.minDx, pos.x - drag.anchor.x));
+		const dy = Math.min(drag.maxDy, Math.max(drag.minDy, pos.y - drag.anchor.y));
+		if (!drag.moved && (Math.abs(dx) > 0.0004 || Math.abs(dy) > 0.0004)) {
+			if (!room) rememberState();
+			drag.moved = true;
+		}
+		drag.lastDx = dx;
+		drag.lastDy = dy;
+		strokes = strokes.map((stroke) => {
+			const original = drag.strokes.get(stroke.id);
+			return original
+				? { ...stroke, points: original.map((point) => ({ x: point.x + dx, y: point.y + dy })) }
+				: stroke;
+		});
+		shapes = shapes.map((shape) => {
+			const original = drag.shapes.get(shape.id);
+			return original
+				? {
+						...shape,
+						start: { x: original.start.x + dx, y: original.start.y + dy },
+						end: { x: original.end.x + dx, y: original.end.y + dy }
+					}
+				: shape;
+		});
+		stamps = stamps.map((stamp) => {
+			const original = drag.stamps.get(stamp.id);
+			return original ? { ...stamp, pos: { x: original.x + dx, y: original.y + dy } } : stamp;
+		});
+		redrawPlanner();
+	}
+
+	function endLayerMove() {
+		const drag = layerMoveDrag;
+		if (!drag) return;
+		layerMoveDrag = null;
+		const { lastDx: dx, lastDy: dy } = drag;
+		// Snap back to the originals so the committed delta is applied exactly once
+		// (and recorded as a single undo step / room event).
+		strokes = strokes.map((stroke) => {
+			const original = drag.strokes.get(stroke.id);
+			return original ? { ...stroke, points: original.map((point) => ({ ...point })) } : stroke;
+		});
+		shapes = shapes.map((shape) => {
+			const original = drag.shapes.get(shape.id);
+			return original
+				? { ...shape, start: { ...original.start }, end: { ...original.end } }
+				: shape;
+		});
+		stamps = stamps.map((stamp) => {
+			const original = drag.stamps.get(stamp.id);
+			return original ? { ...stamp, pos: { ...original } } : stamp;
+		});
+		if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) {
+			redrawPlanner();
+			return;
+		}
+		commitPlannerOperation(
+			{ type: 'translate_layer', layerId: drag.layerId, dx, dy },
+			{ remember: false }
+		);
+	}
+
 	function isActiveShape(kind: ShapeKind) {
 		return toolMode === 'shape' && activeShape === kind;
 	}
@@ -2451,6 +2613,8 @@
 
 	function getCursor() {
 		if (room && !actorIdentityReady) return 'not-allowed';
+		if (layerMoveDrag) return 'grabbing';
+		if (movingLayerId) return 'move';
 		if (draggingShape) return 'grabbing';
 		if (draggingStamp) return 'grabbing';
 		if (toolMode === 'stamp') return 'copy';
@@ -2823,6 +2987,7 @@
 		selectedShapeId !== null ? shapes.find((shape) => shape.id === selectedShapeId) ?? null : null
 	);
 	const isRoomMode = $derived(Boolean(room));
+	const isMovingLayer = $derived(movingLayerId !== null);
 	const canStartLiveRoom = $derived(Boolean(currentUser) && !room);
 	const hasContent = $derived(strokes.length > 0 || stamps.length > 0 || shapes.length > 0);
 	const activeLayer = $derived(layers.find((layer) => layer.id === activeLayerId) ?? layers[0] ?? null);
@@ -2986,7 +3151,7 @@
 									{@const shape = item.shape}
 									<g
 										opacity={layerOpacity(shape.layerId)}
-										class={toolMode === 'eraser' || isLayerLocked(shape.layerId)
+										class={toolMode === 'eraser' || isMovingLayer || isLayerLocked(shape.layerId)
 											? 'pointer-events-none'
 											: 'pointer-events-auto'}
 										role="button"
@@ -3223,7 +3388,7 @@
 											</g>
 										{/if}
 										<g
-											class={toolMode === 'eraser' || isLayerLocked(stamp.layerId)
+											class={toolMode === 'eraser' || isMovingLayer || isLayerLocked(stamp.layerId)
 												? 'pointer-events-none'
 												: 'pointer-events-auto'}
 											style="cursor: {draggingStamp?.id === stamp.id ? 'grabbing' : 'grab'};"
@@ -3574,6 +3739,22 @@
 									aria-label="Delete layer"
 								>
 									✕
+								</button>
+							</div>
+							<div class="px-1.5 pb-1.5">
+								<button
+									class="{tbtn} flex w-full items-center justify-center gap-1.5 {movingLayerId === layer.id
+										? tActive
+										: tIdle} disabled:opacity-30"
+									onclick={() => toggleMoveLayer(layer.id)}
+									disabled={!layerHasItems(layer.id)}
+									title="Drag everything on this layer to reposition it together"
+								>
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M8 1.5v13M1.5 8h13" />
+										<path d="M8 1.5 6 3.5M8 1.5l2 2M8 14.5l-2-2M8 14.5l2-2M1.5 8l2-2M1.5 8l2 2M14.5 8l-2-2M14.5 8l-2 2" />
+									</svg>
+									{movingLayerId === layer.id ? 'Drag map · Esc to stop' : 'Move Layer Items'}
 								</button>
 							</div>
 						{/if}
@@ -4116,9 +4297,12 @@
 		<div
 			class="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--hud-outline-variant)]/40 pt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 		>
-			<span class={layerNotice ? 'text-[#ffd166]' : ''}>
+			<span class={layerNotice || isMovingLayer ? 'text-[#ffd166]' : ''}>
 				{#if layerNotice}
 					{layerNotice}
+				{:else if isMovingLayer}
+					Move mode: drag anywhere on the map to reposition everything on “{activeLayer?.name ??
+						'—'}”. Press Esc to stop.
 				{:else if selectedShape}
 					Selected {selectedShape.kind}. Drag it to reposition, or press Delete to clear it.
 				{:else if isRoomMode}
