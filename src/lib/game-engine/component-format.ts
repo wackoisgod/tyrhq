@@ -65,6 +65,15 @@ function isComponentValueToken(token: string): token is ComponentValueToken {
 	);
 }
 
+/**
+ * Resolve a raw point value through its token semantics (e.g. a `MultiplyDecrease`
+ * multiplier of 0.85 becomes a "15%" reduction) and render it for display. Shared by
+ * component templates and the talent planner so both render percentages consistently.
+ */
+export function formatComponentTokenValue(token: ComponentValueToken, rawValue: number): string {
+	return formatTokenValue(token, resolveComponentToken(token, rawValue));
+}
+
 export function fillTemplatedComponentDescription(description: string, pointValues: number[]): string {
 	const cleaned = plainComponentDescription(description);
 	if (!pointValues.length) return cleaned;
@@ -73,9 +82,7 @@ export function fillTemplatedComponentDescription(description: string, pointValu
 	return cleaned.replace(
 		/\{(LevelValue(?:Abs|Percent(?:Multiply(?:Decrease|Increase))?)?)\}/g,
 		(match: string, token: string) =>
-			isComponentValueToken(token)
-				? formatTokenValue(token, resolveComponentToken(token, value))
-				: match
+			isComponentValueToken(token) ? formatComponentTokenValue(token, value) : match
 	);
 }
 

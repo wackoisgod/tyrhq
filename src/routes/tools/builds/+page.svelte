@@ -22,7 +22,9 @@
 	import {
 		fillComponentDescription,
 		formatComponentCategory,
-		plainComponentDescription
+		formatComponentTokenValue,
+		plainComponentDescription,
+		type ComponentValueToken
 	} from '$lib/game-engine/component-format';
 
 	import { onMount } from 'svelte';
@@ -560,7 +562,8 @@
 		description: string,
 		pointValues: number[],
 		currentPoints: number,
-		nodeMaxPoints: number
+		nodeMaxPoints: number,
+		valueToken: ComponentValueToken = 'LevelValue'
 	) {
 		const cleaned = plainComponentDescription(description);
 		if (!pointValues.length) return cleaned;
@@ -574,18 +577,13 @@
 			: Math.min(nodeMaxPoints, pointValues.length);
 		const levelValue = pointValues[Math.max(1, previewIndex) - 1];
 
-		function fmt(n: number) {
-			const abs = Math.abs(n);
-			if (abs >= 100) return String(Math.round(n));
-			if (abs >= 1 && abs === Math.round(abs)) return String(n);
-			const s = n.toFixed(2).replace(/\.?0+$/, '');
-			return s === '-0' ? '0' : s;
-		}
-
+		// Resolve each "value" through its token semantics so percentage decreases/increases
+		// (e.g. a dispersion multiplier of 0.85 → "15%") render the same way component
+		// templates do, instead of leaking the raw multiplier.
 		let count = 0;
 		return cleaned.replace(/\bvalue\b/gi, () => {
 			count++;
-			return fmt(count === 1 ? levelValue : perPoint);
+			return formatComponentTokenValue(valueToken, count === 1 ? levelValue : perPoint);
 		});
 	}
 
@@ -1024,11 +1022,11 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints)}
+										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints, data.talentValueTokens[node.talent.key])}
 									</p>
 									{#if node.talent.supplementalDescription}
 										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
-											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints)}
+											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints, data.talentValueTokens[node.talent.key])}
 										</p>
 									{/if}
 	
