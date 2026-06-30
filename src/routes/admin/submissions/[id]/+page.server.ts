@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { getSubmissionById } from '$lib/server/submissions';
 import { getArticleByIdForReview } from '$lib/server/articles';
 import { sanitizeArticleBody } from '$lib/server/content-sanitize';
+import { renderGameStatRefs } from '$lib/server/game-data-refs';
 import { computeArticleDiff } from '$lib/server/article-diff';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -23,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	let renderError: string | null = null;
 	try {
 		const result = await sanitizeArticleBody(submission.body_markdown);
-		renderedHtml = result.html;
+		renderedHtml = renderGameStatRefs(result.html);
 	} catch (err) {
 		renderError = err instanceof Error ? err.message : String(err);
 	}

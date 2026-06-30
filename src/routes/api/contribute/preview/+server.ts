@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sanitizeArticleBody } from '$lib/server/content-sanitize';
+import { renderGameStatRefs } from '$lib/server/game-data-refs';
 import { parseJsonBody, previewBodySchema, rethrowAsHttp } from '$lib/server/submission-requests';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -11,7 +12,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	try {
 		const result = await sanitizeArticleBody(body.bodyMarkdown);
-		return json({ html: result.html, wordCount: result.wordCount });
+		return json({ html: renderGameStatRefs(result.html), wordCount: result.wordCount });
 	} catch (err) {
 		rethrowAsHttp(err);
 	}

@@ -17,6 +17,7 @@
 
 const YOUTUBE_TAG = 'aggro-youtube';
 const CALLOUT_TAG = 'aggro-callout';
+const STAT_TAG = 'aggro-stat';
 
 const CALLOUT_STYLES: Record<string, { wrapper: string; label: string }> = {
 	info: {
@@ -102,5 +103,20 @@ export function registerArticleCustomElements() {
 			}
 		}
 		customElements.define(CALLOUT_TAG, AggroCallout);
+	}
+
+	if (!customElements.get(STAT_TAG)) {
+		// Inline live game-data value. The visible number is resolved server-side
+		// from the current game-data bundle (see $lib/server/game-data-refs.ts);
+		// this element only styles it as instrumentation-style telemetry and keeps
+		// a graceful em-dash fallback if a value couldn't be resolved.
+		class AggroStat extends HTMLElement {
+			connectedCallback() {
+				if (!(this.textContent ?? '').trim()) this.textContent = '—';
+				this.className =
+					'font-mono font-semibold text-[var(--hud-teal)] whitespace-nowrap [border-bottom:1px_dotted_var(--hud-teal)]';
+			}
+		}
+		customElements.define(STAT_TAG, AggroStat);
 	}
 }

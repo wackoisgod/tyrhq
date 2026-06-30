@@ -12,6 +12,12 @@ import type { Root } from 'mdast';
 import type { Node } from 'unist';
 import { env as publicEnv } from '$env/dynamic/public';
 import { createHeadingSlugger } from '$lib/contribute/toc';
+import {
+	SHOW_MODES,
+	STAT_TOKEN_RE,
+	TANK_TOKEN_RE,
+	normalizeShow
+} from '$lib/game-engine/stat-ref-format';
 
 export const CALLOUT_TYPES = ['info', 'warning', 'tip'] as const;
 export type CalloutType = (typeof CALLOUT_TYPES)[number];
@@ -118,9 +124,69 @@ function validateAggroDirectives() {
 				return;
 			}
 
+			if (name === 'stat') {
+				if (directive.type !== 'textDirective') {
+					throw new ContentValidationError(
+						'body',
+						'`stat` must be written as an inline directive: :stat{tank="atlas" stat="health"}'
+					);
+				}
+				const tank = directive.attributes?.tank?.trim();
+				if (!tank) {
+					throw new ContentValidationError(
+						'body',
+						':stat reference is missing the `tank` attribute, e.g. :stat{tank="atlas" stat="health"}'
+					);
+				}
+				if (!TANK_TOKEN_RE.test(tank)) {
+					throw new ContentValidationError(
+						'body',
+						`:stat tank "${tank}" must be a lowercase vehicle slug (letters, numbers, hyphens)`
+					);
+				}
+				const stat = directive.attributes?.stat?.trim();
+				if (!stat) {
+					throw new ContentValidationError(
+						'body',
+						':stat reference is missing the `stat` attribute, e.g. :stat{tank="atlas" stat="health"}'
+					);
+				}
+				if (!STAT_TOKEN_RE.test(stat)) {
+					throw new ContentValidationError('body', `:stat stat "${stat}" is not a valid stat name`);
+				}
+				const showRaw = directive.attributes?.show?.trim();
+				if (showRaw && !(SHOW_MODES as readonly string[]).includes(showRaw)) {
+					throw new ContentValidationError(
+						'body',
+						`:stat show "${showRaw}" must be one of: ${SHOW_MODES.join(', ')}`
+					);
+				}
+
+				// Store only the reference — the value is resolved against the live
+				// game-data bundle at render time (see $lib/server/game-data-refs.ts),
+				// so the number tracks the latest game data without re-editing.
+				const data =
+					(directive as DirectiveNode & {
+						data?: {
+							hName?: string;
+							hProperties?: Record<string, unknown>;
+							hChildren?: unknown[];
+						};
+					}).data ?? {};
+				data.hName = 'aggro-stat';
+				data.hProperties = {
+					'data-tank': tank,
+					'data-stat': stat,
+					'data-show': normalizeShow(showRaw)
+				};
+				data.hChildren = [];
+				(directive as DirectiveNode & { data?: unknown }).data = data;
+				return;
+			}
+
 			throw new ContentValidationError(
 				'body',
-				`Unknown directive ":::${name}". Only :::youtube and :::callout are allowed.`
+				`Unknown directive ":${name}". Only :::youtube, :::callout, and :stat are allowed.`
 			);
 		});
 	};
@@ -221,13 +287,19 @@ export function getArticleImageHostPrefix(): string {
  * source itself is gated by `validateImageSources` upstream).
  */
 function buildSanitizeSchema(): Schema {
-	const tagNames = new Set([...(defaultSchema.tagNames ?? []), 'aggro-youtube', 'aggro-callout']);
+	const tagNames = new Set([
+		...(defaultSchema.tagNames ?? []),
+		'aggro-youtube',
+		'aggro-callout',
+		'aggro-stat'
+	]);
 	if (!tagNames.has('img')) tagNames.add('img');
 
 	const attributes: Schema['attributes'] = {
 		...(defaultSchema.attributes ?? {}),
 		'aggro-youtube': [['data-id'], ['data-title']],
 		'aggro-callout': [['data-type'], ['data-title']],
+		'aggro-stat': [['data-tank'], ['data-stat'], ['data-show']],
 		img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding']
 	};
 

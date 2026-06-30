@@ -10,7 +10,8 @@
 	 * The plan called for Tiptap WYSIWYG; that's the intended v2 upgrade.
 	 * For the first cut we ship a markdown editor with a button toolbar that
 	 * inserts the same shortcodes Tiptap would emit (`::youtube{id="..."}`,
-	 * `:::callout{type="info"} ... :::`). Combined with the live preview pane
+	 * `:::callout{type="info"} ... :::`, `:stat{tank="..." stat="..."}`).
+	 * Combined with the live preview pane
 	 * (which uses the *real* server-side sanitiser, so what you see is what
 	 * gets published), it covers the "non-technical contributor" use case
 	 * without locking us into Tiptap's Svelte 5 integration story.
@@ -105,6 +106,26 @@
 
 	function insertCallout(type: 'info' | 'warning' | 'tip') {
 		insertBlock(`:::callout{type="${type}"}\nYour callout text here.\n:::`);
+	}
+
+	function insertStat() {
+		if (!textarea) return;
+		const tank = window.prompt('Vehicle slug (e.g. atlas):', '');
+		if (!tank) return;
+		const stat =
+			window.prompt('Stat (e.g. health, speed, damage, reload, penetration):', 'health') || 'health';
+		const snippet = `:stat{tank="${tank.trim()}" stat="${stat.trim()}"}`;
+		const start = textarea.selectionStart;
+		const end = textarea.selectionEnd;
+		const before = value.slice(0, start);
+		const after = value.slice(end);
+		value = `${before}${snippet}${after}`;
+		queueMicrotask(() => {
+			if (!textarea) return;
+			textarea.focus();
+			const cursor = before.length + snippet.length;
+			textarea.setSelectionRange(cursor, cursor);
+		});
 	}
 
 	function insertLink() {
@@ -282,6 +303,12 @@
 		<button type="button" class="tb-btn" onclick={() => insertCallout('info')} title="Info callout">ⓘ Info</button>
 		<button type="button" class="tb-btn" onclick={() => insertCallout('warning')} title="Warning callout">⚠ Warning</button>
 		<button type="button" class="tb-btn" onclick={() => insertCallout('tip')} title="Tip callout">★ Tip</button>
+		<button
+			type="button"
+			class="tb-btn"
+			onclick={insertStat}
+			title="Insert a live game-data value (e.g. a tank's HP)">＃ Stat</button
+		>
 		<span class="tb-sep ml-auto"></span>
 		<button
 			type="button"
