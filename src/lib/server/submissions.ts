@@ -10,6 +10,7 @@ import {
 	type SanitizedFrontmatter
 } from './content-sanitize';
 import { isSlugTaken } from './articles';
+import { collectStatRefErrors } from './game-data-refs';
 import type { FlyoutSection } from '$lib/content/flyout-sections';
 
 export type SubmissionStatus =
@@ -130,6 +131,18 @@ export async function sanitizeSubmissionInput(
 
 	const heroImageUrl = assertHeroImageUrl(input.heroImageUrl ?? null);
 	const { html } = await sanitizeArticleBody(input.bodyMarkdown);
+
+	// Reject inline :stat references to tanks/stats that don't exist in the game
+	// data, so the author fixes them before review. Only enforced at the stricter
+	// submit-time bar — drafts stay saveable while a slug is half-typed (the
+	// preview just renders an em dash until the reference resolves).
+	if (enforceLength) {
+		const statRefErrors = collectStatRefErrors(html);
+		if (statRefErrors.length > 0) {
+			throw new ContentValidationError('body', statRefErrors[0]);
+		}
+	}
+
 	const contentHash = computeContentHash(frontmatter, html, heroImageUrl);
 
 	return {

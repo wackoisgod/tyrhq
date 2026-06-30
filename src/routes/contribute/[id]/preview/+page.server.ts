@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getSubmissionById } from '$lib/server/submissions';
 import { sanitizeArticleBody } from '$lib/server/content-sanitize';
+import { renderGameStatRefs } from '$lib/server/game-data-refs';
 import { getGameSnapshot } from '$lib/data/game-data';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -27,7 +28,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	let renderError: string | null = null;
 	try {
 		const result = await sanitizeArticleBody(submission.body_markdown);
-		bodyHtml = result.html;
+		bodyHtml = renderGameStatRefs(result.html);
 	} catch (err) {
 		renderError = err instanceof Error ? err.message : String(err);
 	}

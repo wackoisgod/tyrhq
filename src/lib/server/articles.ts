@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from './supabase-admin';
 import type { FlyoutSection } from '$lib/content/flyout-sections';
 import { isRecentlyPublished } from '$lib/utils/article-recency';
+import { renderGameStatRefs } from './game-data-refs';
 
 export type ArticleType = 'guide' | 'article' | 'patch';
 
@@ -113,7 +114,9 @@ function detailFromRow(row: ArticleRow): ArticleDetail {
 	return {
 		...summaryFromRow(row),
 		bodyMarkdown: row.body_markdown,
-		bodyHtml: row.body_html,
+		// Resolve inline :stat game-data references against the live bundle on
+		// every read, so referenced values track the latest game data.
+		bodyHtml: renderGameStatRefs(row.body_html),
 		currentRevisionId: row.current_revision_id
 	};
 }

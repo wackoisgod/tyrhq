@@ -75,6 +75,35 @@ describe('sanitizeArticleBody', () => {
 		await expect(sanitizeArticleBody(':::evil{}\nstuff\n:::')).rejects.toThrow(/Unknown directive/);
 	});
 
+	it('rewrites inline :stat into a reference-only <aggro-stat> (no value baked in)', async () => {
+		const { html } = await sanitizeArticleBody('The Atlas has :stat{tank="atlas" stat="health"} HP.');
+		expect(html).toContain('<aggro-stat');
+		expect(html).toContain('data-tank="atlas"');
+		expect(html).toContain('data-stat="health"');
+		expect(html).toContain('data-show="value"');
+		// The value itself is never stored — it's resolved live at render time.
+		expect(html).toContain('></aggro-stat>');
+	});
+
+	it('keeps an explicit :stat show mode', async () => {
+		const { html } = await sanitizeArticleBody(':stat{tank="atlas" stat="health" show="label"}');
+		expect(html).toContain('data-show="label"');
+	});
+
+	it('rejects :stat missing a tank', async () => {
+		await expect(sanitizeArticleBody(':stat{stat="health"}')).rejects.toThrow(/`tank` attribute/);
+	});
+
+	it('rejects :stat missing a stat', async () => {
+		await expect(sanitizeArticleBody(':stat{tank="atlas"}')).rejects.toThrow(/`stat` attribute/);
+	});
+
+	it('rejects :stat with an invalid show mode', async () => {
+		await expect(
+			sanitizeArticleBody(':stat{tank="atlas" stat="health" show="wat"}')
+		).rejects.toThrow(/show "wat" must be one of/);
+	});
+
 	it('preserves links and lists', async () => {
 		const { html } = await sanitizeArticleBody(
 			'- one\n- [two](https://example.com)\n- three'
