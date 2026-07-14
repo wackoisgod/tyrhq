@@ -14,6 +14,11 @@ import {
 // depend on PUBLIC_SUPABASE_URL being set in the test environment.
 const TEST_IMAGE_PREFIX = 'https://example.test/storage/v1/object/public/article-images/';
 
+// Same bucket path under the host the project used before moving to a custom
+// domain — articles published back then still embed this host.
+const LEGACY_IMAGE_PREFIX =
+	'https://old-project.supabase.co/storage/v1/object/public/article-images/';
+
 describe('sanitizeArticleBody', () => {
 	it('renders ordinary markdown to safe HTML', async () => {
 		const { html } = await sanitizeArticleBody('## Heading\n\nA **bold** paragraph.');
@@ -281,6 +286,32 @@ describe('image source validation', () => {
 		);
 		expect(html).not.toMatch(/srcset/i);
 	});
+
+	it('rewrites bucket images stored under a legacy host to the current prefix', async () => {
+		const { html } = await sanitizeArticleBody(
+			`![ok](${LEGACY_IMAGE_PREFIX}2026/06/abc.gif)`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
+		expect(html).toContain(`src="${TEST_IMAGE_PREFIX}2026/06/abc.gif"`);
+		expect(html).not.toContain('old-project.supabase.co');
+	});
+
+	it('rejects a bucket-shaped path on a non-https URL', async () => {
+		await expect(
+			sanitizeArticleBody(
+				`![bad](http://old-project.supabase.co/storage/v1/object/public/article-images/x.png)`,
+				{ imageHostPrefix: TEST_IMAGE_PREFIX }
+			)
+		).rejects.toThrow(/uploaded via the editor/);
+	});
+
+	it('rejects external hosts whose path is not the bucket path', async () => {
+		await expect(
+			sanitizeArticleBody('![bad](https://evil.test/article-images/x.png)', {
+				imageHostPrefix: TEST_IMAGE_PREFIX
+			})
+		).rejects.toThrow(/uploaded via the editor/);
+	});
 });
 
 describe('assertHeroImageUrl', () => {
@@ -298,6 +329,12 @@ describe('assertHeroImageUrl', () => {
 	it('rejects external URLs', () => {
 		expect(() => assertHeroImageUrl('https://imgur.com/h.png', TEST_IMAGE_PREFIX)).toThrow(
 			ContentValidationError
+		);
+	});
+
+	it('rewrites a hero URL stored under a legacy host to the current prefix', () => {
+		expect(assertHeroImageUrl(`${LEGACY_IMAGE_PREFIX}2026/06/hero.jpg`, TEST_IMAGE_PREFIX)).toBe(
+			`${TEST_IMAGE_PREFIX}2026/06/hero.jpg`
 		);
 	});
 
