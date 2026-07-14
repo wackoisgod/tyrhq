@@ -193,10 +193,43 @@ function validateAggroDirectives() {
 }
 
 /**
+ * Resolve an image URL to its canonical form under the configured bucket
+ * prefix, or null when it isn't one of ours. URLs already under the prefix
+ * pass through unchanged. URLs whose *path* points into the article-images
+ * bucket but whose host differs are rewritten to the current host: articles
+ * published before a PUBLIC_SUPABASE_URL change (e.g. moving from the raw
+ * `*.supabase.co` project URL to a custom API domain) still store the old
+ * host in their markdown, and must keep validating when the body is
+ * re-sanitized (suggest-an-edit, approvals, previews all re-run the
+ * pipeline over stored markdown). The rewrite is safe because the output
+ * always points at our own bucket — a path that doesn't exist there just
+ * 404s, and hosts with a non-bucket path (imgur hotlinks etc.) are still
+ * rejected outright.
+ */
+export function canonicalizeArticleImageUrl(
+	src: string,
+	allowedPrefix: string
+): string | null {
+	if (!allowedPrefix) return null;
+	if (src.startsWith(allowedPrefix)) return src;
+	let parsed: URL;
+	try {
+		parsed = new URL(src);
+	} catch {
+		return null;
+	}
+	if (parsed.protocol !== 'https:') return null;
+	if (!parsed.pathname.startsWith(ARTICLE_IMAGE_BUCKET_PATH)) return null;
+	return new URL(parsed.pathname, allowedPrefix).toString();
+}
+
+/**
  * Restrict <img src> to our own storage bucket. Inline body images come from
  * the upload endpoint, which only writes to `article-images/` under
  * PUBLIC_SUPABASE_URL — anything else (imgur hotlinks, raw HTML <img> tags
- * pasted into markdown) is a content-validation error.
+ * pasted into markdown) is a content-validation error. Bucket URLs stored
+ * under a previous host are rewritten to the current one (see
+ * `canonicalizeArticleImageUrl`).
  *
  * Also strips srcset (we don't generate it; it's an injection vector if
  * accepted blindly) and forces lazy loading + async decoding for everything
@@ -212,12 +245,14 @@ function validateImageSources(allowedPrefix: string) {
 			if (el.tagName !== 'img') return;
 			const props = (el.properties ?? {}) as Record<string, unknown>;
 			const src = typeof props.src === 'string' ? props.src : null;
-			if (!src || !allowedPrefix || !src.startsWith(allowedPrefix)) {
+			const canonical = src ? canonicalizeArticleImageUrl(src, allowedPrefix) : null;
+			if (!canonical) {
 				throw new ContentValidationError(
 					'body',
 					'Images must be uploaded via the editor — external URLs are not allowed.'
 				);
 			}
+			props.src = canonical;
 			delete props.srcSet;
 			delete props.srcset;
 			props.loading = 'lazy';
@@ -529,7 +564,8 @@ export function computeContentHash(
 /**
  * Validate a hero/thumbnail URL against the same bucket-prefix rule that
  * `validateImageSources` enforces for inline body images. Returns the
- * trimmed URL, or null when the input is empty.
+ * canonicalized URL (stale bucket hosts are rewritten to the current one),
+ * or null when the input is empty.
  *
  * Pass `imageHostPrefix` to override the env-derived default (used by tests).
  */
@@ -544,13 +580,14 @@ export function assertHeroImageUrl(
 		throw new ContentValidationError('heroImageUrl', 'Hero image URL is too long.');
 	}
 	const prefix = imageHostPrefix ?? getArticleImageHostPrefix();
-	if (!prefix || !trimmed.startsWith(prefix)) {
+	const canonical = canonicalizeArticleImageUrl(trimmed, prefix);
+	if (!canonical) {
 		throw new ContentValidationError(
 			'heroImageUrl',
 			'Hero image must be uploaded via the editor — external URLs are not allowed.'
 		);
 	}
-	return trimmed;
+	return canonical;
 }
 
 export const BODY_MIN_CHARS = 200;
