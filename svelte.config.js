@@ -44,6 +44,29 @@ function mdsvexAutoImportPreprocess() {
 	};
 }
 
+/**
+ * The browser talks to Supabase directly (auth refresh, signed-URL image
+ * uploads), so its origin must be in connect-src/img-src. The project moved
+ * from the raw `*.supabase.co` URL to a custom domain, so derive the origin
+ * from PUBLIC_SUPABASE_URL at build time; keep the `*.supabase.co` wildcard
+ * as a fallback for environments where the var is unset at build.
+ */
+function supabaseCspSources() {
+	const sources = ['https://*.supabase.co'];
+	const url = process.env.PUBLIC_SUPABASE_URL;
+	if (url) {
+		try {
+			const origin = new URL(url).origin;
+			if (!sources.includes(origin)) sources.push(origin);
+		} catch {
+			console.warn(`svelte.config.js: PUBLIC_SUPABASE_URL is not a valid URL: ${url}`);
+		}
+	}
+	return sources;
+}
+
+const supabaseSources = supabaseCspSources();
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	extensions: ['.svelte', mdsvexExtension],
@@ -64,13 +87,13 @@ const config = {
 			mode: 'auto',
 			directives: {
 				'base-uri': ['self'],
-				'connect-src': ['self', 'blob:', 'https://*.supabase.co', 'ws:', 'wss:'],
+				'connect-src': ['self', 'blob:', ...supabaseSources, 'ws:', 'wss:'],
 				'default-src': ['self'],
 				'font-src': ['self', 'https://fonts.gstatic.com'],
 				'form-action': ['self'],
 				'frame-ancestors': ['none'],
 				'frame-src': ['self', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
-				'img-src': ['self', 'blob:', 'data:', 'https://*.ytimg.com', 'https://*.supabase.co'],
+				'img-src': ['self', 'blob:', 'data:', 'https://*.ytimg.com', ...supabaseSources],
 				'manifest-src': ['self'],
 				'object-src': ['none'],
 				'script-src': ['self', 'wasm-unsafe-eval'],
