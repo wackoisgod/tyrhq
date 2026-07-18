@@ -1,6 +1,6 @@
 ---
 headline: "The battlefield is open."
-tagline: "Tyr's public playtest is now open on Steam. Choose your tank, join your team, and take the fight to the enemy."
+tagline: "Tyr's playtest is now open on Steam. Choose your tank, join your team, and take the fight to the enemy."
 ctas:
   - label: "Play Now"
     href: "https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home"

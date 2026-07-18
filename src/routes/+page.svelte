@@ -60,7 +60,7 @@
 	<div class="tyr-briefing-row">
 	<section class="tyr-signal-card">
 		<div class="tyr-signal-meta">
-			<span>Public Playtest</span>
+			<span>Open Playtest</span>
 			<span>//</span>
 			<span>Live Now</span>
 		</div>
