@@ -1,5 +1,5 @@
 import { getGameSnapshot } from '$lib/data/game-data';
-import { fetchSteamNews, fetchYouTubePlaylist } from '$lib/server/content';
+import { fetchYouTubePlaylist } from '$lib/server/content';
 import { listPublishedArticles } from '$lib/server/articles';
 import { compareVersionsDesc } from '$lib/utils/version';
 import type { HeroFrontmatter } from '$lib/types/content';
@@ -33,9 +33,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// YouTube dev updates
 	const devVideos = await fetchYouTubePlaylist('PL7n_PygfF9b_ikfybVVXdNtFzHim1wQLA', 4);
 
-	// Steam news for hero banner
-	const steamNews = await fetchSteamNews('2445260', 1);
-	const latestSteamPost = steamNews[0] ?? null;
 
 	// Pre-slice each type so the home's All/Articles/Guides/Patches filter chips
 	// can switch instantly without a server round-trip and each chip always
@@ -71,7 +68,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			tagline: hero.tagline,
 			ctas: hero.ctas
 		},
-		latestSteamPost,
 		devVideos,
 		latestBuilds,
 		latestDispatches

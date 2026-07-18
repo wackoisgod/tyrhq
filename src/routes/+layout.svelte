@@ -141,7 +141,7 @@
 							rel="noreferrer"
 							class="hud-cta tyr-primary-cta tyr-header-button px-6 py-3"
 						>
-							Join The Playtest
+							Play Now
 						</a>
 					</div>
 				</div>

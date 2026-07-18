@@ -10,14 +10,8 @@
 
 	let { data } = $props();
 
-	const steamTitle = $derived(
-		data.latestSteamPost?.title.replace(/^\[.*?\]\s*/, '').trim() ?? ''
-	);
-
-	const heroHeadline = $derived(steamTitle || data.hero.headline);
-	const heroSummary = $derived(data.latestSteamPost?.summary ?? data.hero.tagline);
-	const heroKicker = $derived(data.latestSteamPost ? 'Latest From Steam' : 'Pilot Briefing');
-	const heroDate = $derived(data.latestSteamPost?.date ?? 'Live Companion Site');
+	const heroHeadline = $derived(data.hero.headline);
+	const heroSummary = $derived(data.hero.tagline);
 	const heroHeadlineLong = $derived(heroHeadline.length > 42);
 
 	const buildsWithVehicle = $derived(toBuildCardData(data.latestBuilds));
@@ -58,17 +52,17 @@
 <section class="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-8 md:px-6 md:pb-12">
 	<div class="tyr-section-heading">
 		<div class="tyr-shell-accent">
-			<div class="tyr-shell-kicker">Frontline Intel</div>
-			<h1 class="tyr-section-title">Mission Briefing</h1>
+			<div class="tyr-shell-kicker">Playtest Live</div>
+			<h1 class="tyr-section-title">Deployment Open</h1>
 		</div>
 	</div>
 
 	<div class="tyr-briefing-row">
 	<section class="tyr-signal-card">
 		<div class="tyr-signal-meta">
-			<span>{heroKicker}</span>
+			<span>Public Playtest</span>
 			<span>//</span>
-			<span>{heroDate}</span>
+			<span>Live Now</span>
 		</div>
 
 		<h1
@@ -79,7 +73,7 @@
 
 		<p class="tyr-signal-summary mt-5">{heroSummary}</p>
 
-		{#if !data.latestSteamPost && HeroContent}
+		{#if HeroContent}
 			<div class="mt-4 max-w-3xl">
 				<HeroContent />
 			</div>
@@ -93,20 +87,10 @@
 					rel={cta.external ? 'noreferrer' : undefined}
 					class="{cta.style === 'primary' ? 'hud-cta' : 'hud-cta-outline'} px-5 py-3"
 				>
-					{cta.style === 'primary' ? 'Join The Playtest' : cta.label}
+					{cta.label}
 				</a>
 			{/each}
 
-			{#if data.latestSteamPost}
-				<a
-					href={data.latestSteamPost.link}
-					target="_blank"
-					rel="noreferrer"
-					class="hud-cta-outline px-5 py-3"
-				>
-					Read More
-				</a>
-			{/if}
 		</div>
 	</section>
 

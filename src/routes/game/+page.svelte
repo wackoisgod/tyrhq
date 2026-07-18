@@ -114,7 +114,7 @@
 					rel="noreferrer"
 					class="hud-cta-outline px-5 py-3"
 				>
-					Join the Playtest
+					Play Now
 				</a>
 			</div>
 		</div>

@@ -1598,15 +1598,67 @@ input[type="radio"] {
 
 .tyr-signal-card {
 	position: relative;
+	isolation: isolate;
+	display: flex;
+	min-height: clamp(23rem, 32vw, 27rem);
+	flex-direction: column;
+	justify-content: center;
 	overflow: hidden;
 	padding: clamp(1.5rem, 1rem + 1.6vw, 2.6rem);
-	background:
-		radial-gradient(circle at 84% 26%, rgba(153, 247, 255, 0.12), transparent 22%),
-		linear-gradient(135deg, rgba(42, 51, 77, 0.94) 0%, rgba(21, 28, 43, 0.98) 52%, rgba(13, 17, 26, 0.98) 100%);
+	background: #0d111a url('/images/tyr-open-playtest-hero.webp') 68% center / cover no-repeat;
 	box-shadow:
 		var(--hud-notch-shadow),
 		inset 0 0 0 1px rgba(160, 170, 217, 0.14),
 		0 28px 56px rgba(0, 0, 0, 0.34);
+}
+
+.tyr-signal-card::before {
+	position: absolute;
+	z-index: -1;
+	inset: 0;
+	content: '';
+	background:
+		linear-gradient(90deg, rgba(9, 14, 23, 0.97) 0%, rgba(12, 18, 29, 0.93) 58%, rgba(12, 18, 29, 0.78) 100%),
+		linear-gradient(0deg, rgba(7, 11, 18, 0.72) 0%, transparent 58%);
+	pointer-events: none;
+}
+
+.tyr-signal-card::after {
+	position: absolute;
+	z-index: -1;
+	inset: 0;
+	content: '';
+	background: linear-gradient(90deg, var(--hud-teal) 0 3px, transparent 3px 100%);
+	opacity: 0.8;
+	pointer-events: none;
+}
+
+.tyr-signal-card .tyr-signal-title {
+	max-width: none;
+	font-size: clamp(2.2rem, 1.4rem + 2.2vw, 3.6rem);
+	text-shadow: 0 3px 28px rgba(0, 0, 0, 0.72);
+}
+
+.tyr-signal-card .tyr-signal-summary {
+	max-width: 38rem;
+	text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9);
+}
+
+@media (min-width: 768px) {
+	.tyr-signal-card > * {
+		width: min(64%, 43rem);
+	}
+
+	.tyr-signal-card > .tyr-signal-title {
+		width: min(88%, 52rem);
+		white-space: nowrap;
+	}
+
+	.tyr-signal-card::before {
+		background:
+			linear-gradient(90deg, rgba(9, 14, 23, 0.98) 0%, rgba(12, 18, 29, 0.96) 42%, rgba(12, 18, 29, 0.62) 68%, rgba(12, 18, 29, 0.18) 100%),
+			linear-gradient(0deg, rgba(7, 11, 18, 0.7) 0%, transparent 55%);
+	}
 }
 
 .tyr-briefing-panel {
