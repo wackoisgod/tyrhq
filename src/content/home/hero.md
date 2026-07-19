@@ -1,9 +1,9 @@
 ---
-headline: "Know your tank. Build your edge. Win the fight."
-tagline: "Tyr HQ is the independent community companion for Tyr — explore every vehicle, theory-craft loadouts, and share builds that actually work."
+headline: "The battlefield is open."
+tagline: "Tyr's playtest is now open on Steam. Choose your tank, join your team, and take the fight to the enemy."
 ctas:
-  - label: "Join Playtest"
-    href: "https://stoke.firstlook.gg/?utm_source=playtyr&utm_content=playtyr-home"
+  - label: "Play Now"
+    href: "https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home"
     style: primary
     external: true
   - label: "Wishlist On Steam"
@@ -12,4 +12,4 @@ ctas:
     external: true
 ---
 
-Browse tanks, compare stats, plan your loadout, and save builds to your account — all in one place.
+Deploy through Steam, then use Tyr HQ to compare vehicles, plan builds, and sharpen your edge.

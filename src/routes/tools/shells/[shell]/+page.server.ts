@@ -34,7 +34,10 @@ export const load: PageServerLoad = ({ params }) => {
 				penetration: Number(vehicle.stats.ShellPenetration ?? 0),
 				reload: Number(vehicle.stats.ReloadTime ?? 0),
 				velocity: Number(vehicle.stats.ShellVelocity ?? 0),
-				detection: Number(vehicle.stats.DetectionRadius ?? 0)
+				detection: Number(vehicle.stats.DetectionRadius ?? 0),
+				maxSpeed: Number(vehicle.stats.MaxSpeed ?? 0),
+				reverseSpeed: Number(vehicle.stats.MaxReverseSpeed ?? 0),
+				strafeSpeed: Number(vehicle.stats.MaxStrafingSpeed ?? 0)
 			}
 		}))
 		.sort((left, right) => left.name.localeCompare(right.name));

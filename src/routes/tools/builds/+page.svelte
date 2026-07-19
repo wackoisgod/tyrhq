@@ -556,14 +556,23 @@
 		selection.ammoIds[slotIndex] = ammoId;
 	}
 
-	function formatTalentDescription(description: string, pointValues: number[], currentPoints: number) {
+	function formatTalentDescription(
+		description: string,
+		pointValues: number[],
+		currentPoints: number,
+		nodeMaxPoints: number
+	) {
 		const cleaned = plainComponentDescription(description);
 		if (!pointValues.length) return cleaned;
 
 		const perPoint = pointValues[0];
-		const levelValue = currentPoints > 0
-			? pointValues[Math.min(currentPoints, pointValues.length) - 1]
-			: pointValues[pointValues.length - 1];
+		// When unallocated, preview the value at the node's cap — pointValues may extend
+		// past the node's maxPoints (e.g. Sonar Max Energy: pointValues=[10,20,30,40,50]
+		// but the node only allows 3 points, so the previewed max should be 30, not 50).
+		const previewIndex = currentPoints > 0
+			? Math.min(currentPoints, pointValues.length)
+			: Math.min(nodeMaxPoints, pointValues.length);
+		const levelValue = pointValues[Math.max(1, previewIndex) - 1];
 
 		function fmt(n: number) {
 			const abs = Math.abs(n);
@@ -681,8 +690,8 @@
 		if (node.isKeystone) {
 			const keystoneActive = points > 0
 				? ' ring-[var(--hud-lime)]/40 bg-[var(--hud-panel-high)] shadow-[inset_4px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(202,242,0,0.18)]'
-				: ' ring-[#454932]/18 bg-[var(--hud-panel-high)] shadow-[inset_4px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(202,242,0,0.12)]';
-			const locked = ruleLocked ? ' opacity-50' : ' hover:ring-[var(--hud-teal)]/25';
+				: ' ring-[#454932]/18 bg-[var(--hud-surface)] shadow-[inset_3px_0_0_0_rgba(202,242,0,0.28)]';
+			const locked = ruleLocked ? ' opacity-50' : ' hover:ring-[var(--hud-lime)]/25';
 			return `${shell}${keystoneActive}${locked}`;
 		}
 		if (points > 0) {
@@ -1015,11 +1024,11 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.description, node.talent.pointValues, points)}
+										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints)}
 									</p>
 									{#if node.talent.supplementalDescription}
 										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
-											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points)}
+											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints)}
 										</p>
 									{/if}
 	
@@ -1156,7 +1165,7 @@
 							{#each currentVehicle.loadout.defaultAmmoIds as _, index}
 								{@const pickedAmmo = catalog.ammoById.get(selection.ammoIds[index])}
 								{@const ammoMods = pickedAmmo?.modifiers}
-								{@const ammoHasStats = ammoMods && (ammoMods.damage !== 1 || ammoMods.penetration !== 1 || ammoMods.reload !== 1 || ammoMods.dispersion !== 1 || ammoMods.detection !== 1 || ammoMods.velocity !== 1)}
+								{@const ammoHasStats = ammoMods && (ammoMods.damage !== 1 || ammoMods.penetration !== 1 || ammoMods.reload !== 1 || ammoMods.dispersion !== 1 || ammoMods.detection !== 1 || ammoMods.velocity !== 1 || (ammoMods.maxSpeed ?? 1) !== 1 || (ammoMods.reverseSpeed ?? 1) !== 1 || (ammoMods.strafeSpeed ?? 1) !== 1)}
 								<div class="group/ammo relative flex items-stretch gap-0">
 									<div
 										class="relative flex h-[4.5rem] w-[8.75rem] flex-col rounded-sm ring-1 transition {selection.previewAmmoSlot === index
@@ -1236,7 +1245,10 @@
 														{ label: 'RLD', v: ammoMods.reload },
 														{ label: 'DSP', v: ammoMods.dispersion },
 														{ label: 'DET', v: ammoMods.detection },
-														{ label: 'VEL', v: ammoMods.velocity }
+														{ label: 'VEL', v: ammoMods.velocity },
+														{ label: 'SPD', v: ammoMods.maxSpeed ?? 1 },
+														{ label: 'REV', v: ammoMods.reverseSpeed ?? 1 },
+														{ label: 'STR', v: ammoMods.strafeSpeed ?? 1 }
 													] as m}
 														{#if m.v !== 1}
 															<span
@@ -1650,7 +1662,7 @@
 							{#each catalog.ammo.filter((a) => modalAmmoSlot !== 1 || a.canLoadSecondary) as ammo}
 								{@const isSelected = selection.ammoIds[modalAmmoSlot] === ammo.id}
 								{@const modifiers = ammo.modifiers}
-								{@const hasStatChanges = modifiers.damage !== 1 || modifiers.penetration !== 1 || modifiers.reload !== 1 || modifiers.dispersion !== 1 || modifiers.detection !== 1 || modifiers.velocity !== 1}
+								{@const hasStatChanges = modifiers.damage !== 1 || modifiers.penetration !== 1 || modifiers.reload !== 1 || modifiers.dispersion !== 1 || modifiers.detection !== 1 || modifiers.velocity !== 1 || (modifiers.maxSpeed ?? 1) !== 1 || (modifiers.reverseSpeed ?? 1) !== 1 || (modifiers.strafeSpeed ?? 1) !== 1}
 								<button
 									type="button"
 									class={`flex flex-col rounded-sm p-4 text-left ring-1 transition ${
@@ -1686,7 +1698,10 @@
 												{ label: 'RLD', value: modifiers.reload, tip: 'Reload Time' },
 												{ label: 'DSP', value: modifiers.dispersion, tip: 'Dispersion (all types)' },
 												{ label: 'DET', value: modifiers.detection, tip: 'Detection Radius' },
-												{ label: 'VEL', value: modifiers.velocity, tip: 'Shell Velocity' }
+												{ label: 'VEL', value: modifiers.velocity, tip: 'Shell Velocity' },
+												{ label: 'SPD', value: modifiers.maxSpeed ?? 1, tip: 'Top Speed (while loaded)' },
+												{ label: 'REV', value: modifiers.reverseSpeed ?? 1, tip: 'Reverse Speed (while loaded)' },
+												{ label: 'STR', value: modifiers.strafeSpeed ?? 1, tip: 'Strafing Speed (while loaded)' }
 											] as mod}
 												{#if mod.value !== 1}
 													<span

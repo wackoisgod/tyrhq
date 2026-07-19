@@ -10,18 +10,24 @@
 		reload: 'Reload',
 		dispersion: 'Dispersion',
 		detection: 'Detection',
-		velocity: 'Velocity'
+		velocity: 'Velocity',
+		maxSpeed: 'Top Speed',
+		reverseSpeed: 'Reverse',
+		strafeSpeed: 'Strafe'
 	};
 
 	// For most modifiers, > 1 is a buff. For reload, dispersion, detection, > 1 is a debuff
-	// (slower reload, worse spread, easier to spot).
+	// (slower reload, worse spread, easier to spot). Speeds: faster is better.
 	const HIGHER_IS_BETTER: Record<string, boolean> = {
 		damage: true,
 		penetration: true,
 		reload: false,
 		dispersion: false,
 		detection: false,
-		velocity: true
+		velocity: true,
+		maxSpeed: true,
+		reverseSpeed: true,
+		strafeSpeed: true
 	};
 
 	type StatKey = keyof (typeof data.vehicles)[number]['base'];
@@ -32,7 +38,10 @@
 		reload: 'reload',
 		velocity: 'velocity',
 		detection: 'detection',
-		dispersion: null
+		dispersion: null,
+		maxSpeed: 'maxSpeed',
+		reverseSpeed: 'reverseSpeed',
+		strafeSpeed: 'strafeSpeed'
 	};
 
 	const PREVIEW_STORAGE_KEY = 'tyr.shellPreviewVehicle';
@@ -60,6 +69,8 @@
 		if (key === 'reload') return `${value.toFixed(1)} s`;
 		if (key === 'velocity') return `${Math.round(value)} m/s`;
 		if (key === 'detection') return `${Math.round(value)} m`;
+		if (key === 'maxSpeed' || key === 'reverseSpeed' || key === 'strafeSpeed')
+			return `${Math.round(value)} kph`;
 		return Math.round(value).toString();
 	}
 

@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from './supabase-admin';
 import type { FlyoutSection } from '$lib/content/flyout-sections';
 import { isRecentlyPublished } from '$lib/utils/article-recency';
+import { renderGameStatRefs } from './game-data-refs';
 
 export type ArticleType = 'guide' | 'article' | 'patch';
 
@@ -113,7 +114,9 @@ function detailFromRow(row: ArticleRow): ArticleDetail {
 	return {
 		...summaryFromRow(row),
 		bodyMarkdown: row.body_markdown,
-		bodyHtml: row.body_html,
+		// Resolve inline :stat game-data references against the live bundle on
+		// every read, so referenced values track the latest game data.
+		bodyHtml: renderGameStatRefs(row.body_html),
 		currentRevisionId: row.current_revision_id
 	};
 }
@@ -201,6 +204,42 @@ export async function getPublishedArticle(
 	}
 
 	return data ? detailFromRow(withPinnedDefault(data)) : null;
+}
+
+export interface WithdrawnArticleStub {
+	type: ArticleType;
+	slug: string;
+	title: string;
+}
+
+/**
+ * Look up a *withdrawn* article by type+slug. Lets the public [slug] routes tell
+ * "this was taken down" apart from "never existed": a withdrawn row yields a 410
+ * Gone notice, a missing slug stays a 404. Withdrawal is reversible (see
+ * restoreArticle) so the row still exists — it just isn't served by
+ * getPublishedArticle. Only the fields needed for the notice are selected, so
+ * there's no is_pinned legacy-column fallback to worry about.
+ */
+export async function getWithdrawnArticle(
+	type: ArticleType,
+	slug: string
+): Promise<WithdrawnArticleStub | null> {
+	const admin = getSupabaseAdminClient();
+	if (!admin) return null;
+
+	const { data, error } = await admin
+		.from('articles')
+		.select('type, slug, title')
+		.eq('type', type)
+		.eq('slug', slug)
+		.eq('status', 'withdrawn')
+		.maybeSingle<WithdrawnArticleStub>();
+
+	if (error) {
+		console.error('[articles] getWithdrawnArticle failed', error);
+		return null;
+	}
+	return data ?? null;
 }
 
 export async function getArticleByIdForReview(id: string): Promise<ArticleDetail | null> {

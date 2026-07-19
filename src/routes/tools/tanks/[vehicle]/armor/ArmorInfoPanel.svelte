@@ -27,7 +27,7 @@
 		no_pen: { label: 'NO PENETRATION', color: 'text-[var(--hud-text)]' },
 		fifty_fifty: { label: '50/50 ZONE', color: 'text-[#ffd400]' },
 		module: { label: 'MODULE', color: 'text-[#3b5eff]' },
-		absorb: { label: 'TRACK IMMOBILIZATION', color: 'text-[#ff1fb9]' }
+		absorb: { label: 'TRACK IMMOBILIZATION', color: 'text-[#3b5eff]' }
 	};
 </script>
 
@@ -145,8 +145,7 @@
 				{ color: 'bg-[#175950]', label: 'Penetration' },
 				{ color: 'bg-[#594000]', label: '50/50 Zone' },
 				{ color: 'bg-[#0a0b14]', label: 'No Penetration' },
-				{ color: 'bg-[#1733bf]', label: 'Module' },
-				{ color: 'bg-[#8f0f63]', label: 'Track Immobilization' }
+				{ color: 'bg-[#1733bf]', label: 'Module' }
 			] as item}
 				<div class="flex items-center gap-2">
 					<div class="h-3 w-5 rounded-sm {item.color}"></div>

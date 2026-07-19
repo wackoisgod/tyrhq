@@ -23,6 +23,7 @@ export type TankSummary = {
 		vision: number;
 		detection: number;
 		camo: number;
+		difficulty: number;
 	};
 	ability: VehicleAbility;
 };
@@ -36,14 +37,22 @@ export type AmmoSummary = {
 	description: string;
 	selectable: boolean;
 	canLoadSecondary: boolean;
-	modifiers: {
-		damage: number;
-		penetration: number;
-		reload: number;
-		dispersion: number;
-		detection: number;
-		velocity: number;
-	};
+	modifiers: AmmoModifiers;
+};
+
+// Shell modifiers (always present) plus optional while-loaded vehicle-speed
+// modifiers, which only exist for ammo whose equip effect alters movement
+// (e.g. Lightweight/Mobility raises speed, Unstable restricts it).
+export type AmmoModifiers = {
+	damage: number;
+	penetration: number;
+	reload: number;
+	dispersion: number;
+	detection: number;
+	velocity: number;
+	maxSpeed?: number;
+	reverseSpeed?: number;
+	strafeSpeed?: number;
 };
 
 export type ComponentSummary = {
@@ -110,14 +119,7 @@ export type VehicleRecord = {
 };
 
 export type AmmoRecord = AmmoSummary & {
-	modifiers: {
-		damage: number;
-		penetration: number;
-		reload: number;
-		dispersion: number;
-		detection: number;
-		velocity: number;
-	};
+	modifiers: AmmoModifiers;
 	source: {
 		key: string;
 	};

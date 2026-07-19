@@ -14,10 +14,16 @@ import {
 // depend on PUBLIC_SUPABASE_URL being set in the test environment.
 const TEST_IMAGE_PREFIX = 'https://example.test/storage/v1/object/public/article-images/';
 
+// Same bucket path under the host the project used before moving to a custom
+// domain — articles published back then still embed this host.
+const LEGACY_IMAGE_PREFIX =
+	'https://old-project.supabase.co/storage/v1/object/public/article-images/';
+
 describe('sanitizeArticleBody', () => {
 	it('renders ordinary markdown to safe HTML', async () => {
 		const { html } = await sanitizeArticleBody('## Heading\n\nA **bold** paragraph.');
-		expect(html).toContain('<h2>Heading</h2>');
+		// Headings carry an auto-generated slug id for deep-linking (see TOC feature).
+		expect(html).toContain('<h2 id="heading">Heading</h2>');
 		expect(html).toContain('<strong>bold</strong>');
 	});
 
@@ -74,6 +80,35 @@ describe('sanitizeArticleBody', () => {
 		await expect(sanitizeArticleBody(':::evil{}\nstuff\n:::')).rejects.toThrow(/Unknown directive/);
 	});
 
+	it('rewrites inline :stat into a reference-only <aggro-stat> (no value baked in)', async () => {
+		const { html } = await sanitizeArticleBody('The Atlas has :stat{tank="atlas" stat="health"} HP.');
+		expect(html).toContain('<aggro-stat');
+		expect(html).toContain('data-tank="atlas"');
+		expect(html).toContain('data-stat="health"');
+		expect(html).toContain('data-show="value"');
+		// The value itself is never stored — it's resolved live at render time.
+		expect(html).toContain('></aggro-stat>');
+	});
+
+	it('keeps an explicit :stat show mode', async () => {
+		const { html } = await sanitizeArticleBody(':stat{tank="atlas" stat="health" show="label"}');
+		expect(html).toContain('data-show="label"');
+	});
+
+	it('rejects :stat missing a tank', async () => {
+		await expect(sanitizeArticleBody(':stat{stat="health"}')).rejects.toThrow(/`tank` attribute/);
+	});
+
+	it('rejects :stat missing a stat', async () => {
+		await expect(sanitizeArticleBody(':stat{tank="atlas"}')).rejects.toThrow(/`stat` attribute/);
+	});
+
+	it('rejects :stat with an invalid show mode', async () => {
+		await expect(
+			sanitizeArticleBody(':stat{tank="atlas" stat="health" show="wat"}')
+		).rejects.toThrow(/show "wat" must be one of/);
+	});
+
 	it('preserves links and lists', async () => {
 		const { html } = await sanitizeArticleBody(
 			'- one\n- [two](https://example.com)\n- three'
@@ -107,6 +142,25 @@ describe('sanitizeArticleBody', () => {
 		const { html } = await sanitizeArticleBody('[click](javascript:alert(1))');
 		// rehype-sanitize defaultSchema drops javascript: from href
 		expect(html).not.toMatch(/href="javascript:/i);
+	});
+
+	it('assigns slug ids to headings for deep-linking', async () => {
+		const { html } = await sanitizeArticleBody('## Frontline Survival\n\nbody\n\n### Loadout');
+		expect(html).toContain('<h2 id="frontline-survival">Frontline Survival</h2>');
+		expect(html).toContain('<h3 id="loadout">Loadout</h3>');
+	});
+
+	it('dedupes ids for repeated heading text', async () => {
+		const { html } = await sanitizeArticleBody('## Setup\n\na\n\n## Setup\n\nb');
+		expect(html).toContain('id="setup"');
+		expect(html).toContain('id="setup-2"');
+	});
+
+	it('slugifies heading ids from sanitized text only (no markup leaks in)', async () => {
+		const { html } = await sanitizeArticleBody('## Armor *vs* Ammo');
+		expect(html).toContain('id="armor-vs-ammo"');
+		// the generated id must never contain raw HTML
+		expect(html).not.toMatch(/id="[^"]*[<>][^"]*"/);
 	});
 });
 
@@ -232,6 +286,32 @@ describe('image source validation', () => {
 		);
 		expect(html).not.toMatch(/srcset/i);
 	});
+
+	it('rewrites bucket images stored under a legacy host to the current prefix', async () => {
+		const { html } = await sanitizeArticleBody(
+			`![ok](${LEGACY_IMAGE_PREFIX}2026/06/abc.gif)`,
+			{ imageHostPrefix: TEST_IMAGE_PREFIX }
+		);
+		expect(html).toContain(`src="${TEST_IMAGE_PREFIX}2026/06/abc.gif"`);
+		expect(html).not.toContain('old-project.supabase.co');
+	});
+
+	it('rejects a bucket-shaped path on a non-https URL', async () => {
+		await expect(
+			sanitizeArticleBody(
+				`![bad](http://old-project.supabase.co/storage/v1/object/public/article-images/x.png)`,
+				{ imageHostPrefix: TEST_IMAGE_PREFIX }
+			)
+		).rejects.toThrow(/uploaded via the editor/);
+	});
+
+	it('rejects external hosts whose path is not the bucket path', async () => {
+		await expect(
+			sanitizeArticleBody('![bad](https://evil.test/article-images/x.png)', {
+				imageHostPrefix: TEST_IMAGE_PREFIX
+			})
+		).rejects.toThrow(/uploaded via the editor/);
+	});
 });
 
 describe('assertHeroImageUrl', () => {
@@ -249,6 +329,12 @@ describe('assertHeroImageUrl', () => {
 	it('rejects external URLs', () => {
 		expect(() => assertHeroImageUrl('https://imgur.com/h.png', TEST_IMAGE_PREFIX)).toThrow(
 			ContentValidationError
+		);
+	});
+
+	it('rewrites a hero URL stored under a legacy host to the current prefix', () => {
+		expect(assertHeroImageUrl(`${LEGACY_IMAGE_PREFIX}2026/06/hero.jpg`, TEST_IMAGE_PREFIX)).toBe(
+			`${TEST_IMAGE_PREFIX}2026/06/hero.jpg`
 		);
 	});
 

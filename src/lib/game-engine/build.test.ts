@@ -512,4 +512,256 @@ describe('computeBuild aggregator math', () => {
 		expect(build!.breakdown.IntraClipReloadTime ?? []).toHaveLength(0);
 		expect(build!.breakdown.ShellSwapTime?.[0]?.delta).toBeCloseTo(-2.2, 4);
 	});
+
+	it('extended gearing applies its point value as a Max Speed multiplier, not a flat add', () => {
+		// ExtendedGearing's GE ships with empty modifiers, so the engine has nothing
+		// from the effect data to act on. The fallback must still treat 1.15 as a
+		// +15% multiplier, not "+1.15 kph" added to MaxSpeed.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const extendedGearingEffect: EffectRecord = {
+			id: 'ge-components-extendedgearing',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_ExtendedGearing.GE_Components_ExtendedGearing_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const extendedGearing = makeComponent(
+			'extendedgearing',
+			'EXTENDED GEARING',
+			['ge-components-extendedgearing'],
+			[1.149999976158142],
+			'Increases Max Speed by 0.15 after actively throttling for more than 10 continuous seconds'
+		);
+		const vehicle = makeVehicle('phantom', { MaxSpeed: 65 }, 'standard', 'tree_phantom');
+		const tree = makeTree('tree_phantom', 'phantom', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [extendedGearing],
+			talents: [],
+			effects: [extendedGearingEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['extendedgearing', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 65 × 1.15 = 74.75 (the +15% multiplier), NOT 65 + 1.15 = 66.15 (the old bug)
+		expect(build!.stats.MaxSpeed).toBeCloseTo(74.75, 4);
+		expect(build!.stats.MaxSpeed).not.toBeCloseTo(66.15, 2);
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('EXTENDED GEARING'));
+		expect(entry?.delta).toBeCloseTo(9.75, 4);
+	});
+
+	it('ammo equip-effect speed modifiers apply to vehicle Max/Reverse/Strafing speed', () => {
+		// Unstable restricts all three movement speeds to 65% while loaded — these live
+		// on the ammo's equip effect, surfaced via the optional speed modifiers.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const unstable = makeAmmo('unstable', 'Unstable', 1.1, {
+			maxSpeed: 0.65,
+			reverseSpeed: 0.65,
+			strafeSpeed: 0.65
+		});
+		const vehicle = makeVehicle(
+			'phantom',
+			{ MaxSpeed: 60, MaxReverseSpeed: 20, MaxStrafingSpeed: 40 },
+			'standard',
+			'tree_phantom'
+		);
+		const tree = makeTree('tree_phantom', 'phantom', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard, unstable],
+			components: [],
+			talents: [],
+			effects: [],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['unstable'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.MaxSpeed).toBeCloseTo(39, 4); // 60 × 0.65
+		expect(build!.stats.MaxReverseSpeed).toBeCloseTo(13, 4); // 20 × 0.65
+		expect(build!.stats.MaxStrafingSpeed).toBeCloseTo(26, 4); // 40 × 0.65
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.startsWith('Ammo:'));
+		expect(entry?.source).toContain('Unstable');
+		expect(entry?.delta).toBeCloseTo(-21, 4); // 39 − 60
+	});
+
+	it('ammo without speed modifiers leaves vehicle speed untouched', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const vehicle = makeVehicle('phantom', { MaxSpeed: 60 }, 'standard', 'tree_phantom');
+		const tree = makeTree('tree_phantom', 'phantom', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [],
+			effects: [],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'phantom',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build!.stats.MaxSpeed).toBeCloseTo(60, 4);
+		expect((build!.breakdown.MaxSpeed ?? []).some((e) => e.source.startsWith('Ammo:'))).toBe(false);
+	});
+
+	it('power converter applies its cooldown reduction as a multiplier on the AbilityCooldownTwo attribute', () => {
+		// POWER CONVERTER's GE drives the displayed Ability Cooldown through the engine-internal
+		// `AbilityCooldownTwo` attribute via a MultiplyAdditive op, with the point value (0.75) as
+		// the resulting multiplier — i.e. a 25% reduction. The old behaviour mis-read it as a flat
+		// −0.75s (from the effect-name "…AbilityCooldownReduction" fallback mapping).
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const powerConverterEffect = makeEffect(
+			'ge-components-powerconverterabilitycooldownreduction',
+			'AbilityCooldownTwo',
+			'MultiplyAdditive',
+			0.75,
+			{ magnitudeType: 'CustomCalculationClass', stackLimit: 999 }
+		);
+		const powerConverter = makeComponent(
+			'powerconverter',
+			'POWER CONVERTER',
+			['ge-components-powerconverterabilitycooldownreduction'],
+			[0.75],
+			'Activating your ability heals you and your Ability Cooldown is reduced by value'
+		);
+		const vehicle = makeVehicle('healer', { AbilityCooldown: 22 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [powerConverter],
+			talents: [],
+			effects: [powerConverterEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['powerconverter', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 22 × 0.75 = 16.5 (−25%), NOT 22 − 0.75 = 21.25 (the old flat-add bug).
+		expect(build!.stats.AbilityCooldown).toBeCloseTo(16.5, 4);
+		expect(build!.stats.AbilityCooldown).not.toBeCloseTo(21.25, 2);
+		const entry = build!.breakdown.AbilityCooldown?.find((e) => e.source.includes('POWER CONVERTER'));
+		expect(entry?.delta).toBeCloseTo(-5.5, 4);
+	});
+
+	it('tech-tree cooldown talents driven through AbilityCooldownTwo surface on Ability Cooldown', () => {
+		// The per-vehicle "Ability Cooldown" talents (e.g. Valor's) apply a flat AddBase to the
+		// engine-internal `AbilityCooldownTwo`. These must show on the displayed Ability Cooldown
+		// stat — previously they were dropped because the attribute wasn't recognised.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const cooldownEffect = makeEffect('ge-abilitycooldownflat', 'AbilityCooldownTwo', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const cooldownTalent = makeTalent(
+			'healer-talent019',
+			'Ability Cooldown',
+			['ge-abilitycooldownflat'],
+			[-2, -4]
+		);
+		const vehicle = makeVehicle('healer', { AbilityCooldown: 22 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', ['healer-talent019']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [cooldownTalent],
+			effects: [cooldownEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { 'healer-talent019': 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.AbilityCooldown).toBeCloseTo(18, 4); // 22 − 4 (max rank)
+		const entry = build!.breakdown.AbilityCooldown?.find((e) => e.source.includes('Ability Cooldown'));
+		expect(entry?.delta).toBeCloseTo(-4, 4);
+	});
+
+	it('catalytic reservoir does not leak its trigger wording ("penetration") into a stat bonus', () => {
+		// CATALYTIC RESERVOIR generates energy (CurrentAbilityResource) when you land a penetration.
+		// Because it has a concrete data-driven modifier — even though it targets an attribute we
+		// don't surface — the description-based fallback must NOT fire and mis-map the word
+		// "penetration" to a +3 ShellPenetration bonus.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const reservoirEffect = makeEffect(
+			'ge-components-catalyticreservoirinitial',
+			'CurrentAbilityResource',
+			'AddBase',
+			0,
+			{ magnitudeType: 'CustomCalculationClass' }
+		);
+		const reservoir = makeComponent(
+			'catalyticreservoir',
+			'CATALYTIC RESERVOIR',
+			['ge-components-catalyticreservoirinitial'],
+			[3],
+			'Generates value energy when you land a penetration while having above 50 Energy'
+		);
+		const vehicle = makeVehicle('healer', { ShellPenetration: 60 }, 'standard', 'tree_healer');
+		const tree = makeTree('tree_healer', 'healer', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [reservoir],
+			talents: [],
+			effects: [reservoirEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'healer',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['catalyticreservoir', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.ShellPenetration).toBeCloseTo(60, 4); // unchanged; no phantom +3
+		expect(build!.breakdown.ShellPenetration).toBeUndefined();
+	});
 });

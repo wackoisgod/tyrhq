@@ -11,6 +11,13 @@ import { visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
 import type { Node } from 'unist';
 import { env as publicEnv } from '$env/dynamic/public';
+import { createHeadingSlugger } from '$lib/contribute/toc';
+import {
+	SHOW_MODES,
+	STAT_TOKEN_RE,
+	TANK_TOKEN_RE,
+	normalizeShow
+} from '$lib/game-engine/stat-ref-format';
 
 export const CALLOUT_TYPES = ['info', 'warning', 'tip'] as const;
 export type CalloutType = (typeof CALLOUT_TYPES)[number];
@@ -117,19 +124,112 @@ function validateAggroDirectives() {
 				return;
 			}
 
+			if (name === 'stat') {
+				if (directive.type !== 'textDirective') {
+					throw new ContentValidationError(
+						'body',
+						'`stat` must be written as an inline directive: :stat{tank="atlas" stat="health"}'
+					);
+				}
+				const tank = directive.attributes?.tank?.trim();
+				if (!tank) {
+					throw new ContentValidationError(
+						'body',
+						':stat reference is missing the `tank` attribute, e.g. :stat{tank="atlas" stat="health"}'
+					);
+				}
+				if (!TANK_TOKEN_RE.test(tank)) {
+					throw new ContentValidationError(
+						'body',
+						`:stat tank "${tank}" must be a lowercase vehicle slug (letters, numbers, hyphens)`
+					);
+				}
+				const stat = directive.attributes?.stat?.trim();
+				if (!stat) {
+					throw new ContentValidationError(
+						'body',
+						':stat reference is missing the `stat` attribute, e.g. :stat{tank="atlas" stat="health"}'
+					);
+				}
+				if (!STAT_TOKEN_RE.test(stat)) {
+					throw new ContentValidationError('body', `:stat stat "${stat}" is not a valid stat name`);
+				}
+				const showRaw = directive.attributes?.show?.trim();
+				if (showRaw && !(SHOW_MODES as readonly string[]).includes(showRaw)) {
+					throw new ContentValidationError(
+						'body',
+						`:stat show "${showRaw}" must be one of: ${SHOW_MODES.join(', ')}`
+					);
+				}
+
+				// Store only the reference — the value is resolved against the live
+				// game-data bundle at render time (see $lib/server/game-data-refs.ts),
+				// so the number tracks the latest game data without re-editing.
+				const data =
+					(directive as DirectiveNode & {
+						data?: {
+							hName?: string;
+							hProperties?: Record<string, unknown>;
+							hChildren?: unknown[];
+						};
+					}).data ?? {};
+				data.hName = 'aggro-stat';
+				data.hProperties = {
+					'data-tank': tank,
+					'data-stat': stat,
+					'data-show': normalizeShow(showRaw)
+				};
+				data.hChildren = [];
+				(directive as DirectiveNode & { data?: unknown }).data = data;
+				return;
+			}
+
 			throw new ContentValidationError(
 				'body',
-				`Unknown directive ":::${name}". Only :::youtube and :::callout are allowed.`
+				`Unknown directive ":${name}". Only :::youtube, :::callout, and :stat are allowed.`
 			);
 		});
 	};
 }
 
 /**
+ * Resolve an image URL to its canonical form under the configured bucket
+ * prefix, or null when it isn't one of ours. URLs already under the prefix
+ * pass through unchanged. URLs whose *path* points into the article-images
+ * bucket but whose host differs are rewritten to the current host: articles
+ * published before a PUBLIC_SUPABASE_URL change (e.g. moving from the raw
+ * `*.supabase.co` project URL to a custom API domain) still store the old
+ * host in their markdown, and must keep validating when the body is
+ * re-sanitized (suggest-an-edit, approvals, previews all re-run the
+ * pipeline over stored markdown). The rewrite is safe because the output
+ * always points at our own bucket — a path that doesn't exist there just
+ * 404s, and hosts with a non-bucket path (imgur hotlinks etc.) are still
+ * rejected outright.
+ */
+export function canonicalizeArticleImageUrl(
+	src: string,
+	allowedPrefix: string
+): string | null {
+	if (!allowedPrefix) return null;
+	if (src.startsWith(allowedPrefix)) return src;
+	let parsed: URL;
+	try {
+		parsed = new URL(src);
+	} catch {
+		return null;
+	}
+	if (parsed.protocol !== 'https:') return null;
+	if (!parsed.pathname.startsWith(ARTICLE_IMAGE_BUCKET_PATH)) return null;
+	return new URL(parsed.pathname, allowedPrefix).toString();
+}
+
+/**
  * Restrict <img src> to our own storage bucket. Inline body images come from
  * the upload endpoint, which only writes to `article-images/` under
  * PUBLIC_SUPABASE_URL — anything else (imgur hotlinks, raw HTML <img> tags
- * pasted into markdown) is a content-validation error.
+ * pasted into markdown) is a content-validation error. Bucket URLs stored
+ * under a previous host are rewritten to the current one (see
+ * `canonicalizeArticleImageUrl`).
  *
  * Also strips srcset (we don't generate it; it's an injection vector if
  * accepted blindly) and forces lazy loading + async decoding for everything
@@ -145,16 +245,54 @@ function validateImageSources(allowedPrefix: string) {
 			if (el.tagName !== 'img') return;
 			const props = (el.properties ?? {}) as Record<string, unknown>;
 			const src = typeof props.src === 'string' ? props.src : null;
-			if (!src || !allowedPrefix || !src.startsWith(allowedPrefix)) {
+			const canonical = src ? canonicalizeArticleImageUrl(src, allowedPrefix) : null;
+			if (!canonical) {
 				throw new ContentValidationError(
 					'body',
 					'Images must be uploaded via the editor — external URLs are not allowed.'
 				);
 			}
+			props.src = canonical;
 			delete props.srcSet;
 			delete props.srcset;
 			props.loading = 'lazy';
 			props.decoding = 'async';
+			el.properties = props;
+		});
+	};
+}
+
+const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+/** Recursively collect the visible text of a HAST element (skips comments). */
+function hastTextContent(node: Node): string {
+	const el = node as Node & { type: string; value?: string; children?: Node[] };
+	if (el.type === 'text') return el.value ?? '';
+	if (!el.children) return '';
+	return el.children.map(hastTextContent).join('');
+}
+
+/**
+ * Assign a stable, URL-safe `id` to every heading so articles can be deep-linked
+ * to a section (the "linkable headline" behaviour). Runs AFTER rehype-sanitize
+ * on purpose: the sanitizer clobbers/strips `id` by default, so injecting our
+ * own ids downstream keeps full control and avoids loosening the schema. The
+ * slugs come from the (already sanitized) heading text via the shared slugger,
+ * so the SSR table of contents and the client DOM enhancement agree on ids.
+ */
+function assignHeadingIds() {
+	return (tree: Root) => {
+		const slugger = createHeadingSlugger();
+		visit(tree as unknown as Node, 'element', (node: Node) => {
+			const el = node as Node & {
+				tagName?: string;
+				properties?: Record<string, unknown> | null;
+			};
+			if (!el.tagName || !HEADING_TAGS.has(el.tagName)) return;
+			const text = hastTextContent(el).replace(/\s+/g, ' ').trim();
+			if (!text) return;
+			const props = (el.properties ?? {}) as Record<string, unknown>;
+			props.id = slugger(text);
 			el.properties = props;
 		});
 	};
@@ -184,13 +322,19 @@ export function getArticleImageHostPrefix(): string {
  * source itself is gated by `validateImageSources` upstream).
  */
 function buildSanitizeSchema(): Schema {
-	const tagNames = new Set([...(defaultSchema.tagNames ?? []), 'aggro-youtube', 'aggro-callout']);
+	const tagNames = new Set([
+		...(defaultSchema.tagNames ?? []),
+		'aggro-youtube',
+		'aggro-callout',
+		'aggro-stat'
+	]);
 	if (!tagNames.has('img')) tagNames.add('img');
 
 	const attributes: Schema['attributes'] = {
 		...(defaultSchema.attributes ?? {}),
 		'aggro-youtube': [['data-id'], ['data-title']],
 		'aggro-callout': [['data-type'], ['data-title']],
+		'aggro-stat': [['data-tank'], ['data-stat'], ['data-show']],
 		img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding']
 	};
 
@@ -218,6 +362,8 @@ function buildProcessor(imageHostPrefix: string) {
 		.use(remarkRehype, { allowDangerousHtml: false })
 		.use(validateImageSources, imageHostPrefix)
 		.use(rehypeSanitize, sanitizeSchema)
+		// After sanitize so the generated heading ids survive untouched.
+		.use(assignHeadingIds)
 		.use(rehypeStringify);
 }
 
@@ -418,7 +564,8 @@ export function computeContentHash(
 /**
  * Validate a hero/thumbnail URL against the same bucket-prefix rule that
  * `validateImageSources` enforces for inline body images. Returns the
- * trimmed URL, or null when the input is empty.
+ * canonicalized URL (stale bucket hosts are rewritten to the current one),
+ * or null when the input is empty.
  *
  * Pass `imageHostPrefix` to override the env-derived default (used by tests).
  */
@@ -433,13 +580,14 @@ export function assertHeroImageUrl(
 		throw new ContentValidationError('heroImageUrl', 'Hero image URL is too long.');
 	}
 	const prefix = imageHostPrefix ?? getArticleImageHostPrefix();
-	if (!prefix || !trimmed.startsWith(prefix)) {
+	const canonical = canonicalizeArticleImageUrl(trimmed, prefix);
+	if (!canonical) {
 		throw new ContentValidationError(
 			'heroImageUrl',
 			'Hero image must be uploaded via the editor — external URLs are not allowed.'
 		);
 	}
-	return trimmed;
+	return canonical;
 }
 
 export const BODY_MIN_CHARS = 200;

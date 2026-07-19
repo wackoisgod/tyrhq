@@ -28,6 +28,19 @@
 	let busy = $state(false);
 	let error = $state('');
 
+	// SvelteKit's error() serialises to {"message": "..."} — unwrap it so the
+	// user sees the message, not raw JSON.
+	async function readErrorMessage(res: Response): Promise<string> {
+		const text = await res.text();
+		try {
+			const parsed = JSON.parse(text);
+			if (parsed && typeof parsed.message === 'string') return parsed.message;
+		} catch {
+			// plain-text error body
+		}
+		return text || `Request failed (${res.status})`;
+	}
+
 	async function startSuggestEdit() {
 		if (busy) return;
 		busy = true;
@@ -37,7 +50,7 @@
 				method: 'POST'
 			});
 			if (!res.ok) {
-				error = await res.text();
+				error = await readErrorMessage(res);
 				return;
 			}
 			const { submissionId } = await res.json();
@@ -65,7 +78,7 @@
 				method: 'POST'
 			});
 			if (!res.ok) {
-				error = await res.text();
+				error = await readErrorMessage(res);
 				return;
 			}
 			await goto(listingHref(articleType));

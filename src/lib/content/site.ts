@@ -104,8 +104,8 @@ export const footerSections = [
 		title: 'Official Links',
 		links: [
 			{
-				href: 'https://stoke.firstlook.gg/?utm_source=playtyr&utm_content=playtyr-home',
-				label: 'Playtest'
+				href: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
+				label: 'Play Now'
 			},
 			{
 				href: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
@@ -134,7 +134,7 @@ export const siteCopy = {
 		'Tyr HQ is a third-party site and is not affiliated with, endorsed by, or operated by Stoke Games.',
 	rightsDisclaimer:
 		'Tyr and all related names, logos, game assets, and references remain the property of Stoke Games.',
-	playtestUrl: 'https://stoke.firstlook.gg/?utm_source=playtyr&utm_content=playtyr-home',
+	playtestUrl: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
 	wishlistUrl: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
 	newsUrl: 'https://store.steampowered.com/news/app/2445260',
 	discordUrl: 'https://discord.com/invite/tyr',

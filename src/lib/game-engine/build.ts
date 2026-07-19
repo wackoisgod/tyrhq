@@ -126,7 +126,12 @@ export type ComputedBuild = {
 	}>;
 };
 
-const attributeAliasMap = new Map<string, string>();
+const attributeAliasMap = new Map<string, string>([
+	// The engine drives all ability-cooldown modifiers (Power Converter, the per-vehicle
+	// "Ability Cooldown" tech-tree talents, the Sonar keystone, …) through the internal
+	// `AbilityCooldownTwo` attribute. Surface them on the displayed `AbilityCooldown` stat.
+	['AbilityCooldownTwo', 'AbilityCooldown']
+]);
 
 const componentEffectMappings = [
 	{ pattern: /MaxAndStartingEnergyMultiply/i, key: 'MaxAbilityResource', mode: 'mult' },
@@ -135,6 +140,9 @@ const componentEffectMappings = [
 	{ pattern: /MaxSpeedAndMaxReverseSpeedPercent/i, keys: ['MaxSpeed', 'MaxReverseSpeed'], mode: 'mult' },
 	{ pattern: /MaxSpeedPercent/i, key: 'MaxSpeed', mode: 'mult' },
 	{ pattern: /MaxSpeedFlat/i, key: 'MaxSpeed', mode: 'add' },
+	// ExtendedGearing's GE ships with empty modifiers, so the engine relies on the
+	// component's pointValue (e.g. 1.15) being applied as a Max Speed multiplier.
+	{ pattern: /ExtendedGearing/i, key: 'MaxSpeed', mode: 'mult' },
 	{ pattern: /MaxReverseSpeedPercent/i, key: 'MaxReverseSpeed', mode: 'mult' },
 	{ pattern: /MaxReverseSpeedFlat/i, key: 'MaxReverseSpeed', mode: 'add' },
 	{ pattern: /HullTraverse/i, key: 'HullTraverseSpeed', mode: 'add' },
@@ -710,7 +718,12 @@ export function computeBuild(
 			['TurretTraverseDispersionPenalty', m.dispersion],
 			['FiringDispersionPenalty', m.dispersion],
 			['DetectionRadius', m.detection],
-			['ShellVelocity', m.velocity]
+			['ShellVelocity', m.velocity],
+			// While-loaded vehicle speed effects from the ammo's equip effect
+			// (optional — only present on speed-altering rounds like Lightweight/Unstable).
+			['MaxSpeed', m.maxSpeed ?? 1],
+			['MaxReverseSpeed', m.reverseSpeed ?? 1],
+			['MaxStrafingSpeed', m.strafeSpeed ?? 1]
 		];
 		for (const [attribute, multiplier] of ammoTargets) {
 			if (!Number.isFinite(multiplier) || multiplier === 1) continue;
@@ -729,6 +742,11 @@ export function computeBuild(
 		const conditional = isConditionalComponent(component);
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
+		// True once we see a concrete, data-driven modifier — even one targeting an attribute we
+		// don't surface as a stat card (e.g. Catalytic Reservoir's CurrentAbilityResource). Such a
+		// component is fully described by its GE data, so we must NOT fall back to fuzzy
+		// description parsing (which would misread trigger wording like "land a penetration").
+		let hasDataDrivenModifier = false;
 		const componentEffects = [...new Set(component.effectIds)]
 			.map((effectId) => catalog.effectById.get(effectId))
 			.filter((effect): effect is EffectRecord => Boolean(effect));
@@ -742,9 +760,11 @@ export function computeBuild(
 
 			for (const modifier of effect.modifiers) {
 				const attribute = normalizeAttributeKey(modifier.attribute);
-				if (!attribute || !statKeySet.has(attribute)) continue;
+				if (!attribute) continue;
 				const value = getComponentModifierValue(modifier, component);
 				if (value === null) continue;
+				hasDataDrivenModifier = true;
+				if (!statKeySet.has(attribute)) continue;
 
 				const mode = getModifierModeFromOp(modifier.op) as ContributionMode;
 				pushContribution(
@@ -769,7 +789,7 @@ export function computeBuild(
 			appliedAny ||= effectApplied;
 		}
 
-		if (!appliedAny) {
+		if (!appliedAny && !hasDataDrivenModifier) {
 			const fallbackStacks = getFallbackStackCount(
 				componentEffects,
 				description,

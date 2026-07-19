@@ -8,9 +8,13 @@
 		applyPlannerOperation,
 		buildCompactState,
 		clonePlannerState,
+		createDefaultLayer,
 		createPlannerId,
 		parseCompactState,
+		DEFAULT_LAYER_ID,
+		MAX_PLANNER_LAYERS,
 		type CompactState,
+		type Layer,
 		type LineEnd,
 		type LineStyle,
 		type PlannerOperation,
@@ -63,6 +67,10 @@
 	const colors = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#ffffff'];
 	const FRIENDLY_COLOR = '#22c55e';
 	const ENEMY_COLOR = '#ef4444';
+	// Marker sizes in the 0–1000 overlay coordinate space (markers now live in
+	// the SVG so they obey layer order, scaling with the map like the drawings).
+	const STAMP_TANK_RADIUS_SVG = 28;
+	const STAMP_ZONE_SCALE = 1.4;
 	const HISTORY_LIMIT = 80;
 	const ZOOM_MIN = 1;
 	const ZOOM_MAX = 4;
@@ -131,10 +139,42 @@
 	let strokes = $state<Stroke[]>([]);
 	let stamps = $state<StampEntry[]>([]);
 	let shapes = $state<ShapeEntry[]>([]);
+	let layers = $state<Layer[]>([createDefaultLayer()]);
+	let activeLayerId = $state<string>(DEFAULT_LAYER_ID);
+	let renamingLayerId = $state<string | null>(null);
+	let renameDraft = $state('');
+	let movingLayerId = $state<string | null>(null);
+	let layerMoveDrag: {
+		layerId: string;
+		anchor: Point;
+		minDx: number;
+		maxDx: number;
+		minDy: number;
+		maxDy: number;
+		lastDx: number;
+		lastDy: number;
+		moved: boolean;
+		strokes: Map<string, Point[]>;
+		shapes: Map<string, { start: Point; end: Point }>;
+		stamps: Map<string, Point>;
+	} | null = null;
+	let layerNotice = $state<string | null>(null);
+	let layerNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 	let undoStack = $state<PlannerSnapshot[]>([]);
 	let redoStack = $state<PlannerSnapshot[]>([]);
 	let currentStroke = $state<Point[] | null>(null);
 	let currentShape = $state<ShapeDraft | null>(null);
+	// Two-finger pinch-to-zoom tracking. Active touch pointers are stored by id so
+	// a second finger landing on the map turns the gesture into a zoom rather than
+	// a stray brush stroke. Mouse and pen pointers are left untouched.
+	const activePointers = new Map<number, { x: number; y: number }>();
+	let pinch: {
+		startDist: number;
+		startZoom: number;
+		startScrollLeft: number;
+		startScrollTop: number;
+		startMid: Point;
+	} | null = null;
 	let draggingStamp = $state<{
 		id: string;
 		offsetX: number;
@@ -200,20 +240,6 @@
 			x: clampUnit(point.x),
 			y: clampUnit(point.y)
 		};
-	}
-
-	function formatSvgNumber(value: number) {
-		const rounded = Math.round(value * 1000) / 1000;
-		return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(3).replace(/\.?0+$/, '');
-	}
-
-	function escapeSvgText(value: string) {
-		return value
-			.replaceAll('&', '&amp;')
-			.replaceAll('<', '&lt;')
-			.replaceAll('>', '&gt;')
-			.replaceAll('"', '&quot;')
-			.replaceAll("'", '&#39;');
 	}
 
 	function withAlpha(hex: string, alpha: number) {
@@ -329,6 +355,67 @@
 		return null;
 	}
 
+	function svgStrokeCoord(value: number) {
+		return Math.round(value * 10000) / 10;
+	}
+
+	// Mirrors drawStrokePath's midpoint-quadratic smoothing, but emits an SVG
+	// path string in the 0–1000 overlay coordinate space so brush strokes can
+	// live in the same stacking context as shapes and obey layer order.
+	function buildStrokePathD(points: Point[]): string {
+		if (points.length === 0) return '';
+		let d = `M ${svgStrokeCoord(points[0].x)} ${svgStrokeCoord(points[0].y)}`;
+		if (points.length === 1) return d;
+		if (points.length === 2) {
+			return `${d} L ${svgStrokeCoord(points[1].x)} ${svgStrokeCoord(points[1].y)}`;
+		}
+		for (let i = 1; i < points.length - 2; i += 1) {
+			const current = points[i];
+			const next = points[i + 1];
+			const midX = (current.x + next.x) / 2;
+			const midY = (current.y + next.y) / 2;
+			d += ` Q ${svgStrokeCoord(current.x)} ${svgStrokeCoord(current.y)} ${svgStrokeCoord(midX)} ${svgStrokeCoord(midY)}`;
+		}
+		const penultimate = points[points.length - 2];
+		const last = points[points.length - 1];
+		d += ` Q ${svgStrokeCoord(penultimate.x)} ${svgStrokeCoord(penultimate.y)} ${svgStrokeCoord(last.x)} ${svgStrokeCoord(last.y)}`;
+		return d;
+	}
+
+	// Trims `back` units of length off the tail so a drawn arrowhead sits flush
+	// with the stroke end — the unit-space analogue of trimPointsForArrowEnd.
+	function trimStrokePointsForArrow(points: Point[], back: number): Point[] {
+		if (points.length < 2 || back <= 0) return points;
+		let remaining = back;
+		for (let i = points.length - 1; i > 0; i -= 1) {
+			const next = points[i];
+			const prev = points[i - 1];
+			const segLen = distanceBetween(next, prev);
+			if (segLen <= 0) continue;
+			if (segLen >= remaining) {
+				const t = remaining / segLen;
+				const trimmed = {
+					x: next.x - (next.x - prev.x) * t,
+					y: next.y - (next.y - prev.y) * t
+				};
+				return [...points.slice(0, i), trimmed];
+			}
+			remaining -= segLen;
+		}
+		return [points[0]];
+	}
+
+	function getStrokeSvgPathD(stroke: Stroke): string {
+		if (stroke.tool === 'pen' && stroke.endType === 'arrow') {
+			const terminal = getStrokeTerminalSegment(stroke.points);
+			const geometry = terminal ? getArrowGeometry(terminal.from, terminal.to, stroke.width) : null;
+			if (geometry) {
+				return buildStrokePathD(trimStrokePointsForArrow(stroke.points, geometry.back));
+			}
+		}
+		return buildStrokePathD(stroke.points);
+	}
+
 	function getPointerPos(e: PointerEvent | MouseEvent): Point {
 		const rect = containerEl.getBoundingClientRect();
 		return clampPoint({
@@ -364,6 +451,71 @@
 		}));
 	}
 
+	function cloneLayers(value: Layer[]): Layer[] {
+		return value.map((layer) => ({ ...layer }));
+	}
+
+	function ensureActiveLayer() {
+		if (layers.length === 0) {
+			layers = [createDefaultLayer()];
+		}
+		if (!layers.some((layer) => layer.id === activeLayerId)) {
+			activeLayerId = layers[layers.length - 1].id;
+		}
+	}
+
+	function layerFor(layerId: string | undefined): Layer | undefined {
+		if (layerId) {
+			const match = layers.find((layer) => layer.id === layerId);
+			if (match) return match;
+		}
+		return layers.find((layer) => layer.id === DEFAULT_LAYER_ID) ?? layers[0];
+	}
+
+	function isLayerVisible(layerId: string | undefined): boolean {
+		return layerFor(layerId)?.visible ?? true;
+	}
+
+	function isLayerLocked(layerId: string | undefined): boolean {
+		return layerFor(layerId)?.locked ?? false;
+	}
+
+	function layerOpacity(layerId: string | undefined): number {
+		return layerFor(layerId)?.opacity ?? 1;
+	}
+
+	// Returns true when an object is on a layer that is both visible and
+	// unlocked — the only objects the user can erase, select, or drag.
+	function isLayerEditable(layerId: string | undefined): boolean {
+		const layer = layerFor(layerId);
+		return (layer?.visible ?? true) && !(layer?.locked ?? false);
+	}
+
+	function flashLayerNotice(message: string) {
+		layerNotice = message;
+		if (layerNoticeTimer) clearTimeout(layerNoticeTimer);
+		layerNoticeTimer = setTimeout(() => {
+			layerNotice = null;
+			layerNoticeTimer = null;
+		}, 2600);
+	}
+
+	function layerRankOf(layerId: string | undefined): number {
+		const index = layers.findIndex((layer) => layer.id === layerId);
+		if (index !== -1) return index;
+		const fallback = layers.findIndex((layer) => layer.id === DEFAULT_LAYER_ID);
+		return fallback === -1 ? 0 : fallback;
+	}
+
+	// Stable sort that places objects on higher layers (later in the layer list)
+	// on top, while preserving creation order within a single layer.
+	function orderByLayer<T extends { layerId?: string }>(items: T[]): T[] {
+		return items
+			.map((item, index) => ({ item, index, rank: layerRankOf(item.layerId) }))
+			.sort((a, b) => a.rank - b.rank || a.index - b.index)
+			.map((entry) => entry.item);
+	}
+
 	function getPlannerStorageKey() {
 		return `${PLANNER_STORAGE_PREFIX}${minimapSrc}`;
 	}
@@ -372,6 +524,9 @@
 		strokes = [];
 		stamps = [];
 		shapes = [];
+		layers = [createDefaultLayer()];
+		activeLayerId = DEFAULT_LAYER_ID;
+		renamingLayerId = null;
 		undoStack = [];
 		redoStack = [];
 		currentStroke = null;
@@ -392,7 +547,8 @@
 		return clonePlannerState({
 			strokes,
 			stamps,
-			shapes
+			shapes,
+			layers
 		});
 	}
 
@@ -400,6 +556,9 @@
 		strokes = cloneStrokes(snapshot.strokes);
 		stamps = cloneStamps(snapshot.stamps);
 		shapes = cloneShapes(snapshot.shapes);
+		layers = cloneLayers(snapshot.layers);
+		ensureActiveLayer();
+		renamingLayerId = null;
 		currentStroke = null;
 		currentShape = null;
 		draggingStamp = null;
@@ -423,8 +582,79 @@
 		}
 	}
 
+	function clampZoom(next: number) {
+		return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+	}
+
 	function setZoom(next: number) {
-		zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 2) / 2));
+		// Button and wheel zooming snap to the 0.5 increments shown in the HUD;
+		// pinch zooming sets `zoom` directly through clampZoom for a smooth ramp.
+		zoom = clampZoom(Math.round(next * 2) / 2);
+	}
+
+	function beginPinch() {
+		// A second finger cancels whatever the first finger was drawing so the
+		// gesture reads as a zoom instead of leaving a stray stroke or shape.
+		currentStroke = null;
+		currentShape = null;
+		const pts = [...activePointers.values()];
+		const a = pts[0];
+		const b = pts[1];
+		pinch = {
+			startDist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+			startZoom: zoom,
+			startScrollLeft: viewportEl.scrollLeft,
+			startScrollTop: viewportEl.scrollTop,
+			startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+		};
+		// Capture both pointers so their moves keep flowing to the canvas even if a
+		// finger drifts over a marker or the toolbar mid-gesture.
+		for (const id of activePointers.keys()) {
+			try {
+				canvasEl.setPointerCapture(id);
+			} catch {
+				// setPointerCapture can throw if the pointer is already gone; ignore.
+			}
+		}
+		// Make sure the zoomed viewport keeps its scrollable height once we cross 1x.
+		captureBaseHeight();
+		redrawAll();
+	}
+
+	function updatePinch() {
+		if (!pinch || activePointers.size < 2) return;
+		const pts = [...activePointers.values()];
+		const a = pts[0];
+		const b = pts[1];
+		const dist = Math.hypot(a.x - b.x, a.y - b.y);
+		const midX = (a.x + b.x) / 2;
+		const midY = (a.y + b.y) / 2;
+		const targetZoom = clampZoom(pinch.startZoom * (dist / pinch.startDist));
+		zoom = targetZoom;
+
+		// Keep the content under the initial finger midpoint pinned beneath the
+		// fingers as they spread, pan, and pinch — same anchoring the wheel zoom
+		// does, generalised to a moving midpoint. Content pixels scale linearly
+		// with zoom, so a point at `local + scroll` in start-zoom pixels lands at
+		// `(local + scroll) * ratio` once the wrapper width grows.
+		const rect = viewportEl.getBoundingClientRect();
+		const ratio = targetZoom / pinch.startZoom;
+		const targetLeft =
+			(pinch.startMid.x - rect.left + pinch.startScrollLeft) * ratio - (midX - rect.left);
+		const targetTop =
+			(pinch.startMid.y - rect.top + pinch.startScrollTop) * ratio - (midY - rect.top);
+		tick().then(() => {
+			if (!pinch || !viewportEl) return;
+			viewportEl.scrollLeft = targetLeft;
+			viewportEl.scrollTop = targetTop;
+		});
+	}
+
+	function endPinch() {
+		pinch = null;
+		currentStroke = null;
+		currentShape = null;
+		redrawAll();
 	}
 
 	function onZoomWheel(e: WheelEvent) {
@@ -616,17 +846,6 @@
 		return segments.length > 0 ? segments.join(' ') : undefined;
 	}
 
-	function toExportSvgLength(px: number, displayWidth: number) {
-		return (px * 1000) / Math.max(displayWidth, 1);
-	}
-
-	function getExportSvgDashArray(style: LineStyle, width: number, displayWidth: number) {
-		const segments = getDashSegments(style, width).map((segment) =>
-			formatSvgNumber(toExportSvgLength(segment, displayWidth))
-		);
-		return segments.length > 0 ? segments.join(' ') : undefined;
-	}
-
 	function getShapeStrokeWidth(shape: ShapeEntry | ShapeDraft) {
 		return getDisplayLineWidth(shape.width);
 	}
@@ -775,17 +994,20 @@
 	function eraseAtPoint(point: Point): PlannerOperation | null {
 		for (let index = stamps.length - 1; index >= 0; index -= 1) {
 			const stamp = stamps[index];
+			if (!isLayerEditable(stamp.layerId)) continue;
 			if (!isStampHitByEraser(stamp, point)) continue;
 			return { type: 'delete_stamp', stampId: stamp.id };
 		}
 
 		for (let index = shapes.length - 1; index >= 0; index -= 1) {
 			const shape = shapes[index];
+			if (!isLayerEditable(shape.layerId)) continue;
 			if (!isShapeHitByEraser(shape, point)) continue;
 			return { type: 'delete_shape', shapeId: shape.id };
 		}
 
 		for (let index = strokes.length - 1; index >= 0; index -= 1) {
+			if (!isLayerEditable(strokes[index].layerId)) continue;
 			if (!isStrokeHitByEraser(strokes[index], point)) continue;
 			return { type: 'delete_stroke', strokeId: strokes[index].id };
 		}
@@ -892,7 +1114,8 @@
 		return {
 			strokes,
 			stamps,
-			shapes
+			shapes,
+			layers
 		};
 	}
 
@@ -903,6 +1126,8 @@
 		strokes = cloneStrokes(nextState.strokes);
 		stamps = cloneStamps(nextState.stamps);
 		shapes = cloneShapes(nextState.shapes);
+		layers = nextState.layers.length > 0 ? cloneLayers(nextState.layers) : [createDefaultLayer()];
+		ensureActiveLayer();
 		redrawAll();
 	}
 
@@ -930,12 +1155,18 @@
 
 	function persistPlannerDraft(storageKey: string) {
 		if (typeof window === 'undefined' || !plannerHydrated) return;
-		if (strokes.length === 0 && stamps.length === 0 && shapes.length === 0) {
+		const compact = buildCompactState(getPlannerState());
+		const isEmpty =
+			(compact.s?.length ?? 0) === 0 &&
+			(compact.t?.length ?? 0) === 0 &&
+			(compact.h?.length ?? 0) === 0 &&
+			!compact.y;
+		if (isEmpty) {
 			window.localStorage.removeItem(storageKey);
 			return;
 		}
 
-		window.localStorage.setItem(storageKey, JSON.stringify(buildCompactState(getPlannerState())));
+		window.localStorage.setItem(storageKey, JSON.stringify(compact));
 	}
 
 	function getPreviewPayload() {
@@ -1638,166 +1869,6 @@
 		drawZoneToCanvas(ctx, cx, cy, size, col);
 	}
 
-	function buildExportOverlaySvg(displayWidth: number) {
-		const elements: string[] = [];
-
-		for (const stamp of stamps) {
-			const tankInfo =
-				stamp.stamp === 'tank' && stamp.vehicleId
-					? tanks.find((tank) => tank.id === stamp.vehicleId)
-					: null;
-			if (!stamp.showVision || !tankInfo) continue;
-
-			const cx = toSvgCoord(stamp.pos.x);
-			const cy = toSvgCoord(stamp.pos.y);
-			const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR;
-			const radius = formatSvgNumber(getVisionRadiusSvg(tankInfo.vision));
-			const innerRadius = formatSvgNumber(Math.max(getVisionRadiusSvg(tankInfo.vision) * 0.5, 12));
-			const labelPos = getVisionLabelPosition(stamp);
-			const labelX = toSvgCoord(labelPos.x);
-			const labelY = toSvgCoord(labelPos.y);
-			const labelFontSize = formatSvgNumber(toExportSvgLength(10, displayWidth));
-			const outerStroke = formatSvgNumber(toExportSvgLength(5, displayWidth));
-			const midStroke = formatSvgNumber(toExportSvgLength(2.5, displayWidth));
-			const innerStroke = formatSvgNumber(toExportSvgLength(1.25, displayWidth));
-			const ringDash = `${formatSvgNumber(toExportSvgLength(16, displayWidth))} ${formatSvgNumber(toExportSvgLength(12, displayWidth))}`;
-
-			elements.push(
-				`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="rgba(8,12,18,0.42)" stroke-width="${outerStroke}" stroke-dasharray="${ringDash}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${withAlpha(ringColor, 0.035)}" stroke="${ringColor}" stroke-opacity="0.94" stroke-width="${midStroke}" stroke-dasharray="${ringDash}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="none" stroke="rgba(8,12,18,0.35)" stroke-width="${midStroke}"/>`,
-				`<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="none" stroke="${ringColor}" stroke-opacity="0.45" stroke-width="${innerStroke}"/>`,
-				`<text x="${labelX}" y="${labelY}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="${labelFontSize}" font-weight="700" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="rgba(8,12,18,0.82)" stroke-width="${formatSvgNumber(toExportSvgLength(3, displayWidth))}">${escapeSvgText(getVisionLabel(tankInfo.vision))}</text>`
-			);
-		}
-
-		for (const shape of shapes) {
-			const strokeWidth = formatSvgNumber(toExportSvgLength(getShapeStrokeWidth(shape), displayWidth));
-			const dashArray = getExportSvgDashArray(shape.lineStyle, getShapeStrokeWidth(shape), displayWidth);
-			const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
-
-			if (shape.kind === 'line') {
-				elements.push(
-					`<line x1="${toSvgCoord(shape.start.x)}" y1="${toSvgCoord(shape.start.y)}" x2="${toSvgCoord(shape.end.x)}" y2="${toSvgCoord(shape.end.y)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr} stroke-linecap="round" stroke-linejoin="round"/>`
-				);
-
-				if (shape.endType === 'arrow') {
-					const arrowPoints = getArrowHeadPoints(shape.start, shape.end, shape.width);
-					if (arrowPoints) {
-						elements.push(`<polygon points="${arrowPoints}" fill="${shape.color}"/>`);
-					}
-				} else if (shape.endType === 'stop') {
-					const stopCap = getStopCapSegment(shape.start, shape.end, shape.width);
-					if (stopCap) {
-						elements.push(
-							`<line x1="${toSvgCoord(stopCap.x1)}" y1="${toSvgCoord(stopCap.y1)}" x2="${toSvgCoord(stopCap.x2)}" y2="${toSvgCoord(stopCap.y2)}" stroke="${shape.color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`
-						);
-					}
-				}
-
-				continue;
-			}
-
-			if (shape.kind === 'measure') {
-				const radius = getMeasureRadius(shape);
-				const labelPos = getMeasureLabelPosition(shape);
-				const labelFontSize = formatSvgNumber(
-					toExportSvgLength(Math.max(14, getShapeStrokeWidth(shape) * 2.5), displayWidth)
-				);
-				elements.push(
-					`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius)}" fill="none" stroke="${shape.color}" stroke-width="${strokeWidth}"/>`,
-					`<line x1="${toSvgCoord(shape.start.x)}" y1="${toSvgCoord(shape.start.y)}" x2="${toSvgCoord(shape.end.x)}" y2="${toSvgCoord(shape.end.y)}" stroke="${shape.color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`,
-					`<text x="${toSvgCoord(labelPos.x)}" y="${toSvgCoord(labelPos.y)}" fill="${shape.color}" font-family="system-ui, sans-serif" font-size="${labelFontSize}" font-weight="700" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="rgba(18,22,30,0.78)" stroke-width="${formatSvgNumber(toExportSvgLength(Math.max(3, getShapeStrokeWidth(shape) * 0.42), displayWidth))}">${escapeSvgText(getMeasureLabel(shape))}</text>`
-				);
-				continue;
-			}
-
-			if (shape.kind === 'circle') {
-				const bounds = getShapeBounds(shape);
-				elements.push(
-					`<ellipse cx="${toSvgCoord(bounds.centerX)}" cy="${toSvgCoord(bounds.centerY)}" rx="${toSvgCoord(Math.max(bounds.width / 2, 0.015))}" ry="${toSvgCoord(Math.max(bounds.height / 2, 0.015))}" fill="${withAlpha(shape.color, 0.12)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`
-				);
-				continue;
-			}
-
-			if (shape.kind === 'rectangle') {
-				const bounds = getShapeBounds(shape);
-				elements.push(
-					`<rect x="${toSvgCoord(bounds.left)}" y="${toSvgCoord(bounds.top)}" width="${toSvgCoord(Math.max(bounds.width, 0.02))}" height="${toSvgCoord(Math.max(bounds.height, 0.02))}" fill="${withAlpha(shape.color, 0.1)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`
-				);
-				continue;
-			}
-
-			const radius = Math.max(distanceBetween(shape.start, shape.end), 0.026);
-			elements.push(
-				`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius * 1.35)}" fill="${withAlpha(shape.color, 0.12)}" stroke="${shape.color}" stroke-width="${strokeWidth}"${dashAttr}/>`,
-				`<circle cx="${toSvgCoord(shape.start.x)}" cy="${toSvgCoord(shape.start.y)}" r="${toSvgCoord(radius * 0.44)}" fill="none" stroke="${shape.color}" stroke-opacity="0.55" stroke-width="${formatSvgNumber(toExportSvgLength(Math.max(1, getShapeStrokeWidth(shape) * 0.6), displayWidth))}"/>`
-			);
-		}
-
-		for (const stamp of stamps) {
-			if (stamp.stamp !== 'zone') continue;
-			const col = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR;
-			const cx = toSvgCoord(stamp.pos.x);
-			const cy = toSvgCoord(stamp.pos.y);
-			const outerRadius = formatSvgNumber(toExportSvgLength(18, displayWidth));
-			const innerRadius = formatSvgNumber(toExportSvgLength(12, displayWidth));
-			const outerStroke = formatSvgNumber(toExportSvgLength(2.5, displayWidth));
-			const innerStroke = formatSvgNumber(toExportSvgLength(1, displayWidth));
-			const stemStroke = formatSvgNumber(toExportSvgLength(2, displayWidth));
-			const arrowX = formatSvgNumber(toExportSvgLength(4, displayWidth));
-			const arrowY = formatSvgNumber(toExportSvgLength(10, displayWidth));
-			const arrowTipX = formatSvgNumber(toExportSvgLength(8, displayWidth));
-
-			elements.push(
-				`<g transform="translate(${cx} ${cy})">`,
-				`<circle cx="0" cy="0" r="${outerRadius}" fill="${col}" opacity="0.2"/>`,
-				`<circle cx="0" cy="0" r="${outerRadius}" fill="none" stroke="${col}" stroke-width="${outerStroke}" stroke-dasharray="${formatSvgNumber(toExportSvgLength(6, displayWidth))} ${formatSvgNumber(toExportSvgLength(4, displayWidth))}"/>`,
-				`<circle cx="0" cy="0" r="${innerRadius}" fill="none" stroke="${col}" stroke-width="${innerStroke}" opacity="0.5"/>`,
-				`<line x1="-${arrowX}" y1="-${arrowY}" x2="-${arrowX}" y2="${arrowY}" stroke="${col}" stroke-width="${stemStroke}" stroke-linecap="round"/>`,
-				`<polygon points="-${arrowX},-${arrowY} ${arrowTipX},-${formatSvgNumber(toExportSvgLength(6, displayWidth))} -${arrowX},-${formatSvgNumber(toExportSvgLength(2, displayWidth))}" fill="${col}"/>`,
-				`<line x1="-${formatSvgNumber(toExportSvgLength(8, displayWidth))}" y1="${arrowY}" x2="0" y2="${arrowY}" stroke="${col}" stroke-width="${stemStroke}" stroke-linecap="round"/>`,
-				`</g>`
-			);
-		}
-
-		if (elements.length === 0) return null;
-
-		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">${elements.join('')}</svg>`;
-	}
-
-	function loadImage(src: string): Promise<HTMLImageElement> {
-		return new Promise((resolve, reject) => {
-			const image = new Image();
-			image.onload = () => resolve(image);
-			image.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-			image.src = src;
-		});
-	}
-
-	async function drawExportOverlay(
-		ctx: CanvasRenderingContext2D,
-		w: number,
-		h: number,
-		displayWidth: number
-	) {
-		const svg = buildExportOverlaySvg(displayWidth);
-		if (!svg) return false;
-
-		const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-
-		try {
-			const image = await loadImage(url);
-			ctx.drawImage(image, 0, 0, w, h);
-			return true;
-		} catch {
-			return false;
-		} finally {
-			URL.revokeObjectURL(url);
-		}
-	}
-
 	function buildPreviewStroke(points: Point[]): Stroke {
 		return {
 			id: createPlannerId('stroke'),
@@ -1818,11 +1889,12 @@
 		const h = canvasEl.height;
 		ctx.clearRect(0, 0, w, h);
 
-		for (const stroke of strokes) {
-			drawStroke(ctx, stroke, w, h);
-		}
+		// Committed strokes render in the SVG overlay (so they interleave with
+		// shapes by layer); the canvas only paints the in-progress brush preview.
 		if (preview?.stroke) {
+			ctx.globalAlpha = layerOpacity(activeLayerId);
 			drawStroke(ctx, preview.stroke, w, h);
+			ctx.globalAlpha = 1;
 		}
 	}
 
@@ -1970,16 +2042,41 @@
 
 	function onCanvasPointerDown(e: PointerEvent) {
 		if (e.button !== 0) return;
+		if (e.pointerType === 'touch') {
+			activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+			if (activePointers.size >= 2) {
+				beginPinch();
+				return;
+			}
+		}
 		if (room && !actorIdentityReady) return;
+		if (movingLayerId) {
+			beginLayerMove(e, movingLayerId);
+			return;
+		}
 		const pos = getCanvasPointerPos(e);
 		selectedShapeId = null;
+
+		// Drawing and placement always land on the active layer, so it has to be
+		// available to receive them — mirrors Photoshop refusing to paint on a
+		// hidden or locked layer.
+		if (toolMode !== 'eraser' && !isLayerEditable(activeLayerId)) {
+			const layer = layerFor(activeLayerId);
+			flashLayerNotice(
+				layer && layer.locked
+					? `“${layer.name}” is locked. Unlock it to draw here.`
+					: `“${layer?.name ?? 'Active layer'}” is hidden. Show it to draw here.`
+			);
+			return;
+		}
 
 		if (toolMode === 'stamp') {
 			const entry: StampEntry = {
 				id: createPlannerId('stamp'),
 				pos,
 				stamp: activeStamp,
-				side: activeSide
+				side: activeSide,
+				layerId: activeLayerId
 			};
 			if (activeStamp === 'tank' && tanks.length > 0) {
 				entry.vehicleId = tanks[0].id;
@@ -2012,7 +2109,8 @@
 				color: activeShape === 'measure' ? '#ffffff' : color,
 				width: getConfiguredStrokeWidth(lineWidth) * getDevicePixelRatio(),
 				lineStyle: activeShape === 'measure' ? 'solid' : lineStyle,
-				endType: activeShape === 'measure' ? 'none' : lineEnd
+				endType: activeShape === 'measure' ? 'none' : lineEnd,
+				layerId: activeLayerId
 			};
 			redrawAll();
 			return;
@@ -2023,6 +2121,17 @@
 	}
 
 	function onCanvasPointerMove(e: PointerEvent) {
+		if (e.pointerType === 'touch' && activePointers.has(e.pointerId)) {
+			activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		}
+		if (pinch) {
+			updatePinch();
+			return;
+		}
+		if (layerMoveDrag) {
+			updateLayerMove(e);
+			return;
+		}
 		if (currentShape) {
 			currentShape = {
 				...currentShape,
@@ -2051,6 +2160,19 @@
 	}
 
 	function onCanvasPointerUp(e?: PointerEvent) {
+		if (e && e.pointerType === 'touch') {
+			activePointers.delete(e.pointerId);
+		}
+		if (pinch) {
+			// Stay in pinch mode until both fingers lift; resuming a stroke from the
+			// lone remaining finger would draw an unwanted line out of the gesture.
+			if (activePointers.size < 2) endPinch();
+			return;
+		}
+		if (layerMoveDrag) {
+			endLayerMove();
+			return;
+		}
 		if (currentShape) {
 			if (currentShape.kind === 'measure') {
 				currentShape = null;
@@ -2088,7 +2210,8 @@
 				stroke: {
 					...buildPreviewStroke(currentStroke),
 					id: createPlannerId('stroke'),
-					tool: 'pen'
+					tool: 'pen',
+					layerId: activeLayerId
 				}
 			},
 			{ remember: true }
@@ -2111,6 +2234,10 @@
 				}
 				commitPlannerOperation(operation, { remember: false });
 			}
+			return;
+		}
+		if (isLayerLocked(stamp.layerId)) {
+			flashLayerNotice(`“${layerFor(stamp.layerId)?.name ?? 'Layer'}” is locked.`);
 			return;
 		}
 		stampDragMoved = false;
@@ -2204,6 +2331,10 @@
 			}
 			return;
 		}
+		if (isLayerLocked(shape.layerId)) {
+			flashLayerNotice(`“${layerFor(shape.layerId)?.name ?? 'Layer'}” is locked.`);
+			return;
+		}
 		selectedShapeId = shape.id;
 		shapeDragMoved = false;
 		draggingShape = {
@@ -2291,6 +2422,11 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		const mod = e.ctrlKey || e.metaKey;
+		if (e.key === 'Escape' && movingLayerId && !layerMoveDrag) {
+			e.preventDefault();
+			movingLayerId = null;
+			return;
+		}
 		if (!room && mod && e.key === 'z' && !e.shiftKey) {
 			e.preventDefault();
 			undo();
@@ -2300,6 +2436,9 @@
 		} else if (!mod && (e.key === 'Delete' || e.key === 'Backspace') && selectedShapeId !== null) {
 			e.preventDefault();
 			commitPlannerOperation({ type: 'delete_shape', shapeId: selectedShapeId }, { remember: true });
+		} else if (!mod && (e.key === 'Delete' || e.key === 'Backspace') && selectedStampId !== null) {
+			e.preventDefault();
+			commitPlannerOperation({ type: 'delete_stamp', stampId: selectedStampId }, { remember: true });
 		}
 	}
 
@@ -2325,6 +2464,243 @@
 		activeDrawer = activeDrawer === section ? null : section;
 	}
 
+	function selectActiveLayer(layerId: string) {
+		activeLayerId = layerId;
+		movingLayerId = null;
+	}
+
+	function addLayer() {
+		if (layers.length >= MAX_PLANNER_LAYERS) {
+			flashLayerNotice(`Layer limit reached (${MAX_PLANNER_LAYERS}).`);
+			return;
+		}
+		const layer: Layer = {
+			id: createPlannerId('layer'),
+			name: `Layer ${layers.length + 1}`,
+			visible: true,
+			locked: false,
+			opacity: 1
+		};
+		commitPlannerOperation({ type: 'add_layer', layer }, { remember: true });
+		activeLayerId = layer.id;
+	}
+
+	function deleteLayer(layerId: string) {
+		if (layers.length <= 1) {
+			flashLayerNotice('A plan needs at least one layer.');
+			return;
+		}
+		const layer = layerFor(layerId);
+		const count = layerObjectCounts.get(layerId) ?? 0;
+		if (count > 0 && typeof window !== 'undefined') {
+			const confirmed = window.confirm(
+				`Delete “${layer?.name ?? 'layer'}” and its ${count} item${count === 1 ? '' : 's'}?`
+			);
+			if (!confirmed) return;
+		}
+		if (renamingLayerId === layerId) renamingLayerId = null;
+		if (movingLayerId === layerId) movingLayerId = null;
+		commitPlannerOperation({ type: 'delete_layer', layerId }, { remember: true });
+	}
+
+	function toggleLayerVisible(layerId: string) {
+		const layer = layers.find((entry) => entry.id === layerId);
+		if (!layer) return;
+		commitPlannerOperation(
+			{ type: 'update_layer', layer: { ...layer, visible: !layer.visible } },
+			{ remember: true }
+		);
+	}
+
+	function toggleLayerLocked(layerId: string) {
+		const layer = layers.find((entry) => entry.id === layerId);
+		if (!layer) return;
+		commitPlannerOperation(
+			{ type: 'update_layer', layer: { ...layer, locked: !layer.locked } },
+			{ remember: true }
+		);
+	}
+
+	function setLayerOpacity(layerId: string, value: number) {
+		const layer = layers.find((entry) => entry.id === layerId);
+		if (!layer) return;
+		const opacity = Math.min(1, Math.max(0, value));
+		if (opacity === layer.opacity) return;
+		commitPlannerOperation(
+			{ type: 'update_layer', layer: { ...layer, opacity } },
+			{ remember: true }
+		);
+	}
+
+	// Reorder by direction expressed in render order: +1 brings the layer one
+	// step toward the front, -1 sends it one step back.
+	function reorderLayer(layerId: string, direction: 1 | -1) {
+		const index = layers.findIndex((entry) => entry.id === layerId);
+		if (index === -1) return;
+		const target = index + direction;
+		if (target < 0 || target >= layers.length) return;
+		const order = layers.map((entry) => entry.id);
+		[order[index], order[target]] = [order[target], order[index]];
+		commitPlannerOperation({ type: 'reorder_layers', order }, { remember: true });
+	}
+
+	function startLayerRename(layer: Layer) {
+		renamingLayerId = layer.id;
+		renameDraft = layer.name;
+	}
+
+	function commitLayerRename() {
+		const layerId = renamingLayerId;
+		if (!layerId) return;
+		const layer = layers.find((entry) => entry.id === layerId);
+		const name = renameDraft.trim().slice(0, 48);
+		renamingLayerId = null;
+		if (!layer || !name || name === layer.name) return;
+		commitPlannerOperation({ type: 'update_layer', layer: { ...layer, name } }, { remember: true });
+	}
+
+	function moveSelectionToActiveLayer() {
+		const objectIds: string[] = [];
+		if (selectedShapeId) objectIds.push(selectedShapeId);
+		if (selectedStampId) objectIds.push(selectedStampId);
+		if (objectIds.length === 0) {
+			flashLayerNotice('Select a shape or marker first.');
+			return;
+		}
+		commitPlannerOperation(
+			{ type: 'move_to_layer', targetLayerId: activeLayerId, objectIds },
+			{ remember: true }
+		);
+	}
+
+	function layerHasItems(layerId: string) {
+		return (layerObjectCounts.get(layerId) ?? 0) > 0;
+	}
+
+	function toggleMoveLayer(layerId: string) {
+		movingLayerId = movingLayerId === layerId ? null : layerId;
+	}
+
+	// Snapshot every object on the layer plus the slack it has before any of them
+	// would cross the map edge, so the whole group drags as one without deforming.
+	function beginLayerMove(e: PointerEvent, layerId: string) {
+		const belongs = (entryLayerId: string | undefined) =>
+			(entryLayerId ?? DEFAULT_LAYER_ID) === layerId;
+		const strokeMap = new Map<string, Point[]>();
+		const shapeMap = new Map<string, { start: Point; end: Point }>();
+		const stampMap = new Map<string, Point>();
+		let minX = 1;
+		let minY = 1;
+		let maxX = 0;
+		let maxY = 0;
+		const include = (point: Point) => {
+			if (point.x < minX) minX = point.x;
+			if (point.x > maxX) maxX = point.x;
+			if (point.y < minY) minY = point.y;
+			if (point.y > maxY) maxY = point.y;
+		};
+		for (const stroke of strokes) {
+			if (!belongs(stroke.layerId)) continue;
+			const points = stroke.points.map((point) => ({ ...point }));
+			strokeMap.set(stroke.id, points);
+			points.forEach(include);
+		}
+		for (const shape of shapes) {
+			if (!belongs(shape.layerId)) continue;
+			shapeMap.set(shape.id, { start: { ...shape.start }, end: { ...shape.end } });
+			include(shape.start);
+			include(shape.end);
+		}
+		for (const stamp of stamps) {
+			if (!belongs(stamp.layerId)) continue;
+			stampMap.set(stamp.id, { ...stamp.pos });
+			include(stamp.pos);
+		}
+		if (strokeMap.size + shapeMap.size + stampMap.size === 0) return;
+
+		canvasEl.setPointerCapture(e.pointerId);
+		layerMoveDrag = {
+			layerId,
+			anchor: getCanvasPointerPos(e),
+			minDx: -minX,
+			maxDx: 1 - maxX,
+			minDy: -minY,
+			maxDy: 1 - maxY,
+			lastDx: 0,
+			lastDy: 0,
+			moved: false,
+			strokes: strokeMap,
+			shapes: shapeMap,
+			stamps: stampMap
+		};
+	}
+
+	function updateLayerMove(e: PointerEvent) {
+		const drag = layerMoveDrag;
+		if (!drag) return;
+		const pos = getCanvasPointerPos(e);
+		const dx = Math.min(drag.maxDx, Math.max(drag.minDx, pos.x - drag.anchor.x));
+		const dy = Math.min(drag.maxDy, Math.max(drag.minDy, pos.y - drag.anchor.y));
+		if (!drag.moved && (Math.abs(dx) > 0.0004 || Math.abs(dy) > 0.0004)) {
+			if (!room) rememberState();
+			drag.moved = true;
+		}
+		drag.lastDx = dx;
+		drag.lastDy = dy;
+		strokes = strokes.map((stroke) => {
+			const original = drag.strokes.get(stroke.id);
+			return original
+				? { ...stroke, points: original.map((point) => ({ x: point.x + dx, y: point.y + dy })) }
+				: stroke;
+		});
+		shapes = shapes.map((shape) => {
+			const original = drag.shapes.get(shape.id);
+			return original
+				? {
+						...shape,
+						start: { x: original.start.x + dx, y: original.start.y + dy },
+						end: { x: original.end.x + dx, y: original.end.y + dy }
+					}
+				: shape;
+		});
+		stamps = stamps.map((stamp) => {
+			const original = drag.stamps.get(stamp.id);
+			return original ? { ...stamp, pos: { x: original.x + dx, y: original.y + dy } } : stamp;
+		});
+		redrawPlanner();
+	}
+
+	function endLayerMove() {
+		const drag = layerMoveDrag;
+		if (!drag) return;
+		layerMoveDrag = null;
+		const { lastDx: dx, lastDy: dy } = drag;
+		// Snap back to the originals so the committed delta is applied exactly once
+		// (and recorded as a single undo step / room event).
+		strokes = strokes.map((stroke) => {
+			const original = drag.strokes.get(stroke.id);
+			return original ? { ...stroke, points: original.map((point) => ({ ...point })) } : stroke;
+		});
+		shapes = shapes.map((shape) => {
+			const original = drag.shapes.get(shape.id);
+			return original
+				? { ...shape, start: { ...original.start }, end: { ...original.end } }
+				: shape;
+		});
+		stamps = stamps.map((stamp) => {
+			const original = drag.stamps.get(stamp.id);
+			return original ? { ...stamp, pos: { ...original } } : stamp;
+		});
+		if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) {
+			redrawPlanner();
+			return;
+		}
+		commitPlannerOperation(
+			{ type: 'translate_layer', layerId: drag.layerId, dx, dy },
+			{ remember: false }
+		);
+	}
+
 	function isActiveShape(kind: ShapeKind) {
 		return toolMode === 'shape' && activeShape === kind;
 	}
@@ -2342,6 +2718,8 @@
 
 	function getCursor() {
 		if (room && !actorIdentityReady) return 'not-allowed';
+		if (layerMoveDrag) return 'grabbing';
+		if (movingLayerId) return 'move';
 		if (draggingShape) return 'grabbing';
 		if (draggingStamp) return 'grabbing';
 		if (toolMode === 'stamp') return 'copy';
@@ -2404,33 +2782,23 @@
 		const exportScale = w / displayWidth;
 		const dpr = window.devicePixelRatio || 1;
 
-		for (const stroke of strokes) {
-			drawStroke(
-				ctx,
-				{
-					...stroke,
-					width: (stroke.width / dpr) * exportScale
-				},
-				w,
-				h
-			);
-		}
-
-		const overlayDrawn = await drawExportOverlay(ctx, w, h, displayWidth);
-		if (!overlayDrawn) {
-			for (const shape of shapes) {
+		// Strokes, shapes, and markers are drawn interleaved in layer order so the
+		// export matches the on-screen stacking instead of forcing every stroke
+		// beneath every shape and every marker on top.
+		const stampScale = exportScale * 1.2;
+		for (const item of orderedDrawables) {
+			ctx.globalAlpha = layerOpacity(item.layerId);
+			if (item.type === 'stroke') {
+				drawStroke(ctx, { ...item.stroke, width: (item.stroke.width / dpr) * exportScale }, w, h);
+			} else if (item.type === 'shape') {
 				drawShapeToCanvas(
 					ctx,
-					{
-						...shape,
-						width: (shape.width / dpr) * exportScale
-					},
+					{ ...item.shape, width: (item.shape.width / dpr) * exportScale },
 					w,
 					h
 				);
-			}
-
-			for (const stamp of stamps) {
+			} else {
+				const stamp = item.stamp;
 				const tankInfo =
 					stamp.stamp === 'tank' && stamp.vehicleId
 						? tanks.find((tank) => tank.id === stamp.vehicleId)
@@ -2438,14 +2806,10 @@
 				if (stamp.showVision && tankInfo) {
 					drawVisionRingToCanvas(ctx, stamp, tankInfo, w, h);
 				}
+				drawStampToCanvas(ctx, stamp, w, h, stampScale);
 			}
 		}
-
-		const stampScale = exportScale * 1.2;
-		for (const stamp of stamps) {
-			if (overlayDrawn && stamp.stamp === 'zone') continue;
-			drawStampToCanvas(ctx, stamp, w, h, stampScale);
-		}
+		ctx.globalAlpha = 1;
 
 		offscreen.toBlob((blob) => {
 			if (!blob) return;
@@ -2587,6 +2951,7 @@
 		strokes;
 		stamps;
 		shapes;
+		layers;
 		persistPlannerDraft(storageKey);
 	});
 
@@ -2727,8 +3092,43 @@
 		selectedShapeId !== null ? shapes.find((shape) => shape.id === selectedShapeId) ?? null : null
 	);
 	const isRoomMode = $derived(Boolean(room));
+	const isMovingLayer = $derived(movingLayerId !== null);
 	const canStartLiveRoom = $derived(Boolean(currentUser) && !room);
 	const hasContent = $derived(strokes.length > 0 || stamps.length > 0 || shapes.length > 0);
+	const activeLayer = $derived(layers.find((layer) => layer.id === activeLayerId) ?? layers[0] ?? null);
+	// The layer panel reads top-to-bottom (front layer first), the inverse of the
+	// bottom-to-top render order.
+	const layersTopFirst = $derived([...layers].slice().reverse());
+	const visibleShapes = $derived(orderByLayer(shapes.filter((s) => isLayerVisible(s.layerId))));
+	// Brush strokes, vector shapes, and markers all share one SVG stacking
+	// context so layer order — not the medium they render in — decides what sits
+	// on top. Within a single layer they paint strokes → shapes → markers,
+	// matching the prior top-to-bottom look.
+	const orderedDrawables = $derived(
+		orderByLayer([
+			...strokes
+				.filter((s) => isLayerVisible(s.layerId) && s.tool === 'pen')
+				.map((stroke) => ({ type: 'stroke' as const, id: stroke.id, layerId: stroke.layerId, stroke })),
+			...shapes
+				.filter((s) => isLayerVisible(s.layerId))
+				.map((shape) => ({ type: 'shape' as const, id: shape.id, layerId: shape.layerId, shape })),
+			...stamps
+				.filter((s) => isLayerVisible(s.layerId))
+				.map((stamp) => ({ type: 'stamp' as const, id: stamp.id, layerId: stamp.layerId, stamp }))
+		])
+	);
+	const layerObjectCounts = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const layer of layers) counts.set(layer.id, 0);
+		const bump = (layerId: string | undefined) => {
+			const id = layerFor(layerId)?.id;
+			if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+		};
+		for (const stroke of strokes) bump(stroke.layerId);
+		for (const stamp of stamps) bump(stamp.layerId);
+		for (const shape of shapes) bump(shape.layerId);
+		return counts;
+	});
 	const lineControlsEnabled = $derived(
 		toolMode === 'pen' ||
 			(toolMode === 'shape' &&
@@ -2745,12 +3145,13 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div>
-	<div
-		bind:this={viewportEl}
-		class="overflow-auto"
-		style={viewportBaseH > 0 && zoom > 1 ? `max-height: ${viewportBaseH}px;` : ''}
-		onwheel={onZoomWheel}
-	>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-start">
+		<div
+			bind:this={viewportEl}
+			class="min-w-0 flex-1 overflow-auto"
+			style={viewportBaseH > 0 && zoom > 1 ? `max-height: ${viewportBaseH}px;` : ''}
+			onwheel={onZoomWheel}
+		>
 		<div style={zoom > 1 ? `width: ${zoom * 100}%;` : ''}>
 			<div class="flex">
 				<div class="flex min-w-0 flex-1 flex-col">
@@ -2813,65 +3214,59 @@
 							viewBox="0 0 1000 1000"
 							preserveAspectRatio="none"
 						>
-							{#each stamps as stamp (stamp.id)}
-								{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
-								{@const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
-								{#if stamp.stamp === 'tank' && stamp.showVision && tankInfo}
-									{@const visionRadius = getVisionRadiusSvg(tankInfo.vision)}
-									<circle
-										cx={toSvgCoord(stamp.pos.x)}
-										cy={toSvgCoord(stamp.pos.y)}
-										r={visionRadius}
-										fill="none"
-										stroke="rgba(8,12,18,0.42)"
-										stroke-width="5"
-										stroke-dasharray="16 12"
-										vector-effect="non-scaling-stroke"
-									/>
-									<circle
-										cx={toSvgCoord(stamp.pos.x)}
-										cy={toSvgCoord(stamp.pos.y)}
-										r={visionRadius}
-										fill={withAlpha(ringColor, 0.035)}
-										stroke={ringColor}
-										stroke-opacity="0.94"
-										stroke-width="2.5"
-										stroke-dasharray="16 12"
-										vector-effect="non-scaling-stroke"
-									/>
-									<circle
-										cx={toSvgCoord(stamp.pos.x)}
-										cy={toSvgCoord(stamp.pos.y)}
-										r={Math.max(visionRadius * 0.5, 12)}
-										fill="none"
-										stroke="rgba(8,12,18,0.35)"
-										stroke-width="2.5"
-										vector-effect="non-scaling-stroke"
-									/>
-									<circle
-										cx={toSvgCoord(stamp.pos.x)}
-										cy={toSvgCoord(stamp.pos.y)}
-										r={Math.max(visionRadius * 0.5, 12)}
-										fill="none"
-										stroke={ringColor}
-										stroke-opacity="0.45"
-										stroke-width="1.25"
-										vector-effect="non-scaling-stroke"
-									/>
-								{/if}
-							{/each}
-
-							{#each shapes as shape (shape.id)}
-								<g
-									class={toolMode === 'eraser' ? 'pointer-events-none' : 'pointer-events-auto'}
-									role="button"
-									tabindex="-1"
-									onpointerdown={(e) => onShapePointerDown(e, shape)}
-									onpointermove={onShapePointerMove}
-									onpointerup={onShapePointerUp}
-									onpointercancel={onShapePointerUp}
-									oncontextmenu={(e) => deleteShape(e, shape.id)}
-								>
+							{#each orderedDrawables as item (item.type + ':' + item.id)}
+								{#if item.type === 'stroke'}
+									{@const stroke = item.stroke}
+									{@const strokeWidth = getDisplayStrokeWidth(stroke.width)}
+									{@const terminal =
+										stroke.endType !== 'none' ? getStrokeTerminalSegment(stroke.points) : null}
+									<g opacity={layerOpacity(stroke.layerId)} class="pointer-events-none">
+										<path
+											d={getStrokeSvgPathD(stroke)}
+											fill="none"
+											stroke={stroke.color}
+											stroke-width={strokeWidth}
+											stroke-dasharray={getSvgDashArray(stroke.lineStyle, strokeWidth)}
+											stroke-linecap={stroke.endType === 'arrow' ? 'butt' : 'round'}
+											stroke-linejoin="round"
+											vector-effect="non-scaling-stroke"
+										/>
+										{#if stroke.endType === 'arrow' && terminal}
+											<polygon
+												points={getArrowHeadPoints(terminal.from, terminal.to, stroke.width)}
+												fill={stroke.color}
+											/>
+										{:else if stroke.endType === 'stop' && terminal}
+											{@const stopCap = getStopCapSegment(terminal.from, terminal.to, stroke.width)}
+											{#if stopCap}
+												<line
+													x1={toSvgCoord(stopCap.x1)}
+													y1={toSvgCoord(stopCap.y1)}
+													x2={toSvgCoord(stopCap.x2)}
+													y2={toSvgCoord(stopCap.y2)}
+													stroke={stroke.color}
+													stroke-width={strokeWidth}
+													vector-effect="non-scaling-stroke"
+													stroke-linecap="round"
+												/>
+											{/if}
+										{/if}
+									</g>
+								{:else if item.type === 'shape'}
+									{@const shape = item.shape}
+									<g
+										opacity={layerOpacity(shape.layerId)}
+										class={toolMode === 'eraser' || isMovingLayer || isLayerLocked(shape.layerId)
+											? 'pointer-events-none'
+											: 'pointer-events-auto'}
+										role="button"
+										tabindex="-1"
+										onpointerdown={(e) => onShapePointerDown(e, shape)}
+										onpointermove={onShapePointerMove}
+										onpointerup={onShapePointerUp}
+										onpointercancel={onShapePointerUp}
+										oncontextmenu={(e) => deleteShape(e, shape.id)}
+									>
 									{#if shape.kind === 'line'}
 										{@const lineEnd = getLineDrawEnd(shape)}
 										{@const visibleCap = shape.endType === 'arrow' ? 'butt' : 'round'}
@@ -3081,6 +3476,68 @@
 										/>
 									{/if}
 								</g>
+								{:else}
+									{@const stamp = item.stamp}
+									{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
+									{@const ringColor = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
+									{@const cx = toSvgCoord(stamp.pos.x)}
+									{@const cy = toSvgCoord(stamp.pos.y)}
+									<g opacity={layerOpacity(stamp.layerId)}>
+										{#if stamp.stamp === 'tank' && stamp.showVision && tankInfo}
+											{@const visionRadius = getVisionRadiusSvg(tankInfo.vision)}
+											<g class="pointer-events-none">
+												<circle cx={cx} cy={cy} r={visionRadius} fill="none" stroke="rgba(8,12,18,0.42)" stroke-width="5" stroke-dasharray="16 12" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={visionRadius} fill={withAlpha(ringColor, 0.035)} stroke={ringColor} stroke-opacity="0.94" stroke-width="2.5" stroke-dasharray="16 12" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={Math.max(visionRadius * 0.5, 12)} fill="none" stroke="rgba(8,12,18,0.35)" stroke-width="2.5" vector-effect="non-scaling-stroke" />
+												<circle cx={cx} cy={cy} r={Math.max(visionRadius * 0.5, 12)} fill="none" stroke={ringColor} stroke-opacity="0.45" stroke-width="1.25" vector-effect="non-scaling-stroke" />
+											</g>
+										{/if}
+										<g
+											class={toolMode === 'eraser' || isMovingLayer || isLayerLocked(stamp.layerId)
+												? 'pointer-events-none'
+												: 'pointer-events-auto'}
+											style="cursor: {draggingStamp?.id === stamp.id ? 'grabbing' : 'grab'};"
+											role="button"
+											tabindex="-1"
+											onpointerdown={(e) => onStampPointerDown(e, stamp)}
+											onpointermove={onStampPointerMove}
+											onpointerup={onStampPointerUp}
+											onpointercancel={onStampPointerUp}
+											oncontextmenu={(e) => deleteStamp(e, stamp.id)}
+										>
+											{#if stamp.stamp === 'tank'}
+												<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} fill="#1a1d23" />
+												{#if stamp.vehicleId}
+													<clipPath id={`stamp-clip-${stamp.id}`}>
+														<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} />
+													</clipPath>
+													<image
+														href={`/images/vehicles/${stamp.vehicleId}.png`}
+														x={cx - STAMP_TANK_RADIUS_SVG}
+														y={cy - STAMP_TANK_RADIUS_SVG}
+														width={STAMP_TANK_RADIUS_SVG * 2}
+														height={STAMP_TANK_RADIUS_SVG * 2}
+														preserveAspectRatio="xMidYMid slice"
+														clip-path={`url(#stamp-clip-${stamp.id})`}
+													/>
+												{/if}
+												<circle cx={cx} cy={cy} r={STAMP_TANK_RADIUS_SVG} fill="none" stroke={ringColor} stroke-width="3" vector-effect="non-scaling-stroke" />
+												{#if stamp.showVision && tankInfo}
+													<text x={cx + STAMP_TANK_RADIUS_SVG + 8} y={cy} fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="700" dominant-baseline="middle" paint-order="stroke" stroke="rgba(8,12,18,0.78)" stroke-width="4" vector-effect="non-scaling-stroke">{getVisionLabel(tankInfo.vision)}</text>
+												{/if}
+											{:else}
+												<g transform={`translate(${cx} ${cy}) scale(${STAMP_ZONE_SCALE})`}>
+													<circle cx="0" cy="0" r="18" fill={ringColor} opacity="0.2" />
+													<circle cx="0" cy="0" r="18" fill="none" stroke={ringColor} stroke-width="2.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" />
+													<circle cx="0" cy="0" r="12" fill="none" stroke={ringColor} stroke-width="1" opacity="0.5" vector-effect="non-scaling-stroke" />
+													<line x1="-4" y1="-10" x2="-4" y2="10" stroke={ringColor} stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+													<polygon points="-4,-10 8,-6 -4,-2" fill={ringColor} />
+													<line x1="-8" y1="10" x2="0" y2="10" stroke={ringColor} stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+												</g>
+											{/if}
+										</g>
+									</g>
+								{/if}
 							{/each}
 
 							{#if currentShape}
@@ -3190,12 +3647,12 @@
 							{/if}
 						</svg>
 
-						{#each shapes as shape (shape.id)}
+						{#each visibleShapes as shape (shape.id)}
 							{#if shape.kind === 'measure'}
 								{@const labelPos = getMeasureLabelPosition(shape)}
 								<div
 									class="pointer-events-none absolute px-1 text-sm font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]"
-									style="left: {labelPos.x * 100}%; top: {labelPos.y * 100}%; transform: translate(-50%, -50%); z-index: 4;"
+									style="left: {labelPos.x * 100}%; top: {labelPos.y * 100}%; transform: translate(-50%, -50%); z-index: 4; opacity: {layerOpacity(shape.layerId)};"
 								>
 									{getMeasureLabel(shape)}
 								</div>
@@ -3211,112 +3668,6 @@
 								{getMeasureLabel(currentShape)}
 							</div>
 						{/if}
-
-						{#each stamps as stamp (stamp.id)}
-							{@const col = stamp.side === 'friendly' ? FRIENDLY_COLOR : ENEMY_COLOR}
-							{@const tankInfo = stamp.vehicleId ? tanks.find((tank) => tank.id === stamp.vehicleId) : null}
-							<div
-								class="stamp-overlay absolute {toolMode === 'eraser' ? 'pointer-events-none' : ''}"
-								style="
-									left: {stamp.pos.x * 100}%;
-									top: {stamp.pos.y * 100}%;
-									transform: translate(-50%, -50%);
-									cursor: {draggingStamp?.id === stamp.id ? 'grabbing' : 'grab'};
-									touch-action: none;
-									z-index: {draggingStamp?.id === stamp.id ? 20 : 10};
-								"
-								role="button"
-								tabindex="-1"
-								onpointerdown={(e) => onStampPointerDown(e, stamp)}
-								onpointermove={onStampPointerMove}
-								onpointerup={onStampPointerUp}
-								onpointercancel={onStampPointerUp}
-								oncontextmenu={(e) => deleteStamp(e, stamp.id)}
-							>
-								{#if stamp.stamp === 'tank'}
-									<div
-										class="pointer-events-none relative"
-										style="width: 44px; height: 44px;"
-										title={tankInfo?.name ?? 'Tank'}
-									>
-										<div
-											class="absolute inset-0 overflow-hidden rounded-full"
-											style="
-												border: 3px solid {col};
-												box-shadow: 0 2px 6px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.1);
-												background: #1a1d23;
-											"
-										>
-											{#if stamp.vehicleId}
-												<img
-													src="/images/vehicles/{stamp.vehicleId}.png"
-													alt={tankInfo?.name ?? ''}
-													class="absolute h-[130%] w-[130%] object-cover object-top"
-													style="top: -5%; left: -15%;"
-													draggable="false"
-												/>
-											{/if}
-										</div>
-										{#if stamp.showVision && tankInfo}
-											<div
-												class="absolute left-[calc(100%+0.4rem)] top-1/2 rounded-sm bg-[rgba(8,12,18,0.78)] px-1.5 py-0.5 text-[10px] font-bold tracking-[0.08em] text-white shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
-												style="transform: translateY(-50%);"
-											>
-												{getVisionLabel(tankInfo.vision)}
-											</div>
-										{/if}
-									</div>
-								{:else}
-									<svg
-										width="38"
-										height="38"
-										viewBox="-22 -22 44 44"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-										class="pointer-events-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
-									>
-										<circle cx="0" cy="0" r="18" fill={col} opacity="0.2" />
-										<circle
-											cx="0"
-											cy="0"
-											r="18"
-											fill="none"
-											stroke={col}
-											stroke-width="2.5"
-											stroke-dasharray="6 4"
-										/>
-										<circle
-											cx="0"
-											cy="0"
-											r="12"
-											fill="none"
-											stroke={col}
-											stroke-width="1"
-											opacity="0.5"
-										/>
-										<line
-											x1="-4"
-											y1="-10"
-											x2="-4"
-											y2="10"
-											stroke={col}
-											stroke-width="2"
-											stroke-linecap="round"
-										/>
-										<polygon points="-4,-10 8,-6 -4,-2" fill={col} />
-										<line
-											x1="-8"
-											y1="10"
-											x2="0"
-											y2="10"
-											stroke={col}
-											stroke-width="2"
-											stroke-linecap="round"
-										/>
-									</svg>
-								{/if}
-							</div>
-						{/each}
 					</div>
 
 					<div class="flex h-5 bg-[var(--hud-surface)]">
@@ -3346,6 +3697,196 @@
 				</div>
 			</div>
 		</div>
+		</div>
+
+		<aside
+			class="flex shrink-0 flex-col gap-2 rounded-sm bg-[var(--hud-panel-mid)] p-2 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.18)] lg:w-52"
+			aria-label="Layers"
+		>
+			<div class="flex items-center justify-between gap-2">
+				<p class="hud-eyebrow tracking-[0.18em]">Layers</p>
+				<div class="flex items-center gap-1.5">
+					<span class="hud-numeric text-[10px] text-[var(--hud-muted)]">
+						{layers.length}/{MAX_PLANNER_LAYERS}
+					</span>
+					<button
+						class="{tbtn} {tIdle} disabled:opacity-30"
+						onclick={addLayer}
+						disabled={layers.length >= MAX_PLANNER_LAYERS}
+						title="Add a new layer on top"
+					>
+						+ Add
+					</button>
+				</div>
+			</div>
+
+			<ul class="flex max-h-[55vh] flex-col gap-1 overflow-y-auto lg:max-h-[60vh]">
+				{#each layersTopFirst as layer (layer.id)}
+					{@const renderIndex = layerRankOf(layer.id)}
+					{@const count = layerObjectCounts.get(layer.id) ?? 0}
+					{@const isActive = layer.id === activeLayerId}
+					<li
+						class="rounded-sm shadow-[inset_0_0_0_1px_rgba(69,73,50,0.18)] {isActive
+							? 'bg-[var(--hud-teal)]/12 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.18)]'
+							: 'bg-[var(--hud-panel)]/55'}"
+					>
+						<div class="flex items-center gap-1.5 px-1.5 py-1">
+							<button
+								class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-text)]"
+								onclick={() => toggleLayerVisible(layer.id)}
+								title={layer.visible ? 'Hide layer' : 'Show layer'}
+								aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
+							>
+								{#if layer.visible}
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+										<circle cx="8" cy="8" r="2" />
+									</svg>
+								{:else}
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M1.5 8S4 3.5 8 3.5c1 0 1.9.3 2.7.6M14.5 8s-1 1.8-2.9 3" />
+										<path d="M6.3 6.3a2 2 0 0 0 2.8 2.8" />
+										<path d="M2.5 2.5l11 11" />
+									</svg>
+								{/if}
+							</button>
+
+							{#if renamingLayerId === layer.id}
+								<input
+									type="text"
+									bind:value={renameDraft}
+									maxlength="48"
+									class="min-w-0 flex-1 rounded-sm bg-[var(--hud-panel)]/80 px-1.5 py-0.5 text-xs text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.3)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+									onblur={commitLayerRename}
+									onkeydown={(e) => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											commitLayerRename();
+										} else if (e.key === 'Escape') {
+											e.preventDefault();
+											renamingLayerId = null;
+										}
+									}}
+								/>
+							{:else}
+								<button
+									class="min-w-0 flex-1 truncate text-left text-xs font-semibold {isActive
+										? 'text-[var(--hud-teal)]'
+										: 'text-[var(--hud-text)]'} {layer.visible ? '' : 'opacity-50'}"
+									onclick={() => selectActiveLayer(layer.id)}
+									ondblclick={() => startLayerRename(layer)}
+									title="Click to make active · double-click to rename"
+								>
+									{layer.name}
+								</button>
+							{/if}
+
+							<span class="hud-numeric shrink-0 text-[10px] text-[var(--hud-muted)]">{count}</span>
+						</div>
+
+						{#if isActive}
+							<div class="flex items-center gap-0.5 border-t border-[var(--hud-outline-variant)]/30 px-1.5 py-1">
+								<button
+									class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm transition {layer.locked
+										? 'text-[var(--hud-teal)]'
+										: 'text-[var(--hud-dim)] hover:text-[var(--hud-text)]'}"
+									onclick={() => toggleLayerLocked(layer.id)}
+									title={layer.locked ? 'Unlock layer' : 'Lock layer'}
+									aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+								>
+									{#if layer.locked}
+										<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<rect x="3.5" y="7" width="9" height="6" rx="1" />
+											<path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+										</svg>
+									{:else}
+										<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<rect x="3.5" y="7" width="9" height="6" rx="1" />
+											<path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" />
+										</svg>
+									{/if}
+								</button>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => reorderLayer(layer.id, 1)}
+									disabled={renderIndex >= layers.length - 1}
+									title="Move layer forward"
+									aria-label="Move layer forward"
+								>
+									↑
+								</button>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => reorderLayer(layer.id, -1)}
+									disabled={renderIndex <= 0}
+									title="Move layer back"
+									aria-label="Move layer back"
+								>
+									↓
+								</button>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									step="5"
+									value={Math.round(layer.opacity * 100)}
+									class="ml-1 min-w-0 flex-1 accent-[var(--hud-teal)]"
+									title="Layer opacity"
+									aria-label="Layer opacity"
+									onchange={(e) =>
+										setLayerOpacity(layer.id, Number((e.currentTarget as HTMLInputElement).value) / 100)}
+								/>
+								<button
+									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
+									onclick={() => deleteLayer(layer.id)}
+									disabled={layers.length <= 1}
+									title="Delete layer and its contents"
+									aria-label="Delete layer"
+								>
+									✕
+								</button>
+							</div>
+							<div class="px-1.5 pb-1.5">
+								<button
+									class="{tbtn} flex w-full items-center justify-center gap-1.5 {movingLayerId === layer.id
+										? tActive
+										: tIdle} disabled:opacity-30"
+									onclick={() => toggleMoveLayer(layer.id)}
+									disabled={!layerHasItems(layer.id)}
+									title="Drag everything on this layer to reposition it together"
+								>
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M8 1.5v13M1.5 8h13" />
+										<path d="M8 1.5 6 3.5M8 1.5l2 2M8 14.5l-2-2M8 14.5l2-2M1.5 8l2-2M1.5 8l2 2M14.5 8l-2-2M14.5 8l-2 2" />
+									</svg>
+									{movingLayerId === layer.id ? 'Drag map · Esc to stop' : 'Move Layer Items'}
+								</button>
+							</div>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+
+			{#if selectedShape || selectedStamp}
+				<button
+					class="{tbtn} {tIdle} disabled:opacity-30"
+					onclick={moveSelectionToActiveLayer}
+					title="Move the selected shape or marker onto the active layer"
+				>
+					Move Selection Here
+				</button>
+			{/if}
+
+			{#if layerNotice}
+				<p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ffd166]">
+					{layerNotice}
+				</p>
+			{:else}
+				<p class="text-[10px] leading-snug text-[var(--hud-dim)]">
+					Click a layer to draw on it. Drag the stack to change what sits on top.
+				</p>
+			{/if}
+		</aside>
 	</div>
 
 	<div
@@ -3861,13 +4402,18 @@
 		<div
 			class="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--hud-outline-variant)]/40 pt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 		>
-			<span>
-				{#if selectedShape}
+			<span class={layerNotice || isMovingLayer ? 'text-[#ffd166]' : ''}>
+				{#if layerNotice}
+					{layerNotice}
+				{:else if isMovingLayer}
+					Move mode: drag anywhere on the map to reposition everything on “{activeLayer?.name ??
+						'—'}”. Press Esc to stop.
+				{:else if selectedShape}
 					Selected {selectedShape.kind}. Drag it to reposition, or press Delete to clear it.
 				{:else if isRoomMode}
 					Live room sync publishes each completed action. In-progress brush strokes stay local until release.
 				{:else}
-					Open the drawers to tune style, markers, and actions without crowding the command bar.
+					Drawing on “{activeLayer?.name ?? '—'}”. Use the Layers panel to add, hide, lock, or reorder.
 				{/if}
 			</span>
 			<span>

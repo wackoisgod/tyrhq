@@ -2,12 +2,16 @@
 	import '../app.css';
 	import { buildNavigation, footerSections, siteCopy } from '$lib/content/site';
 	import { getAbsoluteUrl } from '$lib/site-url';
+	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { createBrowserClient } from '@supabase/ssr';
+	import { injectAnalytics } from '@vercel/analytics/sveltekit';
 	import { env } from '$env/dynamic/public';
 	import NavFlyout from '$lib/components/nav/NavFlyout.svelte';
+
+	injectAnalytics({ mode: dev ? 'development' : 'production' });
 
 	let { children, data } = $props();
 
@@ -137,7 +141,7 @@
 							rel="noreferrer"
 							class="hud-cta tyr-primary-cta tyr-header-button px-6 py-3"
 						>
-							Join The Playtest
+							Play Now
 						</a>
 					</div>
 				</div>

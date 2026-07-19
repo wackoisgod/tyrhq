@@ -8,9 +8,11 @@
 		Color,
 		AnimationMixer,
 		FrontSide,
+		InstancedMesh,
 		LinearFilter,
 		LoopOnce,
 		LoopRepeat,
+		Matrix4,
 		Mesh as ThreeMesh,
 		MeshStandardMaterial,
 		NearestFilter,
@@ -99,6 +101,13 @@
 	let deployedAnimationAction: AnimationAction | null = null;
 	let deployedAnimationRunning = $state(false);
 	let deployedBasePose: DeployedBasePose | null = null;
+
+	type TrackBoneRest = { node: Object3D; rest: Matrix4; pos: Vector3 };
+	type TrackSkinPart = { mesh: InstancedMesh; bones: Object3D[]; relatives: Matrix4[] };
+	let trackSkinParts: TrackSkinPart[] | null = null;
+	let trackSkinRoot: Object3D | null = null;
+	const trackSkinInvRoot = new Matrix4();
+	const trackSkinTmp = new Matrix4();
 	let lastSyncedDeployedMode: boolean | null = null;
 
 	const AUTO_BOUNCE_ANGLE = 80;
@@ -155,13 +164,8 @@
 			mask = 0.0;
 
 			if (vIsModule > 0.5) {
-				if (vIsAbsorb > 0.5) {
-					fillColor = vec3(0.35, 0.01, 0.24);
-					outlineColor = vec3(1.00, 0.04, 0.68);
-				} else {
-					fillColor = vec3(0.09, 0.20, 0.75);
-					outlineColor = vec3(0.00, 0.23, 1.00);
-				}
+				fillColor = vec3(0.09, 0.20, 0.75);
+				outlineColor = vec3(0.00, 0.23, 1.00);
 				mask = 1.0;
 				return;
 			}
@@ -465,6 +469,119 @@
 		});
 	}
 
+	type TrackTread = { mesh: string; instances: number[][] };
+	type TracksData = { vehicleId: string; treads: TrackTread[] };
+
+	function loadTracksData(currentVehicleId: string) {
+		return fetch(`/models/vehicles/${currentVehicleId}-tracks.json`)
+			.then((response) => (response.ok ? (response.json() as Promise<TracksData>) : null))
+			.catch(() => null);
+	}
+
+	function loadGlbMesh(url: string) {
+		return new Promise<ThreeMesh | null>((resolve) => {
+			gltfLoader.load(
+				url,
+				(gltf) => resolve(findFirstMesh(gltf.scene) as ThreeMesh | null),
+				undefined,
+				() => resolve(null)
+			);
+		});
+	}
+
+	// Tracks are one or more tread-link meshes (left/right may differ) instanced
+	// along the authored spline; per-link transforms are baked (glTF space) into
+	// <id>-tracks.json by the exporter. Returns a group of InstancedMeshes.
+	async function buildTracks(tracksData: TracksData | null): Promise<Object3D | null> {
+		if (!tracksData?.treads?.length) return null;
+		const group = new Object3D();
+		group.name = 'ProceduralTracks';
+		const matrix = new Matrix4();
+		for (const tread of tracksData.treads) {
+			if (!tread.instances?.length) continue;
+			const mesh = await loadGlbMesh(`/models/vehicles/${tread.mesh}`);
+			if (!mesh) continue;
+			const instanced = new InstancedMesh(
+				mesh.geometry as BufferGeometry,
+				mesh.material as Material | Material[],
+				tread.instances.length
+			);
+			instanced.frustumCulled = false;
+			tread.instances.forEach((values, index) => {
+				matrix.fromArray(values);
+				instanced.setMatrixAt(index, matrix);
+			});
+			instanced.instanceMatrix.needsUpdate = true;
+			group.add(instanced);
+		}
+		return group.children.length ? group : null;
+	}
+
+	// Track/wheel/suspension bones (the ones that fold a tank's tracks during deploy).
+	const TRACK_BONE_PATTERN = /wheel|tread|cog|susp/;
+
+	function gatherTrackBones(root: Object3D): TrackBoneRest[] {
+		root.updateWorldMatrix(true, true);
+		const invRoot = new Matrix4().copy(root.matrixWorld).invert();
+		const bones: TrackBoneRest[] = [];
+		root.traverse((node) => {
+			const name = node.name.toLowerCase();
+			if (!name.startsWith('jnt_') || !TRACK_BONE_PATTERN.test(name)) return;
+			const rest = new Matrix4().multiplyMatrices(invRoot, node.matrixWorld);
+			bones.push({ node, rest, pos: new Vector3().setFromMatrixPosition(rest) });
+		});
+		return bones;
+	}
+
+	// Bind each baked tread instance to its nearest track/wheel bone so the tracks
+	// follow the skeleton (e.g. VTOL folding its tracks on deploy). `relatives[i]` is
+	// the instance expressed in that bone's rest frame; each frame we recombine it
+	// with the bone's live transform. The in-game tracks reshape a spline from these
+	// same bones — this is a per-link approximation of that.
+	function bindTrackSkinning(group: Object3D, bones: TrackBoneRest[]): TrackSkinPart[] | null {
+		if (!bones.length) return null;
+		const parts: TrackSkinPart[] = [];
+		const instMat = new Matrix4();
+		const instPos = new Vector3();
+		group.traverse((child) => {
+			const mesh = child as InstancedMesh;
+			if (!(mesh as { isInstancedMesh?: boolean }).isInstancedMesh) return;
+			const boneNodes: Object3D[] = [];
+			const relatives: Matrix4[] = [];
+			for (let i = 0; i < mesh.count; i++) {
+				mesh.getMatrixAt(i, instMat);
+				instPos.setFromMatrixPosition(instMat);
+				let best = bones[0];
+				let bestDist = Infinity;
+				for (const bone of bones) {
+					const dist = instPos.distanceToSquared(bone.pos);
+					if (dist < bestDist) {
+						bestDist = dist;
+						best = bone;
+					}
+				}
+				boneNodes.push(best.node);
+				relatives.push(new Matrix4().copy(best.rest).invert().multiply(instMat));
+			}
+			parts.push({ mesh, bones: boneNodes, relatives });
+		});
+		return parts;
+	}
+
+	function updateTrackSkinning() {
+		if (!trackSkinParts || !trackSkinRoot) return;
+		trackSkinInvRoot.copy(trackSkinRoot.matrixWorld).invert();
+		for (const part of trackSkinParts) {
+			for (let i = 0; i < part.bones.length; i++) {
+				trackSkinTmp
+					.multiplyMatrices(trackSkinInvRoot, part.bones[i].matrixWorld)
+					.multiply(part.relatives[i]);
+				part.mesh.setMatrixAt(i, trackSkinTmp);
+			}
+			part.mesh.instanceMatrix.needsUpdate = true;
+		}
+	}
+
 	function loadDeployedAnimationClip(currentVehicleId: string, clipName: DeployedClipName) {
 		return new Promise<AnimationClip | null>((resolve) => {
 			gltfLoader.load(
@@ -480,6 +597,57 @@
 		});
 	}
 
+	// Deployed clips ship in two authoring formats: older exports store each track as an
+	// offset from the bind pose ("delta"), while newer exports bake the final local
+	// transform ("absolute"). Combining an absolute clip with the bind pose again doubles
+	// every joint and scatters the model apart, so we detect the format before normalizing.
+	// Heuristic: for joints that sit away from the origin, the average position over the
+	// clip lands near the bind pose for absolute clips and near zero for delta clips.
+	function isDeltaPoseClip(clip: AnimationClip, nodesByName: Map<string, Object3D>) {
+		let absoluteVotes = 0;
+		let deltaVotes = 0;
+
+		for (const track of clip.tracks) {
+			const separatorIndex = track.name.lastIndexOf('.');
+			if (separatorIndex < 1) continue;
+			if (track.name.slice(separatorIndex + 1) !== 'position') continue;
+
+			const target = nodesByName.get(track.name.slice(0, separatorIndex));
+			if (!target) continue;
+
+			const base = target.position;
+			// Joints sitting at the origin read the same in both formats, so they can't vote.
+			if (base.length() < 0.1) continue;
+
+			const frameCount = track.values.length / 3;
+			if (frameCount === 0) continue;
+
+			let meanX = 0;
+			let meanY = 0;
+			let meanZ = 0;
+			for (let index = 0; index < track.values.length; index += 3) {
+				meanX += track.values[index];
+				meanY += track.values[index + 1];
+				meanZ += track.values[index + 2];
+			}
+			meanX /= frameCount;
+			meanY /= frameCount;
+			meanZ /= frameCount;
+
+			const distanceToAbsolute = Math.hypot(meanX - base.x, meanY - base.y, meanZ - base.z);
+			const distanceToDelta = Math.hypot(meanX, meanY, meanZ);
+			if (distanceToDelta <= distanceToAbsolute) {
+				deltaVotes += 1;
+			} else {
+				absoluteVotes += 1;
+			}
+		}
+
+		// Default to delta when there is no usable signal so legacy offset-authored clips
+		// keep working unchanged.
+		return deltaVotes >= absoluteVotes;
+	}
+
 	function normalizeDeployedAnimationClip(clip: AnimationClip | null, root: Object3D) {
 		if (!clip) return null;
 
@@ -491,6 +659,7 @@
 		});
 
 		const sanitizedClip = clip.clone();
+		const treatAsDelta = isDeltaPoseClip(sanitizedClip, nodesByName);
 		sanitizedClip.tracks = sanitizedClip.tracks.filter((track) => {
 			const separatorIndex = track.name.lastIndexOf('.');
 			if (separatorIndex < 1) return true;
@@ -503,6 +672,10 @@
 			if (propertyName === 'scale') {
 				return !track.values.every((value) => Math.abs(value) < 0.000001);
 			}
+
+			// Absolute clips already hold the final local transform; only delta clips need
+			// to be combined with the bind pose.
+			if (!treatAsDelta) return true;
 
 			if (propertyName === 'position') {
 				for (let index = 0; index < track.values.length; index += 3) {
@@ -918,6 +1091,7 @@
 			if (deployedAnimationMixer) {
 				deployedAnimationMixer.update(getDeployedAnimationDelta());
 				copyPoseByName();
+				updateTrackSkinning();
 			}
 
 			const activeCamera = camera.current;
@@ -1041,9 +1215,10 @@
 			loadArmorData(currentVehicleId),
 			loadArmorAsset(currentVehicleId),
 			loadVisualScene(currentVehicleId),
-			loadDeployedAnimationClips(currentVehicleId)
+			loadDeployedAnimationClips(currentVehicleId),
+			loadTracksData(currentVehicleId)
 		])
-			.then(([nextArmorData, armorAsset, visualScene, animationClips]) => {
+			.then(([nextArmorData, armorAsset, visualScene, animationClips, tracksData]) => {
 				if (cancelled) {
 					disposeObject(armorAsset.root);
 					disposeObject(visualScene);
@@ -1059,6 +1234,25 @@
 					visualScene != null
 						? prepareVisualScene(visualScene)
 						: buildFallbackVisualMesh(localArmorMesh.geometry as BufferGeometry);
+				// Tracks load their own GLB(s) asynchronously, then each tread link is
+				// skinned to its nearest track/wheel bone so the tracks follow the body —
+				// including folding during a deploy animation (rest bones captured below).
+				const trackVisualRoot = localVisualRoot;
+				let restTrackBones: TrackBoneRest[] = [];
+				buildTracks(tracksData).then((tracks) => {
+					if (cancelled || !tracks) {
+						if (tracks) disposeObject(tracks);
+						return;
+					}
+					trackVisualRoot.add(tracks);
+					const parts = bindTrackSkinning(tracks, restTrackBones);
+					if (parts) {
+						trackSkinParts = parts;
+						trackSkinRoot = trackVisualRoot;
+						updateTrackSkinning();
+					}
+					invalidate();
+				});
 				localBasePose = captureDeployedBasePose(localArmorRoot);
 				const normalizedAnimationClips = animationClips
 					? {
@@ -1083,6 +1277,8 @@
 				deployedAnimationMixer = localAnimationMixer;
 				deployedBasePose = localBasePose;
 				copyPoseByName(localArmorRoot, localVisualRoot);
+				// Capture the rest-pose track/wheel bones for the async track skinning above.
+				restTrackBones = gatherTrackBones(localVisualRoot);
 				lastSyncedDeployedMode = null;
 				syncDeployedAnimationMode();
 				invalidate();
@@ -1113,6 +1309,10 @@
 			}
 
 			if (localVisualRoot) {
+				if (trackSkinRoot === localVisualRoot) {
+					trackSkinParts = null;
+					trackSkinRoot = null;
+				}
 				scene.remove(localVisualRoot);
 				disposeObject(localVisualRoot);
 				if (visualRoot === localVisualRoot) {

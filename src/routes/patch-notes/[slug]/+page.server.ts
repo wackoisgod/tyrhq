@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getPublishedArticle } from '$lib/server/articles';
+import { getPublishedArticle, getWithdrawnArticle } from '$lib/server/articles';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
@@ -8,7 +8,19 @@ export const load: PageServerLoad = async ({ params, setHeaders, locals }) => {
 	});
 
 	const patch = await getPublishedArticle('patch', params.slug);
-	if (!patch) throw error(404, 'Patch notes not found');
+	if (!patch) {
+		const withdrawn = await getWithdrawnArticle('patch', params.slug);
+		if (withdrawn) {
+			throw error(410, {
+				message: 'These patch notes have been withdrawn',
+				withdrawn: true,
+				title: withdrawn.title,
+				backHref: '/patch-notes',
+				backLabel: 'Back to Patch Notes'
+			});
+		}
+		throw error(404, 'Patch notes not found');
+	}
 
 	const { user } = await locals.safeGetSession();
 	let userHasStarred = false;

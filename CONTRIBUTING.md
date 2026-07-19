@@ -13,10 +13,10 @@ The fastest way to publish an article or guide is the in-site editor:
 2. Visit `/contribute/new`. Pick **Guide** or **Article**.
    - **Guide** = strategy / fundamentals / chassis-specific tips. You can attach vehicle slugs so the guide shows up on the matching tank pages.
    - **Article** = news, dispatches, anything published under `/articles`.
-3. Fill in the title, summary, and tags. Use the editor toolbar to write your body — bold, italic, headings, lists, links, plus inserters for **YouTube embeds** (`▶ YouTube`) and **callout boxes** (`ⓘ Info` / `⚠ Warning` / `★ Tip`).
+3. Fill in the title, summary, and tags. Use the editor toolbar to write your body — bold, italic, headings, lists, links, plus inserters for **YouTube embeds** (`▶ YouTube`), **callout boxes** (`ⓘ Info` / `⚠ Warning` / `★ Tip`), and **live game-data values** (`＃ Stat`).
 4. Toggle **Show preview** in the toolbar to see exactly how the article will render. The preview uses the same server-side sanitizer the publish path does, so what you see is what readers will see.
 5. **Save Draft** at any time to come back later (find your drafts at `/contribute/mine`).
-6. **Submit For Review** when ready. A reviewer will approve, request changes, or reject the submission from `/admin/submissions`. You'll see status updates and any reviewer notes back at `/contribute/mine`.
+6. **Submit For Review** when ready. A reviewer will approve, request changes, or reject the submission from `/admin/submissions`. You'll see status updates and any reviewer notes back at `/contribute/mine`. When a reviewer requests changes they can also propose **inline edits** to your body — those come back to the editor as accept/reject suggestions you resolve hunk-by-hunk before resubmitting.
 
 ### Editing An Existing Article Or Guide
 
@@ -24,16 +24,21 @@ On any published article or guide page (`/guides/<slug>` or `/articles/<slug>`),
 
 ### Allowed Body Content
 
-The editor's body field accepts standard Markdown plus two custom shortcodes:
+The editor's body field accepts standard Markdown plus three custom shortcodes:
 
 - `::youtube{id="dQw4w9WgXcQ"}` — embed a YouTube video. The toolbar inserts this for you. The `id` must be the 11-character video ID.
 - `:::callout{type="info"} … :::` — styled callout box. `type` must be `info`, `warning`, or `tip`. The toolbar inserts this with placeholder body text you replace.
+- `:stat{tank="atlas" stat="health"}` — an **inline live game-data reference**. It renders the current value (e.g. a tank's HP) and is resolved against the latest game data **every time the article is viewed**, so it stays accurate when the game data is updated — you never have to re-edit the article to fix a number.
+  - `tank` is the vehicle slug (the same slug used on `/tools/tanks/<slug>`).
+  - `stat` accepts friendly names (`health`, `speed`, `reverse-speed`, `reload`, `damage`, `penetration`, `vision`, `detection`, `camo`, `velocity`, `acceleration`, …), raw stat keys (e.g. `MaxHealth`), or `name` / `class`.
+  - Optional `show` controls the output: `value` (default, number with its unit, e.g. `58 kph`), `number` (bare number), or `label` (the stat's display label). The toolbar's `＃ Stat` button inserts a starter snippet.
+  - A reference to a tank or stat that doesn't exist is rejected at submission time.
 
 Any other raw HTML or unknown directive is rejected at submission time. The submission also has to be 200–30,000 characters and limited to 10 tags.
 
 ### Becoming A Reviewer
 
-Reviewers (the `contributor` role) can approve other people's submissions, withdraw published articles, and restore withdrawn ones. To become one: ask an existing admin to promote you. Admins do this from `/admin/users` — search by email or callsign, change the role dropdown to "Reviewer".
+Reviewers (the `contributor` role) can approve other people's submissions, withdraw published articles, and restore withdrawn ones. On the review screen they can also edit the body directly to suggest inline changes; those ride along with "Request Changes" so the author can accept or reject each one. To become one: ask an existing admin to promote you. Admins do this from `/admin/users` — search by email or callsign, change the role dropdown to "Reviewer".
 
 The first admin on a fresh deployment has to be set with SQL (see the README's "Database Setup" section). After that, all role changes happen in the UI.
 
@@ -64,7 +69,7 @@ npm run check   # svelte-check (type errors + a11y warnings)
 npm run test    # Vitest
 ```
 
-If you touched `src/lib/server/content-sanitize.ts` or any of the article rendering pipeline, also do a manual smoke test in the dev server: load `/guides/<slug>`, render an article with a callout and a YouTube embed, and visit `/admin/submissions` to confirm the reviewer preview matches.
+If you touched `src/lib/server/content-sanitize.ts` or any of the article rendering pipeline, also do a manual smoke test in the dev server: load `/guides/<slug>`, render an article with a callout, a YouTube embed, and a `:stat` game-data reference, and visit `/admin/submissions` to confirm the reviewer preview matches.
 
 If you touched exported game data or assets derived from the official source, update the `GameData` submodule snapshot or its referenced revision in the same change unless the repo workflow says otherwise.
 

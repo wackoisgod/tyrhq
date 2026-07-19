@@ -5,6 +5,13 @@ declare global {
 		interface Error {
 			message: string;
 			code?: string;
+			// Set on the 410 thrown by the public [slug] routes when an article
+			// exists but has been withdrawn, so +error.svelte can render the
+			// "withdrawn" notice instead of the generic error page.
+			withdrawn?: boolean;
+			title?: string;
+			backHref?: string;
+			backLabel?: string;
 		}
 		interface Locals {
 			supabase: SupabaseClient;
