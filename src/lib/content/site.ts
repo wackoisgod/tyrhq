@@ -23,7 +23,6 @@ export const navigation: NavItem[] = [
 	{ href: '/articles', label: 'Articles' },
 	{ href: '/guides', label: 'Guides' },
 	{ href: '/tools/tanks', label: 'Tanks' },
-	{ href: '/community', label: 'Community' },
 	{
 		label: 'Resources',
 		columns: [
@@ -37,7 +36,8 @@ export const navigation: NavItem[] = [
 			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] },
 			{ heading: 'Updates', items: [{ href: '/patch-notes', label: 'Patch Notes' }] }
 		]
-	}
+	},
+	{ href: '/community', label: 'Community' }
 ];
 
 /**
