@@ -37,7 +37,8 @@ export const navigation: NavItem[] = [
 			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] },
 			{ heading: 'Updates', items: [{ href: '/patch-notes', label: 'Patch Notes' }] }
 		]
-	}
+	},
+	{ href: '/community', label: 'Community' }
 ];
 
 /**
@@ -91,6 +92,7 @@ export const footerSections = [
 	{
 		title: 'Community',
 		links: [
+			{ href: '/community', label: 'Community Hub' },
 			{ href: '/auth', label: 'Accounts' },
 			{ href: '/builds', label: 'My Builds' },
 			{ href: '/teams', label: 'Teams' },
