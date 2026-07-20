@@ -41,13 +41,12 @@ export const communityGroups: CommunityGroup[] = [
 		heading: 'Community Discords',
 		annotation: 'PLAYER-RUN',
 		links: [
-			// Add player-run Discord servers here, e.g.:
-			// {
-			// 	label: 'Tyr Competitive',
-			// 	href: 'https://discord.gg/…',
-			// 	description: 'Scrims, tournaments, and ranked discussion.',
-			// 	tag: 'Discord'
-			// }
+			{
+				label: 'The Tyr Hotline',
+				href: 'https://discord.gg/7WxrVHq8W',
+				description: 'Community-run hub for Tyr players.',
+				tag: 'Discord'
+			}
 		]
 	},
 	{
