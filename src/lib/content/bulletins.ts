@@ -25,7 +25,7 @@ export const communityBulletins: CommunityBulletin[] = [
 	{
 		title: 'The Tyr Hotline is live',
 		byline: 'A community-run Discord for Tyr players — drop in and say hello.',
-		href: 'https://discord.gg/7WxrVHq8W',
+		href: 'https://discord.gg/kbJG4xrAM',
 		publishedAt: '2026-07-20',
 		label: 'Community',
 		tags: ['Discord']

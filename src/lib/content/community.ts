@@ -43,7 +43,7 @@ export const communityGroups: CommunityGroup[] = [
 		links: [
 			{
 				label: 'The Tyr Hotline',
-				href: 'https://discord.gg/7WxrVHq8W',
+				href: 'https://discord.gg/kbJG4xrAM',
 				description: 'Community-run hub for Tyr players.',
 				tag: 'Discord'
 			}
