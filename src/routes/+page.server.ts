@@ -1,6 +1,8 @@
 import { getGameSnapshot } from '$lib/data/game-data';
 import { fetchYouTubePlaylist } from '$lib/server/content';
 import { listPublishedArticles } from '$lib/server/articles';
+import { communityBulletins } from '$lib/content/bulletins';
+import { isRecentlyPublished } from '$lib/utils/article-recency';
 import { compareVersionsDesc } from '$lib/utils/version';
 import type { HeroFrontmatter } from '$lib/types/content';
 
@@ -52,8 +54,24 @@ export const load: PageServerLoad = async ({ locals }) => {
 		if (cmp !== 0) return cmp;
 		return b.publishedAt.localeCompare(a.publishedAt);
 	});
+	// Bulletins are hand-authored external links (see $lib/content/bulletins)
+	// reshaped to match the article summary fields the dispatch card reads.
+	// `type: 'bulletin'` + `href` is what makes the card link out.
+	const bulletins = communityBulletins.map((bulletin, index) => ({
+		id: `bulletin-${index}`,
+		type: 'bulletin' as const,
+		href: bulletin.href,
+		title: bulletin.title,
+		summary: bulletin.byline,
+		tags: bulletin.tags ?? [],
+		publishedAt: bulletin.publishedAt,
+		isNew: isRecentlyPublished(bulletin.publishedAt),
+		heroImageUrl: null,
+		version: null,
+		label: bulletin.label ?? 'Community'
+	}));
 	const latestDispatches = {
-		all: [...articles, ...guides]
+		all: [...articles, ...guides, ...bulletins]
 			.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
 			.slice(0, PREVIEW_LIMIT),
 		article: articles.slice(0, PREVIEW_LIMIT),

@@ -28,7 +28,10 @@
 
 	const visibleDispatches = $derived(data.latestDispatches[dispatchFilter]);
 
-	function dispatchHref(dispatch: { type: 'guide' | 'article' | 'patch'; slug: string }): string {
+	type Dispatch = (typeof data.latestDispatches.all)[number];
+
+	function dispatchHref(dispatch: Dispatch): string {
+		if (dispatch.type === 'bulletin') return dispatch.href;
 		const root =
 			dispatch.type === 'guide'
 				? '/guides'
@@ -38,9 +41,10 @@
 		return `${root}/${dispatch.slug}`;
 	}
 
-	function dispatchTypeLabel(type: 'guide' | 'article' | 'patch'): string {
-		if (type === 'guide') return 'Guide';
-		if (type === 'patch') return 'Patch';
+	function dispatchTypeLabel(dispatch: Dispatch): string {
+		if (dispatch.type === 'bulletin') return dispatch.label;
+		if (dispatch.type === 'guide') return 'Guide';
+		if (dispatch.type === 'patch') return 'Patch';
 		return 'Article';
 	}
 </script>
@@ -141,6 +145,8 @@
 					{#each visibleDispatches as dispatch (dispatch.id)}
 						<a
 							href={dispatchHref(dispatch)}
+							target={dispatch.type === 'bulletin' ? '_blank' : undefined}
+							rel={dispatch.type === 'bulletin' ? 'noreferrer' : undefined}
 							class="flex gap-5 rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
 							style="box-shadow: var(--hud-surface-ghost);"
 						>
@@ -173,7 +179,7 @@
 									<span
 										class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
 									>
-										{dispatchTypeLabel(dispatch.type)}
+										{dispatchTypeLabel(dispatch)}
 									</span>
 									{#if dispatch.tags?.length}
 										{#each dispatch.tags.slice(0, 2) as tag}
