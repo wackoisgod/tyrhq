@@ -23,6 +23,7 @@ export const navigation: NavItem[] = [
 	{ href: '/articles', label: 'Articles' },
 	{ href: '/guides', label: 'Guides' },
 	{ href: '/tools/tanks', label: 'Tanks' },
+	{ href: '/community', label: 'Community' },
 	{
 		label: 'Resources',
 		columns: [
@@ -90,6 +91,7 @@ export const footerSections = [
 	{
 		title: 'Community',
 		links: [
+			{ href: '/community', label: 'Community Hub' },
 			{ href: '/auth', label: 'Accounts' },
 			{ href: '/builds', label: 'My Builds' },
 			{ href: '/contribute', label: 'Contribute' },
