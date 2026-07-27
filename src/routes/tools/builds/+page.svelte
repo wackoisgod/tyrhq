@@ -21,6 +21,7 @@
 	} from '$lib/game-engine/build';
 	import {
 		fillComponentDescription,
+		fillTalentDescription,
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
@@ -557,36 +558,19 @@
 	}
 
 	function formatTalentDescription(
+		talentId: string,
 		description: string,
 		pointValues: number[],
 		currentPoints: number,
 		nodeMaxPoints: number
 	) {
-		const cleaned = plainComponentDescription(description);
-		if (!pointValues.length) return cleaned;
-
-		const perPoint = pointValues[0];
-		// When unallocated, preview the value at the node's cap — pointValues may extend
-		// past the node's maxPoints (e.g. Sonar Max Energy: pointValues=[10,20,30,40,50]
-		// but the node only allows 3 points, so the previewed max should be 30, not 50).
-		const previewIndex = currentPoints > 0
-			? Math.min(currentPoints, pointValues.length)
-			: Math.min(nodeMaxPoints, pointValues.length);
-		const levelValue = pointValues[Math.max(1, previewIndex) - 1];
-
-		function fmt(n: number) {
-			const abs = Math.abs(n);
-			if (abs >= 100) return String(Math.round(n));
-			if (abs >= 1 && abs === Math.round(abs)) return String(n);
-			const s = n.toFixed(2).replace(/\.?0+$/, '');
-			return s === '-0' ? '0' : s;
-		}
-
-		let count = 0;
-		return cleaned.replace(/\bvalue\b/gi, () => {
-			count++;
-			return fmt(count === 1 ? levelValue : perPoint);
-		});
+		return fillTalentDescription(
+			description,
+			pointValues,
+			data.talentValueTokens[talentId] ?? [],
+			currentPoints,
+			nodeMaxPoints
+		);
 	}
 
 	function otherSlotsComponentIds(slotIndex: number): Set<string> {
@@ -1024,11 +1008,13 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints)}
+										{formatTalentDescription(node.talent.id, node.talent.description, node.talent.pointValues, points, node.maxPoints)}
 									</p>
 									{#if node.talent.supplementalDescription}
+										<!-- Supplemental text never carries value placeholders — render it verbatim so
+										     natural uses of the word "value" aren't replaced with numbers. -->
 										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
-											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints)}
+											{plainComponentDescription(node.talent.supplementalDescription)}
 										</p>
 									{/if}
 	
