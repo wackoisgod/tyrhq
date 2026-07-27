@@ -644,6 +644,72 @@
 		return selection?.talentPoints[talentId] ?? 0;
 	}
 
+	const HOLD_PRESS_MS = 400;
+
+	/**
+	 * Tap fires `onTap`, press-and-hold fires `onHold` instead. Keyboard activation
+	 * (Enter/Space) arrives as a synthetic click with no preceding hold, so it taps.
+	 */
+	function pressAndHold(el: HTMLElement, params: { onTap: () => void; onHold: () => void }) {
+		let current = params;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let holdFired = false;
+
+		const cancelHold = () => {
+			if (timer !== null) {
+				clearTimeout(timer);
+				timer = null;
+			}
+		};
+		const onPointerDown = (event: PointerEvent) => {
+			if (event.button !== 0) return;
+			holdFired = false;
+			cancelHold();
+			timer = setTimeout(() => {
+				timer = null;
+				holdFired = true;
+				navigator.vibrate?.(15);
+				current.onHold();
+			}, HOLD_PRESS_MS);
+		};
+		const onClick = (event: MouseEvent) => {
+			if (holdFired) {
+				// The pointerup ending a hold still emits a click — swallow it.
+				holdFired = false;
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				return;
+			}
+			current.onTap();
+		};
+		const onContextMenu = (event: Event) => {
+			// Holding must not pop the mobile long-press context menu.
+			event.preventDefault();
+		};
+
+		el.addEventListener('pointerdown', onPointerDown);
+		el.addEventListener('pointerup', cancelHold);
+		el.addEventListener('pointerleave', cancelHold);
+		el.addEventListener('pointercancel', cancelHold);
+		el.addEventListener('click', onClick);
+		el.addEventListener('contextmenu', onContextMenu);
+
+		return {
+			update(next: typeof params) {
+				current = next;
+			},
+			destroy() {
+				cancelHold();
+				el.removeEventListener('pointerdown', onPointerDown);
+				el.removeEventListener('pointerup', cancelHold);
+				el.removeEventListener('pointerleave', cancelHold);
+				el.removeEventListener('pointercancel', cancelHold);
+				el.removeEventListener('click', onClick);
+				el.removeEventListener('contextmenu', onContextMenu);
+			}
+		};
+	}
+
 	function getPreviewSlotLabel(index: number) {
 		if (index === 0) return 'Primary';
 		if (index === 1) return 'Secondary';
@@ -953,6 +1019,8 @@
 					<span class="text-[var(--hud-teal)]">Teal</span> = spent ·
 					<span class="text-[var(--hud-lime)]">Lime</span> = keystone ·
 					<span class="text-rose-400">Red</span> = invalid.
+					Hold <span class="text-[var(--hud-lime)]">+</span> to max a node · hold
+					<span class="text-[var(--hud-teal)]">−</span> to clear it.
 				</p>
 
 				{#if talentNodes.length === 0}
@@ -1023,19 +1091,38 @@
 									>
 										<button
 											type="button"
-											class="flex h-7 w-7 items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-base leading-none text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
+											class="flex h-7 w-7 touch-manipulation select-none items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-base leading-none text-[var(--hud-teal)] transition [-webkit-touch-callout:none] hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
 											disabled={points <= 0}
-											onclick={() =>
-												setTalentPoints(node.talent.id, points - 1, node.maxPoints)}
+											title="Tap: −1 · Hold: clear"
+											aria-label={`Remove a point from ${node.talent.name}; hold to clear`}
+											use:pressAndHold={{
+												onTap: () =>
+													setTalentPoints(
+														node.talent.id,
+														getTalentPoints(node.talent.id) - 1,
+														node.maxPoints
+													),
+												onHold: () => setTalentPoints(node.talent.id, 0, node.maxPoints)
+											}}
 										>
 											−
 										</button>
 										<button
 											type="button"
-											class="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--hud-lime)] text-base font-medium leading-none text-[var(--hud-on-lime)] transition hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
+											class="flex h-7 w-7 touch-manipulation select-none items-center justify-center rounded-sm bg-[var(--hud-lime)] text-base font-medium leading-none text-[var(--hud-on-lime)] transition [-webkit-touch-callout:none] hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
 											disabled={!canInc}
-											onclick={() =>
-												setTalentPoints(node.talent.id, points + 1, node.maxPoints)}
+											title="Tap: +1 · Hold: max"
+											aria-label={`Add a point to ${node.talent.name}; hold to max`}
+											use:pressAndHold={{
+												onTap: () =>
+													setTalentPoints(
+														node.talent.id,
+														getTalentPoints(node.talent.id) + 1,
+														node.maxPoints
+													),
+												onHold: () =>
+													setTalentPoints(node.talent.id, node.maxPoints, node.maxPoints)
+											}}
 										>
 											+
 										</button>
