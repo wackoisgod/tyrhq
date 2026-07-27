@@ -228,4 +228,20 @@ describe('planner layers', () => {
 		expect(hidden.layers[0].visible).toBe(false);
 		expect(hidden.strokes).toEqual(base.strokes);
 	});
+
+	it('renames a layer and roundtrips the name through compact state', () => {
+		const base = createState();
+		const renamed = applyPlannerOperation(base, {
+			type: 'update_layer',
+			layer: { ...createDefaultLayer(), name: 'Flank Route' }
+		});
+		expect(renamed.layers[0].name).toBe('Flank Route');
+		expect(renamed.strokes).toEqual(base.strokes);
+
+		// A renamed base layer is no longer implicit, so the compact form must
+		// carry the layer table and restore the custom name.
+		const restored = parseCompactState(buildCompactState(renamed));
+		expect(restored.layers[0].name).toBe('Flank Route');
+		expect(restored.layers[0].id).toBe(DEFAULT_LAYER_ID);
+	});
 });

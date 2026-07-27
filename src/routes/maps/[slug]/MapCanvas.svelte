@@ -2559,6 +2559,14 @@
 		commitPlannerOperation({ type: 'update_layer', layer: { ...layer, name } }, { remember: true });
 	}
 
+	// The rename input replaces the layer-name button, taking the focused element
+	// out of the DOM with it — without this the field renders unfocused and the
+	// Enter/Escape/blur handlers never get a chance to run.
+	function focusOnMount(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+
 	function moveSelectionToActiveLayer() {
 		const objectIds: string[] = [];
 		if (selectedShapeId) objectIds.push(selectedShapeId);
@@ -3756,6 +3764,8 @@
 									type="text"
 									bind:value={renameDraft}
 									maxlength="48"
+									use:focusOnMount
+									aria-label="Layer name"
 									class="min-w-0 flex-1 rounded-sm bg-[var(--hud-panel)]/80 px-1.5 py-0.5 text-xs text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.3)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
 									onblur={commitLayerRename}
 									onkeydown={(e) => {
@@ -3805,6 +3815,17 @@
 											<path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1" />
 										</svg>
 									{/if}
+								</button>
+								<button
+									class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[var(--hud-dim)] transition hover:text-[var(--hud-text)]"
+									onclick={() => startLayerRename(layer)}
+									title="Rename layer"
+									aria-label="Rename layer"
+								>
+									<svg class={toolGlyph} viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M11.1 2.6a1.7 1.7 0 0 1 2.4 2.4L5.6 12.9l-3.2.8.8-3.2z" />
+										<path d="M9.9 3.8l2.4 2.4" />
+									</svg>
 								</button>
 								<button
 									class="{tbtn} {tIdle} px-1 disabled:opacity-25"
