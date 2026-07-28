@@ -19,7 +19,15 @@ type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
 	ammo: Array<Omit<GameDataBundle['ammo'][number], 'displayName'> & { displayName?: string }>;
 };
 
-const componentValueTokens = new Map<string, ComponentValueToken>([
+/**
+ * The runtime bundle flattens component description placeholders (e.g. {LevelValuePercent},
+ * {LevelValueAbs}) to the literal word "value", losing how the point value must be scaled
+ * for display. This map restores each component's placeholder token from the raw
+ * ComponentData drop. Components absent here use plain `LevelValue` (raw number) semantics.
+ * `component-tokens.test.ts` asserts this map stays in sync with the raw data.
+ */
+export const componentValueTokens = new Map<string, ComponentValueToken>([
+	['adaptivehardening', 'LevelValuePercent'],
 	['agitator', 'LevelValuePercentMultiplyIncrease'],
 	['bulkheads', 'LevelValuePercentMultiplyIncrease'],
 	['camoweb', 'LevelValuePercentMultiplyIncrease'],
@@ -28,12 +36,18 @@ const componentValueTokens = new Map<string, ComponentValueToken>([
 	['energyexpander', 'LevelValuePercentMultiplyIncrease'],
 	['extendedgearing', 'LevelValuePercentMultiplyIncrease'],
 	['hotchamber', 'LevelValuePercentMultiplyIncrease'],
+	['kineticabsorber', 'LevelValueAbs'],
+	['phasemodule', 'LevelValueAbs'],
 	['powerconverter', 'LevelValuePercentMultiplyDecrease'],
 	['quickslot', 'LevelValuePercentMultiplyDecrease'],
+	['reactivemodules', 'LevelValuePercent'],
 	['repairmechanism', 'LevelValuePercentMultiplyDecrease'],
 	['sensitivesights', 'LevelValuePercentMultiplyIncrease'],
+	['signatureobscurer', 'LevelValueAbs'],
 	['stablerangefinder', 'LevelValuePercentMultiplyDecrease'],
-	['synchronizer', 'LevelValuePercentMultiplyIncrease']
+	['synchronizer', 'LevelValuePercentMultiplyIncrease'],
+	['vulnbreaker', 'LevelValuePercent'],
+	['weaknessanalyzer', 'LevelValueAbs']
 ]);
 
 function deriveAmmoDisplayName(key: string, fallbackName: string) {
