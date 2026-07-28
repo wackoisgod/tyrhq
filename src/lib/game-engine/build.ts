@@ -152,6 +152,9 @@ const componentEffectMappings = [
 	{ pattern: /ShellDamageFlat|DuplicatorShellDamage/i, key: 'ShellDamage', mode: 'add' },
 	{ pattern: /ShellVelocity/i, key: 'ShellVelocity', mode: 'add' },
 	{ pattern: /ShellPenetration/i, key: 'ShellPenetration', mode: 'add' },
+	// GE_ActiveReloadTime ships with empty modifiers, so active-reload talents (e.g.
+	// Penetration Reload Reduction) rely on this name mapping. Must precede /ReloadTime/.
+	{ pattern: /ActiveReload/i, key: 'ActiveReloadReductionTime', mode: 'add' },
 	{ pattern: /ReloadTimePercent/i, key: 'ReloadTime', mode: 'mult' },
 	{ pattern: /ReloadTime/i, key: 'ReloadTime', mode: 'add' },
 	{ pattern: /Intra.*Reload/i, key: 'IntraClipReloadTime', mode: 'add' },
@@ -591,14 +594,16 @@ function descriptionSuggestsSituationalContext(normalizedDesc: string): boolean 
 /**
  * True when a talent is context-dependent (TyrPilotBuilder-style): non-baseline event tags and/or
  * situational wording in the description. Used for Sources badge and the Conditionals toggle.
+ *
+ * Only the main description is scanned. Supplemental descriptions are stat glossaries
+ * ("Base Aiming Dispersion is how inaccurate your shot is while stationary…") whose wording
+ * would wrongly mark permanent passives as situational.
  */
 export function isConditionalTalent(talent: TalentRecord): boolean {
 	const situationalTags = talent.eventTags.filter((tag) => !BASELINE_TALENT_EVENT_TAGS.has(tag));
 	if (situationalTags.length > 0) return true;
 
-	const desc = normalizeDescriptionForConditionalHeuristic(
-		`${talent.description ?? ''} ${talent.supplementalDescription ?? ''}`
-	);
+	const desc = normalizeDescriptionForConditionalHeuristic(talent.description ?? '');
 	return descriptionSuggestsSituationalContext(desc);
 }
 
@@ -696,6 +701,15 @@ export function computeBuild(
 	const includeConditionalEffects = options.includeConditionalEffects ?? true;
 	const assumeMaxStacks = options.assumeMaxStacks ?? false;
 	const baseStats = { ...vehicle.stats };
+
+	// Talents modify StartingSecondary/TertiaryShellsCount, but the tank data stores the
+	// base counts on AltAmmoCountOne/Two — seed the displayed attributes from those.
+	if (baseStats.StartingSecondaryShellsCount === undefined) {
+		baseStats.StartingSecondaryShellsCount = baseStats.AltAmmoCountOne ?? 0;
+	}
+	if (baseStats.StartingTertiaryShellsCount === undefined) {
+		baseStats.StartingTertiaryShellsCount = baseStats.AltAmmoCountTwo ?? 0;
+	}
 
 	const contributions: Contribution[] = [];
 	const ammoContribs: AmmoContribution[] = [];
@@ -831,6 +845,19 @@ export function computeBuild(
 					order++
 				);
 			}
+
+			// Some talent GEs export with no modifiers (e.g. GE_ActiveReloadTime behind
+			// Penetration Reload Reduction). Fall back to the effect-name mapping so the
+			// talent's point value still lands on the right stat.
+			if (effect.modifiers.length === 0) {
+				const effectName = getEffectName(effect.path);
+				if (effectName && !/(Remover|Tracker|Trigger|Applier)/i.test(effectName)) {
+					const edits = getComponentEffectEdits(effectName, value, talent.description, stackCount);
+					for (const edit of edits) {
+						pushContribution(contributions, edit, source, conditional, order++);
+					}
+				}
+			}
 		}
 	}
 
@@ -879,7 +906,16 @@ export function computeBuild(
 
 export function formatStatValue(value: number, unit?: string) {
 	if (!Number.isFinite(value)) return '-';
-	const rounded = Math.abs(value - Math.round(value)) < 0.0001 ? String(Math.round(value)) : value.toFixed(2);
+	let rounded: string;
+	if (Math.abs(value - Math.round(value)) < 0.0001) {
+		rounded = String(Math.round(value));
+	} else if (Math.abs(value) < 1) {
+		// Sub-1 stats (dispersion penalties) lose their talent deltas at two decimals:
+		// 0.14 × 0.85 = 0.119 would render as "0.12" and read as −14.3% instead of −15%.
+		rounded = value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+	} else {
+		rounded = value.toFixed(2);
+	}
 	return unit ? `${rounded} ${unit}` : rounded;
 }
 

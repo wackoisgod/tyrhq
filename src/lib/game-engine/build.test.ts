@@ -10,7 +10,13 @@ import type {
 	VehicleRecord
 } from '$lib/types/game';
 
-import { computeBuild, createPlannerCatalog, type PlannerSelection } from './build';
+import {
+	computeBuild,
+	createPlannerCatalog,
+	formatStatValue,
+	isConditionalTalent,
+	type PlannerSelection
+} from './build';
 
 function makeAmmo(id: string, displayName: string, damage = 1, modOverrides: Partial<AmmoRecord['modifiers']> = {}): AmmoRecord {
 	return {
@@ -720,6 +726,80 @@ describe('computeBuild aggregator math', () => {
 		expect(entry?.delta).toBeCloseTo(-4, 4);
 	});
 
+	it('talents with empty-modifier GEs fall back to the effect-name mapping (active reload)', () => {
+		// GE_ActiveReloadTime exports with no modifiers, so Penetration Reload Reduction
+		// must land on ActiveReloadReductionTime via the effect-name fallback — and not on
+		// the main ReloadTime stat despite the name overlap.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const activeReloadEffect: EffectRecord = {
+			id: 'ge-activereloadtime',
+			path: '/Game/Blueprints/Abilities/Effects/Talents/GE_ActiveReloadTime.GE_ActiveReloadTime_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const reloadTalent = makeTalent(
+			'bush-talent018',
+			'Penetration Reload Reduction',
+			['ge-activereloadtime'],
+			[-0.5, -1]
+		);
+		const vehicle = makeVehicle('bush', { ReloadTime: 8 }, 'standard', 'tree_bush');
+		const tree = makeTree('tree_bush', 'bush', ['bush-talent018']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [reloadTalent],
+			effects: [activeReloadEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'bush',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { 'bush-talent018': 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.ActiveReloadReductionTime).toBeCloseTo(-1, 4);
+		expect(build!.stats.ReloadTime).toBeCloseTo(8, 4);
+	});
+
+	it('seeds starting shell counts from AltAmmoCount base stats', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const shellsEffect = makeEffect('SecondaryShells', 'StartingSecondaryShellsCount', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const shellsTalent = makeTalent('shells', 'Secondary Shells', ['SecondaryShells'], [3, 6]);
+		const vehicle = makeVehicle('bush', { AltAmmoCountOne: 2, AltAmmoCountTwo: 0 }, 'standard', 'tree_bush');
+		const tree = makeTree('tree_bush', 'bush', ['shells']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [shellsTalent],
+			effects: [shellsEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'bush',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { shells: 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.baseStats.StartingSecondaryShellsCount).toBe(2);
+		expect(build!.stats.StartingSecondaryShellsCount).toBeCloseTo(8, 4);
+	});
+
 	it('catalytic reservoir does not leak its trigger wording ("penetration") into a stat bonus', () => {
 		// CATALYTIC RESERVOIR generates energy (CurrentAbilityResource) when you land a penetration.
 		// Because it has a concrete data-driven modifier — even though it targets an attribute we
@@ -763,5 +843,44 @@ describe('computeBuild aggregator math', () => {
 		expect(build).not.toBeNull();
 		expect(build!.stats.ShellPenetration).toBeCloseTo(60, 4); // unchanged; no phantom +3
 		expect(build!.breakdown.ShellPenetration).toBeUndefined();
+	});
+});
+
+describe('isConditionalTalent', () => {
+	function talentWith(description: string, supplementalDescription: string) {
+		return {
+			...makeTalent('t', 'Talent', [], [1]),
+			description,
+			supplementalDescription
+		};
+	}
+
+	it('ignores stat-glossary wording in the supplemental description', () => {
+		// "…while stationary and fully aimed" describes the STAT, not a condition on the
+		// talent — it must not mark this permanent passive as situational.
+		const talent = talentWith(
+			'Reduces base Aiming Dispersion by value (-value per point)',
+			'Base Aiming Dispersion is how inaccurate your shot is while stationary and fully aimed.'
+		);
+		expect(isConditionalTalent(talent)).toBe(false);
+	});
+
+	it('still flags situational wording in the main description', () => {
+		const talent = talentWith('Increases Max Speed by value while spotted', '');
+		expect(isConditionalTalent(talent)).toBe(true);
+	});
+});
+
+describe('formatStatValue', () => {
+	it('keeps three decimals for sub-1 stats so dispersion deltas survive', () => {
+		expect(formatStatValue(0.119)).toBe('0.119');
+		expect(formatStatValue(-0.020999996)).toBe('-0.021');
+		expect(formatStatValue(0.4)).toBe('0.4');
+	});
+
+	it('keeps the legacy formats for whole and larger values', () => {
+		expect(formatStatValue(28, 'deg/s')).toBe('28 deg/s');
+		expect(formatStatValue(34.72, 'deg/s')).toBe('34.72 deg/s');
+		expect(formatStatValue(4.5, 's')).toBe('4.50 s');
 	});
 });
