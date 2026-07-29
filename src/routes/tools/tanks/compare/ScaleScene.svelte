@@ -184,43 +184,64 @@
 				placed.push({ vehicleId: entry.vehicleId, wrapper, box, size: box.getSize(new Vector3()) });
 			}
 
-			const totalWidth =
-				placed.reduce((sum, entry) => sum + entry.size.x, 0) +
+			// The exported hulls share one facing convention, discovered from the
+			// footprints (tanks are longer than wide). Park the lineup abreast along
+			// the lateral axis so vehicles sit gun-to-gun instead of nose-to-tail.
+			const lengthAlongX =
+				placed.reduce((vote, entry) => vote + (entry.size.x >= entry.size.z ? 1 : -1), 0) >= 0;
+			const lateral = (size: Vector3) => (lengthAlongX ? size.z : size.x);
+			const facing = (size: Vector3) => (lengthAlongX ? size.x : size.z);
+
+			const totalSpan =
+				placed.reduce((sum, entry) => sum + lateral(entry.size), 0) +
 				LAYOUT_GAP * Math.max(0, placed.length - 1);
 
-			let cursor = -totalWidth / 2;
+			let cursor = lengthAlongX ? totalSpan / 2 : -totalSpan / 2;
 			let maxHeight = 0;
 			let maxLength = 0;
 			for (const entry of placed) {
-				// Shift so the bounding box rests on the ground plane, centred on Z,
-				// with boxes marching left→right in selection order.
-				entry.wrapper.position.set(
-					cursor - entry.box.min.x,
-					-entry.box.min.y,
-					-(entry.box.min.z + entry.box.max.z) / 2
-				);
-				cursor += entry.size.x + LAYOUT_GAP;
+				// Rest the bounding box on the ground plane, centred on the facing
+				// axis, marching abreast in selection order. The march runs toward
+				// screen-left → screen-right for the camera chosen below, so models
+				// line up in the same order as the stat columns.
+				const centerFacingX = -(entry.box.min.x + entry.box.max.x) / 2;
+				const centerFacingZ = -(entry.box.min.z + entry.box.max.z) / 2;
+				if (lengthAlongX) {
+					entry.wrapper.position.set(centerFacingX, -entry.box.min.y, cursor - entry.box.max.z);
+					cursor -= entry.size.z + LAYOUT_GAP;
+				} else {
+					entry.wrapper.position.set(cursor - entry.box.min.x, -entry.box.min.y, centerFacingZ);
+					cursor += entry.size.x + LAYOUT_GAP;
+				}
 				maxHeight = Math.max(maxHeight, entry.size.y);
-				maxLength = Math.max(maxLength, entry.size.z);
+				maxLength = Math.max(maxLength, facing(entry.size));
 
 				const accent = batch.find((tank) => tank.id === entry.vehicleId)?.accent ?? '#99f7ff';
 				const marker = buildBaseMarker(entry.size, accent);
-				marker.position.x = entry.wrapper.position.x + entry.box.min.x + entry.size.x / 2;
-				marker.position.z = 0;
+				marker.position.x = entry.wrapper.position.x + (entry.box.min.x + entry.box.max.x) / 2;
+				marker.position.z = entry.wrapper.position.z + (entry.box.min.z + entry.box.max.z) / 2;
 				batchRoot.add(marker);
 
 				batchRoot.add(entry.wrapper);
 				onmeasure(entry.vehicleId, {
-					length: entry.size.z,
-					width: entry.size.x,
+					length: facing(entry.size),
+					width: lateral(entry.size),
 					height: entry.size.y
 				});
 			}
 
 			if (placed.length > 0) {
-				const span = Math.max(totalWidth, maxLength, 4);
+				const span = Math.max(totalSpan, 4);
+				// Stand back along the facing axis (with room for the hull depth) and
+				// step aside just enough for a three-quarter view, so the lineup
+				// spreads across the screen without the near hull occluding the rest.
+				const standoff = span * 0.6 + maxLength * 0.75 + 2;
+				const aside = span * 0.25;
+				const eyeHeight = Math.max(2.4, maxHeight * 1.5);
 				cameraTarget = [0, Math.min(1.6, maxHeight * 0.45), 0];
-				cameraPosition = [span * 0.35, Math.max(2.4, maxHeight * 1.5), span * 0.95 + 3];
+				cameraPosition = lengthAlongX
+					? [standoff, eyeHeight, aside]
+					: [aside, eyeHeight, standoff];
 			}
 
 			scene.add(batchRoot);
