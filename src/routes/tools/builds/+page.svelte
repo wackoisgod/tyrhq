@@ -3,6 +3,7 @@
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import {
 		canIncrementTalentPoint,
+		componentSupportsMaxStacks,
 		computeBuild,
 		createPlannerCatalog,
 		descriptionIndicatesStacking,
@@ -469,7 +470,7 @@
 		for (const id of selection.componentIds) {
 			if (!id) continue;
 			const c = catalog.componentById.get(id);
-			if (c && descriptionIndicatesStacking(c.description)) return true;
+			if (c && componentSupportsMaxStacks(c)) return true;
 		}
 		for (const [talentId, pts] of Object.entries(selection.talentPoints)) {
 			if (pts <= 0) continue;

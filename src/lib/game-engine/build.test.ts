@@ -11,6 +11,7 @@ import type {
 } from '$lib/types/game';
 
 import {
+	componentSupportsMaxStacks,
 	computeBuild,
 	createPlannerCatalog,
 	formatStatValue,
@@ -566,6 +567,218 @@ describe('computeBuild aggregator math', () => {
 
 		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('EXTENDED GEARING'));
 		expect(entry?.delta).toBeCloseTo(9.75, 4);
+	});
+
+	it('drift sparker applies the flat 12 kph stated in its tooltip, not the raw 1.12 point value', () => {
+		// DRIFT SPARKER's only GE is an empty Tracker (skipped by name), and its tooltip
+		// bakes the boost into the text — "Powersliding and Hoverdrifting briefly increase
+		// your Acceleration and Max Speed by 12 kph." — while pointValues still carries the
+		// retired ×1.12 hull-traverse multiplier. The description fallback must apply the
+		// stated 12 kph to Top Speed, not "+1.12 kph".
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const trackerEffect: EffectRecord = {
+			id: 'ge-components-driftsparkertracker',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_DriftSparkerTracker.GE_Components_DriftSparkerTracker_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const driftSparker: ComponentRecord = {
+			...makeComponent(
+				'driftsparker',
+				'DRIFT SPARKER',
+				['ge-components-driftsparkertracker'],
+				[1.1200000047683716],
+				'Powersliding and Hoverdrifting briefly increase your Acceleration and Max Speed by 12 kph.'
+			),
+			eventTags: ['Gameplay.Event.WhileEffectiveHandbrake', 'Gameplay.Event.WhileHoverDrifting']
+		};
+		const vehicle = makeVehicle(
+			'stealth',
+			{ MaxSpeed: 65, AccelerationTime: 4.5 },
+			'standard',
+			'tree_stealth'
+		);
+		const tree = makeTree('tree_stealth', 'stealth', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [driftSparker],
+			talents: [],
+			effects: [trackerEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'stealth',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['driftsparker', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 65 + 12 = 77 (the tooltip's stated boost), NOT 65 + 1.12 = 66.12 (the point value)
+		expect(build!.stats.MaxSpeed).toBeCloseTo(77, 4);
+		expect(build!.stats.MaxSpeed).not.toBeCloseTo(66.12, 2);
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('DRIFT SPARKER'));
+		expect(entry?.delta).toBeCloseTo(12, 4);
+		// The boost only applies while powersliding/hoverdrifting.
+		expect(entry?.conditional).toBe(true);
+
+		// The acceleration half has no exported magnitude (its Tracker GE is empty), so the
+		// time-based Acceleration stat must not pick up a phantom edit.
+		expect(build!.stats.AccelerationTime).toBeCloseTo(4.5, 4);
+		expect(build!.breakdown.AccelerationTime ?? []).toHaveLength(0);
+	});
+
+	it('relentless adapter honors its GE stack limit under max stacks despite no "stack" wording', () => {
+		// RELENTLESS ADAPTER re-applies its Max Health gain on every module-damage event, up
+		// to its GE's stack limit (15) — but its tooltip never uses the word "stack", so the
+		// wording-based gate alone would keep "assume max stacks" from ever applying.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const adapterEffect = makeEffect('Components_RelentlessAdapterMaxHP', 'MaxHealth', 'AddBase', 0, {
+			stackLimit: 15,
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const adapter: ComponentRecord = {
+			...makeComponent(
+				'relentlessadapter',
+				'RELENTLESS ADAPTER',
+				['Components_RelentlessAdapterMaxHP'],
+				[60],
+				'Increases Max Health by 60 and heals for the same amount when one of your modules is damaged'
+			),
+			eventTags: ['Gameplay.Event.OnModuleHit']
+		};
+		const vehicle = makeVehicle('brawler', { MaxHealth: 2000 }, 'standard', 'tree_brawler');
+		const tree = makeTree('tree_brawler', 'brawler', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [adapter],
+			talents: [],
+			effects: [adapterEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+		const selection: PlannerSelection = {
+			vehicleId: 'brawler',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['relentlessadapter', '', '', ''],
+			talentPoints: {}
+		};
+
+		expect(componentSupportsMaxStacks(adapter)).toBe(true);
+
+		const singleStack = computeBuild(catalog, selection);
+		expect(singleStack!.stats.MaxHealth).toBeCloseTo(2060, 4);
+
+		const maxStacks = computeBuild(catalog, selection, { assumeMaxStacks: true });
+		expect(maxStacks!.stats.MaxHealth).toBeCloseTo(2000 + 60 * 15, 4);
+	});
+
+	it('friction capacitor surfaces its landing quintuple under max stacks', () => {
+		// FRICTION CAPACITOR's quintuple lives only in its tooltip ("Effect briefly
+		// quintuples on landing after being airborne") — its Max Speed GE has stackLimit 1
+		// and its airborne tracker GE is empty — so the stated multiplier must drive the
+		// max-stacks preview: +2 kph passively, +10 kph on landing.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const trackerEffect: EffectRecord = {
+			id: 'ge-components-frictioncapacitorairbornetracker',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_FrictionCapacitorAirborneTracker.GE_Components_FrictionCapacitorAirborneTracker_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const maxSpeedEffect = makeEffect('Components_MaxSpeedFlat', 'MaxSpeed', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const frictionCapacitor: ComponentRecord = {
+			...makeComponent(
+				'frictioncapacitor',
+				'FRICTION CAPACITOR',
+				['ge-components-frictioncapacitorairbornetracker', 'Components_MaxSpeedFlat'],
+				[2],
+				'Increases Max Speed by 2 kph. Effect briefly quintuples on landing after being airborne.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne']
+		};
+		const vehicle = makeVehicle('blink', { MaxSpeed: 57 }, 'standard', 'tree_blink');
+		const tree = makeTree('tree_blink', 'blink', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [frictionCapacitor],
+			talents: [],
+			effects: [trackerEffect, maxSpeedEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+		const selection: PlannerSelection = {
+			vehicleId: 'blink',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['frictioncapacitor', '', '', ''],
+			talentPoints: {}
+		};
+
+		expect(componentSupportsMaxStacks(frictionCapacitor)).toBe(true);
+
+		const singleStack = computeBuild(catalog, selection);
+		expect(singleStack!.stats.MaxSpeed).toBeCloseTo(59, 4);
+
+		const maxStacks = computeBuild(catalog, selection, { assumeMaxStacks: true });
+		expect(maxStacks!.stats.MaxSpeed).toBeCloseTo(67, 4);
+		const entry = maxStacks!.breakdown.MaxSpeed?.find((e) => e.source.includes('FRICTION CAPACITOR'));
+		expect(entry?.delta).toBeCloseTo(10, 4);
+	});
+
+	it('duplicator\'s "Doubles the number of shells gained" is not a stat-effect multiplier', () => {
+		// The multiplier word must only count when it amplifies the component's own effect
+		// ("Effect briefly quintuples…"). DUPLICATOR doubles shell GAIN, and its ShellDamage
+		// GE exports a meaningless stackLimit of 50 — max stacks must leave its flat +5 alone.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const duplicatorEffect = makeEffect('Components_DuplicatorShellDamage', 'ShellDamage', 'AddBase', 5, {
+			stackLimit: 50
+		});
+		const duplicator = makeComponent(
+			'duplicator',
+			'DUPLICATOR',
+			['Components_DuplicatorShellDamage'],
+			[2],
+			'Increases base Shell Damage by 5 and Doubles the number of shells gained from all sources'
+		);
+		const vehicle = makeVehicle('deadeye', { ShellDamage: 100 }, 'standard', 'tree_deadeye');
+		const tree = makeTree('tree_deadeye', 'deadeye', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [duplicator],
+			talents: [],
+			effects: [duplicatorEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		expect(componentSupportsMaxStacks(duplicator)).toBe(false);
+
+		const build = computeBuild(
+			catalog,
+			{
+				vehicleId: 'deadeye',
+				ammoIds: ['standard'],
+				previewAmmoSlot: 0,
+				componentIds: ['duplicator', '', '', ''],
+				talentPoints: {}
+			},
+			{ assumeMaxStacks: true }
+		);
+		expect(build!.stats.ShellDamage).toBeCloseTo(105, 4);
 	});
 
 	it('ammo equip-effect speed modifiers apply to vehicle Max/Reverse/Strafing speed', () => {
