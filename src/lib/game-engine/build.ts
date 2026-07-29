@@ -392,6 +392,10 @@ function getComponentEffectEdits(
 	return keys.map((key) => ({ attribute: key, value: effectiveValue, mode, stacks: stackCount }));
 }
 
+const kphStatKeys = new Set(
+	statDefinitions.filter((stat) => stat.unit === 'kph').map((stat) => stat.key)
+);
+
 function getDescriptionBasedComponentEdits(
 	component: ComponentRecord,
 	stackCount = 1
@@ -405,8 +409,19 @@ function getDescriptionBasedComponentEdits(
 
 	const inferredMode = inferModeFromDescriptionText(description);
 	const mode: ContributionMode = inferredMode === 'mult' ? 'mult' : 'add';
+
+	// Flat speed boosts read "by N kph", and N is not always derivable from pointValues —
+	// DRIFT SPARKER's tooltip bakes "…increase your Acceleration and Max Speed by 12 kph"
+	// into the text while its pointValue still holds the retired ×1.12 hull-traverse
+	// multiplier. For kph-unit stats, trust the figure the game itself displays.
+	const statedKphMatch =
+		mode === 'add' ? normalizeDescription(description).match(/\bby (\d+(?:\.\d+)?) kph\b/) : null;
+	let statedKph = statedKphMatch ? Number(statedKphMatch[1]) : null;
+	if (statedKph !== null && !(Number.isFinite(statedKph) && statedKph > 0)) statedKph = null;
+
 	if (mode === 'add' && descriptionIndicatesDecrease(description)) {
 		value = -Math.abs(value);
+		if (statedKph !== null) statedKph = -statedKph;
 	}
 
 	if (mode === 'mult') {
@@ -416,7 +431,12 @@ function getDescriptionBasedComponentEdits(
 		if (decrease && value > 1) value = 1 / value;
 	}
 
-	return targets.map((key) => ({ attribute: key, value, mode, stacks: stackCount }));
+	return targets.map((key) => ({
+		attribute: key,
+		value: statedKph !== null && kphStatKeys.has(key) ? statedKph : value,
+		mode,
+		stacks: stackCount
+	}));
 }
 
 /**

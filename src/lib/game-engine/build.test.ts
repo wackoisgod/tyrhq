@@ -568,6 +568,72 @@ describe('computeBuild aggregator math', () => {
 		expect(entry?.delta).toBeCloseTo(9.75, 4);
 	});
 
+	it('drift sparker applies the flat 12 kph stated in its tooltip, not the raw 1.12 point value', () => {
+		// DRIFT SPARKER's only GE is an empty Tracker (skipped by name), and its tooltip
+		// bakes the boost into the text — "Powersliding and Hoverdrifting briefly increase
+		// your Acceleration and Max Speed by 12 kph." — while pointValues still carries the
+		// retired ×1.12 hull-traverse multiplier. The description fallback must apply the
+		// stated 12 kph to Top Speed, not "+1.12 kph".
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const trackerEffect: EffectRecord = {
+			id: 'ge-components-driftsparkertracker',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_DriftSparkerTracker.GE_Components_DriftSparkerTracker_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const driftSparker: ComponentRecord = {
+			...makeComponent(
+				'driftsparker',
+				'DRIFT SPARKER',
+				['ge-components-driftsparkertracker'],
+				[1.1200000047683716],
+				'Powersliding and Hoverdrifting briefly increase your Acceleration and Max Speed by 12 kph.'
+			),
+			eventTags: ['Gameplay.Event.WhileEffectiveHandbrake', 'Gameplay.Event.WhileHoverDrifting']
+		};
+		const vehicle = makeVehicle(
+			'stealth',
+			{ MaxSpeed: 65, AccelerationTime: 4.5 },
+			'standard',
+			'tree_stealth'
+		);
+		const tree = makeTree('tree_stealth', 'stealth', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [driftSparker],
+			talents: [],
+			effects: [trackerEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'stealth',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['driftsparker', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 65 + 12 = 77 (the tooltip's stated boost), NOT 65 + 1.12 = 66.12 (the point value)
+		expect(build!.stats.MaxSpeed).toBeCloseTo(77, 4);
+		expect(build!.stats.MaxSpeed).not.toBeCloseTo(66.12, 2);
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('DRIFT SPARKER'));
+		expect(entry?.delta).toBeCloseTo(12, 4);
+		// The boost only applies while powersliding/hoverdrifting.
+		expect(entry?.conditional).toBe(true);
+
+		// The acceleration half has no exported magnitude (its Tracker GE is empty), so the
+		// time-based Acceleration stat must not pick up a phantom edit.
+		expect(build!.stats.AccelerationTime).toBeCloseTo(4.5, 4);
+		expect(build!.breakdown.AccelerationTime ?? []).toHaveLength(0);
+	});
+
 	it('ammo equip-effect speed modifiers apply to vehicle Max/Reverse/Strafing speed', () => {
 		// Unstable restricts all three movement speeds to 65% while loaded — these live
 		// on the ammo's equip effect, surfaced via the optional speed modifiers.
