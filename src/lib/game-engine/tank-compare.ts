@@ -43,10 +43,12 @@ export const compareRatingRows: CompareRowDef[] = [
 	row('AbilityRating', { label: 'Ability', better: 'higher' })
 ];
 
+// Section titles mirror the stat-definition groups so the comparison reads the
+// same as the build planner's stat table.
 export const compareSections: CompareSectionDef[] = [
 	{
-		id: 'firepower',
-		title: 'Firepower',
+		id: 'weapon',
+		title: 'Weapon',
 		rows: [
 			row('ShellDamage'),
 			row('ShellPenetration', { unit: 'mm' }),
@@ -82,8 +84,8 @@ export const compareSections: CompareSectionDef[] = [
 		]
 	},
 	{
-		id: 'recon',
-		title: 'Recon & Stealth',
+		id: 'vision',
+		title: 'Vision',
 		rows: [
 			row('VisionRadius'),
 			// Raw data confirms this is the tank's own signature radius (stealthy
@@ -108,12 +110,6 @@ export const compareStatKeys: readonly string[] = [
 export function scaleCompareValue(rowDef: CompareRowDef, raw: number | undefined): number {
 	const value = Number(raw ?? 0);
 	return rowDef.scale != null ? value * rowDef.scale : value;
-}
-
-export function formatCompareValue(value: number): string {
-	if (!Number.isFinite(value)) return '—';
-	if (Number.isInteger(value)) return String(value);
-	return value.toFixed(2).replace(/\.?0+$/, '');
 }
 
 /**

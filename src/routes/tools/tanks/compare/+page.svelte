@@ -3,12 +3,12 @@
 	import { page } from '$app/state';
 	import DifficultyMeter from '$lib/components/DifficultyMeter.svelte';
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import { formatStatValue } from '$lib/game-engine/build';
 	import {
 		RATING_MAX,
 		bestCompareValue,
 		compareRatingRows,
 		compareSections,
-		formatCompareValue,
 		scaleCompareValue,
 		shouldShowCompareRow,
 		type CompareRowDef
@@ -382,7 +382,7 @@
 										<span
 											class={`w-7 shrink-0 text-right font-mono text-[11px] tabular-nums ${isBest ? 'font-bold text-[var(--hud-lime)]' : 'text-[var(--hud-muted)]'}`}
 										>
-											{formatCompareValue(value)}
+											{formatStatValue(value)}
 										</span>
 									</div>
 								{/each}
@@ -423,15 +423,10 @@
 									{#each values as value, index}
 										{@const isBest = best != null && value === best}
 										<div class="px-1">
-											<div class="flex items-baseline gap-1">
-												<span
-													class={`font-mono text-sm tabular-nums ${isBest ? 'font-bold text-[var(--hud-lime)]' : 'text-[var(--hud-text)]'}`}
-												>
-													{formatCompareValue(value)}
-												</span>
-												{#if rowDef.unit}
-													<span class="text-[9px] uppercase text-[var(--hud-dim)]">{rowDef.unit}</span>
-												{/if}
+											<div
+												class={`whitespace-nowrap font-mono text-sm tabular-nums ${isBest ? 'font-bold text-[var(--hud-lime)]' : 'text-[var(--hud-text)]'}`}
+											>
+												{formatStatValue(value, rowDef.unit)}
 											</div>
 											{#if bars}
 												<div class="mt-1 h-[3px] w-full max-w-[9rem] bg-[var(--hud-inset)]">
@@ -521,7 +516,9 @@
 <style>
 	.compare-grid {
 		display: grid;
-		grid-template-columns: minmax(7.5rem, 0.9fr) repeat(var(--compare-cols, 2), minmax(0, 1fr));
+		/* Fixed caps instead of fractions: a two-tank comparison hugs the left
+		   edge instead of stretching a huge empty label column across the page. */
+		grid-template-columns: minmax(7.5rem, 10rem) repeat(var(--compare-cols, 2), minmax(9.5rem, 23rem));
 	}
 
 	/* Keep columns readable on small screens; the wrapper scrolls horizontally. */

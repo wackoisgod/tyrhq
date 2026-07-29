@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { getCompareTanks } from '$lib/data/game-data';
+import { statDefinitionByKey } from './stat-definitions';
 import {
 	bestCompareValue,
 	compareRatingRows,
 	compareSections,
 	compareStatKeys,
-	formatCompareValue,
 	scaleCompareValue,
 	shouldShowCompareRow
 } from './tank-compare';
@@ -28,6 +28,17 @@ describe('compare stat definitions', () => {
 			.flatMap((section) => section.rows)
 			.find((entry) => entry.key === 'ReloadTime');
 		expect(reload).toMatchObject({ label: 'Reload Time', unit: 's', better: 'lower' });
+	});
+
+	it('section titles match the build planner stat groups for shared stats', () => {
+		for (const section of compareSections) {
+			for (const entry of section.rows) {
+				const definition = statDefinitionByKey.get(entry.key);
+				if (definition) {
+					expect(definition.group, `${section.title}.${entry.key}`).toBe(section.title);
+				}
+			}
+		}
 	});
 
 	it('treats detection radius as lower-is-better (it is the tank signature radius)', () => {
@@ -73,13 +84,6 @@ describe('row visibility and formatting', () => {
 		expect(shouldShowCompareRow([0, 0, 0])).toBe(false);
 		expect(shouldShowCompareRow([0, 40])).toBe(true);
 		expect(shouldShowCompareRow([-11, -6])).toBe(true);
-	});
-
-	it('formats values without trailing zero noise', () => {
-		expect(formatCompareValue(15.25)).toBe('15.25');
-		expect(formatCompareValue(4.5)).toBe('4.5');
-		expect(formatCompareValue(57)).toBe('57');
-		expect(formatCompareValue(Number.NaN)).toBe('—');
 	});
 
 	it('scales mass from kilograms to tonnes for display', () => {
