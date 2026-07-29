@@ -231,6 +231,47 @@ export function descriptionIndicatesStacking(description: string) {
 	return /stack|stacks|stacking/.test(normalizeDescription(description));
 }
 
+/**
+ * Burst amplifications a tooltip states as a word-multiplier on the whole effect
+ * ("Effect briefly quintuples on landing after being airborne"). Resolved as a stack
+ * count so "assume max stacks" can preview the amplified value. The multiplier word
+ * must sit in a clause whose subject is "effect" — DUPLICATOR's "Doubles the number
+ * of shells gained" amplifies shell gain, not its own stat modifier, and must not match.
+ */
+const effectMultiplierWords: Array<[RegExp, number]> = [
+	[/\bdoubles?\b/, 2],
+	[/\btriples?\b/, 3],
+	[/\bquadruples?\b/, 4],
+	[/\bquintuples?\b/, 5]
+];
+
+function getDescriptionEffectMultiplier(description: string): number {
+	const effectClause = normalizeDescription(description).match(/\beffect\b[^.]*/)?.[0];
+	if (!effectClause) return 1;
+	for (const [pattern, multiplier] of effectMultiplierWords) {
+		if (pattern.test(effectClause)) return multiplier;
+	}
+	return 1;
+}
+
+/**
+ * Components that stack in-game although their tooltip never says "stack": RELENTLESS
+ * ADAPTER re-applies its Max Health gain on every module-damage event, up to its GE's
+ * stack limit (15). Kept opt-in per component because many component GEs export
+ * placeholder stack limits with no gameplay meaning (999 on Power Converter, 50 on
+ * Duplicator).
+ */
+const trustedStackLimitComponents = new Set(['relentlessadapter']);
+
+/** Whether the "assume max stacks" option changes anything for this component. */
+export function componentSupportsMaxStacks(component: ComponentRecord): boolean {
+	return (
+		descriptionIndicatesStacking(component.description) ||
+		trustedStackLimitComponents.has(component.id) ||
+		getDescriptionEffectMultiplier(component.description) > 1
+	);
+}
+
 function inferStatTargetsFromDescription(description: string) {
 	const normalized = normalizeDescription(description);
 	const targets = new Set<string>();
@@ -537,6 +578,24 @@ function getEventStackCount(effect: EffectRecord | undefined, allowMaxStacks: bo
 	return effect?.stackLimit && effect.stackLimit > 1 ? effect.stackLimit : 1;
 }
 
+/**
+ * Stack count for one of a component's data-driven effects. The tooltip's stated burst
+ * multiplier participates because it is not always mirrored in the GE data — FRICTION
+ * CAPACITOR's quintuple lives only in the text (its Max Speed GE has stackLimit 1 and
+ * its airborne tracker is empty).
+ */
+function getComponentEffectStackCount(
+	effect: EffectRecord,
+	component: ComponentRecord,
+	allowMaxStacks: boolean
+) {
+	if (!allowMaxStacks) return 1;
+	return Math.max(
+		getEventStackCount(effect, true),
+		getDescriptionEffectMultiplier(component.description)
+	);
+}
+
 function getDescriptionStackLimit(description: string) {
 	const normalized = normalizeDescription(description);
 	const matches = [
@@ -560,7 +619,10 @@ function getFallbackStackCount(
 ) {
 	if (!allowMaxStacks) return 1;
 
-	let stackCount = getDescriptionStackLimit(description);
+	let stackCount = Math.max(
+		getDescriptionStackLimit(description),
+		getDescriptionEffectMultiplier(description)
+	);
 	for (const effect of effects) {
 		const effectName = getEffectName(effect.path);
 		if (effectName && /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
@@ -772,7 +834,7 @@ export function computeBuild(
 		if (!includeConditionalEffects && isConditionalComponent(component)) continue;
 
 		const description = component.description || '';
-		const allowsStacking = descriptionIndicatesStacking(description);
+		const allowsStacking = componentSupportsMaxStacks(component);
 		const conditional = isConditionalComponent(component);
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
@@ -789,7 +851,11 @@ export function computeBuild(
 			const effectName = getEffectName(effect.path);
 			if (!effectName || /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
 
-			const stackCount = getEventStackCount(effect, assumeMaxStacks && allowsStacking);
+			const stackCount = getComponentEffectStackCount(
+				effect,
+				component,
+				assumeMaxStacks && allowsStacking
+			);
 			let effectApplied = false;
 
 			for (const modifier of effect.modifiers) {
