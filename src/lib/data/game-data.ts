@@ -4,8 +4,10 @@ import {
 	fillGeneratedComponentDescription,
 	type ComponentValueToken
 } from '$lib/game-engine/component-format';
+import { compareStatKeys } from '$lib/game-engine/tank-compare';
 import type {
 	AmmoSummary,
+	CompareTank,
 	ComponentSummary,
 	GameDataBundle,
 	GameSnapshot,
@@ -168,6 +170,21 @@ function toMapSummary(): MapSummary[] {
 
 export function getGameDataBundle() {
 	return bundle;
+}
+
+export function getCompareTanks(): CompareTank[] {
+	return bundle.vehicles.map((vehicle) => ({
+		id: vehicle.id,
+		slug: vehicle.slug,
+		name: vehicle.name,
+		classId: vehicle.classId,
+		classLabel: vehicle.classLabel,
+		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
+		stats: Object.fromEntries(
+			compareStatKeys.map((key) => [key, Number(vehicle.stats[key] ?? 0)])
+		),
+		ability: vehicle.ability
+	}));
 }
 
 export function getGameSnapshot(): GameSnapshot {

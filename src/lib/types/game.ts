@@ -28,6 +28,21 @@ export type TankSummary = {
 	ability: VehicleAbility;
 };
 
+/**
+ * Payload for the vehicle comparison tool: identity plus the raw stat subset
+ * from `compareStatKeys` (see `$lib/game-engine/tank-compare`).
+ */
+export type CompareTank = {
+	id: string;
+	slug: string;
+	name: string;
+	classId: string;
+	classLabel: string;
+	isWorkInProgress: boolean;
+	stats: Record<string, number>;
+	ability: VehicleAbility;
+};
+
 export type AmmoSummary = {
 	id: string;
 	key: string;

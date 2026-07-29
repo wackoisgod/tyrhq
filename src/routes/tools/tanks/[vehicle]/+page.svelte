@@ -98,21 +98,30 @@
 					<div class={`text-xs uppercase tracking-[0.32em] ${getTankTheme(data.tank).accent}`}>
 						{data.tank.classLabel} vehicle
 					</div>
-					{#if data.armorAvailable}
+					<div class="flex items-center gap-2">
 						<a
-							href={`/tools/tanks/${data.tank.slug}/armor`}
+							href={`/tools/tanks/compare?tanks=${data.tank.slug}`}
 							class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm transition hover:bg-[var(--hud-panel)] hover:text-[var(--hud-lime)]"
+							title="Compare {data.tank.name} against other vehicles"
 						>
-							Inspect Armor
+							Compare
 						</a>
-					{:else}
-						<span
-							class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm"
-							title="Armor viewer assets are not published for this vehicle yet."
-						>
-							Armor Data Pending
-						</span>
-					{/if}
+						{#if data.armorAvailable}
+							<a
+								href={`/tools/tanks/${data.tank.slug}/armor`}
+								class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm transition hover:bg-[var(--hud-panel)] hover:text-[var(--hud-lime)]"
+							>
+								Inspect Armor
+							</a>
+						{:else}
+							<span
+								class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm"
+								title="Armor viewer assets are not published for this vehicle yet."
+							>
+								Armor Data Pending
+							</span>
+						{/if}
+					</div>
 				</div>
 
 				<div class="absolute inset-x-5 bottom-5">

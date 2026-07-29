@@ -90,9 +90,14 @@
 						vehicle preselected.
 					</p>
 				</div>
-				<p class="hud-numeric shrink-0 text-sm text-[var(--hud-muted)]">
-					{data.tanks.length} vehicles · {groupedTanks.length} classes
-				</p>
+				<div class="flex shrink-0 flex-wrap items-center gap-4">
+					<a href="/tools/tanks/compare" class="hud-cta-outline px-4 py-2 text-xs">
+						Compare Vehicles
+					</a>
+					<p class="hud-numeric shrink-0 text-sm text-[var(--hud-muted)]">
+						{data.tanks.length} vehicles · {groupedTanks.length} classes
+					</p>
+				</div>
 			</div>
 
 			{#each groupedTanks as [group, tanks]}
