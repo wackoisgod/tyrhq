@@ -31,7 +31,7 @@
 
 	{#if !canCreate && data.isSignedIn}
 		<div class="mt-6 border-l-2 border-[var(--hud-teal)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[var(--hud-muted)]">
-			You captain <a class="hud-link" href="/teams/{data.captainTeams[0].slug}">{data.captainTeams[0].name}</a>. You can join other teams, but each account can only captain one active team.
+			You captain <a class="hud-link" href="/teams/{data.captainTeams[0].slug}">{data.captainTeams[0].name}</a>. You can request to join other teams, but each account can only captain one active team.
 		</div>
 	{/if}
 

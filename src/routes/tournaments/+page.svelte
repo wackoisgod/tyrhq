@@ -52,8 +52,10 @@
 					<a
 						href="/tournaments/{tournament.slug}"
 						class="tournament-card group"
-						style={tournament.logoUrl ? `--tournament-image: url('${tournament.logoUrl}')` : ''}
 					>
+						{#if tournament.logoUrl}
+							<img class="tournament-card__image" src={tournament.logoUrl} alt="" loading="lazy" />
+						{/if}
 						<div class="tournament-card__content">
 							<p class="hud-eyebrow">{registrationLabel(tournament)}</p>
 							<h3 class="mt-2 text-2xl font-semibold uppercase text-[var(--hud-text)]">
@@ -83,8 +85,10 @@
 					<a
 						href="/tournaments/{tournament.slug}"
 						class="tournament-card tournament-card--compact group"
-						style={tournament.logoUrl ? `--tournament-image: url('${tournament.logoUrl}')` : ''}
 					>
+						{#if tournament.logoUrl}
+							<img class="tournament-card__image" src={tournament.logoUrl} alt="" loading="lazy" />
+						{/if}
 						<div class="tournament-card__content">
 							<p class="hud-eyebrow">{registrationLabel(tournament)}</p>
 							<p class="mt-2 font-semibold uppercase text-[var(--hud-text)]">{tournament.name}</p>
@@ -112,11 +116,8 @@
 		border: 1px solid color-mix(in srgb, var(--hud-variant) 82%, transparent);
 		border-radius: 2px;
 		background:
-			linear-gradient(100deg, rgba(5, 10, 20, 0.98) 0%, rgba(5, 10, 20, 0.9) 28%, rgba(5, 10, 20, 0.48) 48%, rgba(5, 10, 20, 0.08) 75%, rgba(5, 10, 20, 0.14) 100%),
-			var(--tournament-image, linear-gradient(135deg, rgba(117, 241, 244, 0.16), rgba(116, 95, 255, 0.12))),
+			linear-gradient(135deg, rgba(117, 241, 244, 0.16), rgba(116, 95, 255, 0.12)),
 			var(--hud-panel);
-		background-position: center;
-		background-size: cover;
 		box-shadow: var(--hud-surface-ghost);
 		transition:
 			border-color 140ms ease,
@@ -124,11 +125,20 @@
 			transform 140ms ease;
 	}
 
+	.tournament-card__image {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
 	.tournament-card::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		z-index: -1;
+		z-index: 1;
 		background:
 			linear-gradient(90deg, rgba(117, 241, 244, 0.09), transparent 34%),
 			repeating-linear-gradient(
@@ -137,8 +147,9 @@
 				rgba(255, 255, 255, 0.035) 1px,
 				transparent 1px,
 				transparent 80px
-			);
-		opacity: 0.38;
+			),
+			linear-gradient(100deg, rgba(5, 10, 20, 0.98) 0%, rgba(5, 10, 20, 0.9) 28%, rgba(5, 10, 20, 0.48) 48%, rgba(5, 10, 20, 0.08) 75%, rgba(5, 10, 20, 0.14) 100%);
+		pointer-events: none;
 	}
 
 	.tournament-card:hover {
@@ -148,6 +159,8 @@
 	}
 
 	.tournament-card__content {
+		position: relative;
+		z-index: 2;
 		max-width: min(34rem, 72%);
 		padding: 1.5rem;
 	}

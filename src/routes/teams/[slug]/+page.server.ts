@@ -1,9 +1,12 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import {
+	cancelTeamJoinRequest,
 	getTeamBySlug,
-	joinTeam,
+	getTeamJoinContext,
 	leaveTeam,
+	requestTeamJoin,
+	reviewTeamJoinRequest,
 	TournamentError,
 	updateTeam,
 	updateTeamLogo,
@@ -15,12 +18,21 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const { user, role } = await locals.safeGetSession();
 	const team = await getTeamBySlug(params.slug);
 	if (!team) error(404, 'Team not found');
+
+	const isMember = Boolean(user && team.members.some((member) => member.userId === user.id));
+	const isCaptain = Boolean(user && team.captainId === user.id);
+	const joinContext = user
+		? await getTeamJoinContext(team.id, user.id, role)
+		: { requestStatus: null, pendingRequests: [] };
+
 	return {
 		team,
 		userId: user?.id ?? null,
 		role,
-		isMember: Boolean(user && team.members.some((member) => member.userId === user.id)),
-		isCaptain: Boolean(user && team.captainId === user.id),
+		isMember,
+		isCaptain,
+		joinRequestStatus: joinContext.requestStatus,
+		pendingJoinRequests: joinContext.pendingRequests,
 		loginHref: `/auth?next=${encodeURIComponent(url.pathname)}`
 	};
 };
@@ -46,13 +58,47 @@ export const actions: Actions = {
 			throw err;
 		}
 	},
-	join: async ({ request, locals }) => {
+	requestJoin: async ({ request, locals }) => {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Authentication required' });
 		const form = await request.formData();
 		try {
-			await joinTeam(String(form.get('teamId') ?? ''), user.id);
-			return { success: 'Joined team.' };
+			await requestTeamJoin(String(form.get('teamId') ?? ''), user.id);
+			return { success: 'Join request sent to the team captain.' };
+		} catch (err) {
+			if (err instanceof TournamentError) return fail(err.statusCode, { error: err.message });
+			throw err;
+		}
+	},
+	cancelJoin: async ({ request, locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		const form = await request.formData();
+		try {
+			await cancelTeamJoinRequest(String(form.get('teamId') ?? ''), user.id);
+			return { success: 'Join request cancelled.' };
+		} catch (err) {
+			if (err instanceof TournamentError) return fail(err.statusCode, { error: err.message });
+			throw err;
+		}
+	},
+	reviewJoin: async ({ request, locals }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		const form = await request.formData();
+		const decision = String(form.get('decision') ?? '');
+		if (decision !== 'approve' && decision !== 'reject') {
+			return fail(400, { error: 'Invalid join request decision.' });
+		}
+		try {
+			await reviewTeamJoinRequest(
+				String(form.get('teamId') ?? ''),
+				String(form.get('applicantId') ?? ''),
+				decision,
+				user.id,
+				role
+			);
+			return { success: decision === 'approve' ? 'Player added to the team.' : 'Join request rejected.' };
 		} catch (err) {
 			if (err instanceof TournamentError) return fail(err.statusCode, { error: err.message });
 			throw err;

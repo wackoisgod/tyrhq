@@ -2,6 +2,7 @@ import adapter from '@sveltejs/adapter-vercel';
 import { mdsvex } from 'mdsvex';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { loadEnv } from 'vite';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mdsvexExtension = '.md';
@@ -48,12 +49,16 @@ function mdsvexAutoImportPreprocess() {
  * The browser talks to Supabase directly (auth refresh, signed-URL image
  * uploads), so its origin must be in connect-src/img-src. The project moved
  * from the raw `*.supabase.co` URL to a custom domain, so derive the origin
- * from PUBLIC_SUPABASE_URL at build time; keep the `*.supabase.co` wildcard
- * as a fallback for environments where the var is unset at build.
+ * from PUBLIC_SUPABASE_URL. Vite has not loaded local `.env` files when this
+ * Svelte config is evaluated, so load them explicitly while still preferring
+ * an environment variable supplied by the deployment platform. Keep the
+ * `*.supabase.co` wildcard as a fallback.
  */
 function supabaseCspSources() {
 	const sources = ['https://*.supabase.co'];
-	const url = process.env.PUBLIC_SUPABASE_URL;
+	const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+	const localEnv = loadEnv(mode, __dirname, '');
+	const url = process.env.PUBLIC_SUPABASE_URL || localEnv.PUBLIC_SUPABASE_URL;
 	if (url) {
 		try {
 			const origin = new URL(url).origin;
