@@ -42,10 +42,11 @@
 		const stripped = raw.replace(/^Gameplay\.Event\./, '');
 		return humanizeAttribute(stripped.replace(/\./g, ' '));
 	}
+	function humanizeEffectPath(raw: string) {
+		const assetName = raw.split('/').at(-1)?.split('.')[0] ?? raw;
+		return humanizeAttribute(assetName.replace(/^GE_/, ''));
+	}
 
-	const hasModifiers = $derived(
-		data.linkedEffects.some((effect) => effect.modifiers.length > 0)
-	);
 </script>
 
 <svelte:head>
@@ -174,25 +175,42 @@
 			</div>
 			{#if data.linkedEffects.length === 0}
 				<p class="text-sm leading-6 text-[var(--hud-muted)]">No gameplay effects on record.</p>
-			{:else if !hasModifiers}
-				<p class="text-sm leading-6 text-[var(--hud-muted)]">
-					{data.linkedEffects.length} effect{data.linkedEffects.length === 1 ? '' : 's'} applied via custom calculation. See description and point values for the magnitude.
-				</p>
 			{:else}
 				<div class="flex flex-col gap-2">
-					{#each data.linkedEffects as effect}
-						{#if effect.modifiers.length > 0}
-							<div
-								class="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 rounded-sm bg-[var(--hud-inset)] px-2.5 py-2 font-mono text-[11px] shadow-[inset_2px_0_0_0_var(--hud-teal)]"
-							>
-								{#each effect.modifiers as modifier}
-									<span class="truncate text-[var(--hud-text)]" title={modifier.attribute}>
-										{humanizeAttribute(modifier.attribute)}
-									</span>
-									<span class="text-right text-[var(--hud-muted)]">{modifier.op}</span>
-								{/each}
+					{#each data.linkedEffects as binding}
+						<div class="rounded-sm bg-[var(--hud-inset)] px-2.5 py-2 shadow-[inset_2px_0_0_0_var(--hud-teal)]">
+							<div class="flex items-baseline justify-between gap-3">
+								<span class="font-[var(--font-display)] text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--hud-text)]" title={binding.eventTag || 'Always active'}>
+									{binding.eventTag ? humanizeEventTag(binding.eventTag) : 'Always active'}
+								</span>
+								<span class="truncate font-mono text-[9px] text-[var(--hud-dim)]" title={binding.effect.path}>
+									{humanizeEffectPath(binding.effect.path)}
+								</span>
 							</div>
-						{/if}
+
+							{#if binding.effect.modifiers.length > 0}
+								<div class="mt-1.5 flex flex-col gap-1 font-mono text-[10px]">
+									{#each binding.effect.modifiers as modifier}
+										<div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
+											<span class="truncate text-[var(--hud-text)]" title={modifier.attribute}>{humanizeAttribute(modifier.attribute)}</span>
+											<span class="text-[var(--hud-muted)]">{modifier.op}</span>
+											<span class="text-right text-[var(--hud-teal)]">
+												{modifier.scalableFloatValue != null ? modifier.scalableFloatValue : modifier.magnitudeType}
+											</span>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<p class="mt-1.5 text-[10px] leading-4 text-[var(--hud-dim)]">
+									No direct attribute modifier exported; the gameplay behavior is implemented by the effect or component logic.
+								</p>
+							{/if}
+
+							<div class="mt-1.5 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--hud-dim)]">
+								{#if binding.effect.durationPolicy}<span>{binding.effect.durationPolicy}</span>{/if}
+								{#if binding.effect.stackLimit > 1}<span>· {binding.effect.stackLimit} stacks</span>{/if}
+							</div>
+						</div>
 					{/each}
 				</div>
 			{/if}

@@ -1,3 +1,5 @@
+import type { ComponentValueToken, TalentValueToken } from '$lib/game-engine/component-format';
+
 export type VehicleAbility = {
 	name: string;
 	description: string;
@@ -76,6 +78,8 @@ export type ComponentSummary = {
 	slug: string;
 	name: string;
 	description: string;
+	descriptionTemplate?: string;
+	valueTokens?: ComponentValueToken[];
 	categoryId: string;
 	category: string;
 	pointValues: number[];
@@ -87,6 +91,8 @@ export type TalentSummary = {
 	slug: string;
 	name: string;
 	description: string;
+	descriptionTemplate?: string;
+	valueTokens?: TalentValueToken[];
 	maxPoints: number;
 };
 
@@ -142,17 +148,44 @@ export type AmmoRecord = AmmoSummary & {
 
 export type EffectModifier = {
 	attribute: string;
+	attributeSet?: string;
 	op: string;
 	magnitude: string;
 	magnitudeType: string;
+	calculationClass?: string;
+	scalableFloatValue?: number | null;
+};
+
+export type EffectBinding = {
+	eventTag: string;
+	effectId: string;
+	effectPath: string;
+};
+
+export type EffectTagRequirement = {
+	requiredTags: string[];
+	ignoredTags: string[];
+	tagQuery: unknown;
 };
 
 export type EffectRecord = {
 	id: string;
 	path: string;
+	durationPolicy?: string;
+	durationMagnitude?: string;
+	period?: string;
+	chanceToApply?: string;
+	stackingType?: string;
 	stackLimit: number;
+	stackDurationRefreshPolicy?: string;
+	stackPeriodResetPolicy?: string;
 	tags: string[];
+	ownedTags?: string[];
+	removeEffectsWithTags?: string[];
+	tagRequirements?: Record<'application' | 'ongoing' | 'removal', EffectTagRequirement>;
 	modifiers: EffectModifier[];
+	executions?: unknown[];
+	gameplayCues?: unknown[];
 };
 
 export type ComponentRecord = ComponentSummary & {
@@ -160,6 +193,7 @@ export type ComponentRecord = ComponentSummary & {
 	eventTags: string[];
 	effectIds: string[];
 	effectPaths: string[];
+	effectBindings?: EffectBinding[];
 	nativeVehicles: NativeVehicleEntry[];
 	source: {
 		key: string;
@@ -173,6 +207,7 @@ export type TalentRecord = TalentSummary & {
 	eventTags: string[];
 	effectIds: string[];
 	effectPaths: string[];
+	effectBindings?: EffectBinding[];
 	pointValues: number[];
 	source: {
 		key: string;
@@ -217,6 +252,12 @@ export type GameDataBundle = {
 		schemaVersion: number;
 		generatedAt: string;
 		rawSource: string;
+		sourceChangelist?: number | null;
+		sourceRevisionPolicy?: string;
+		exporter?: {
+			revision?: number | null;
+			changelist?: number | null;
+		};
 	};
 	vehicles: VehicleRecord[];
 	ammo: AmmoRecord[];

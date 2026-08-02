@@ -1,37 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
 import { getGameDataBundle } from '$lib/data/game-data';
-import { getTalentValueTokens } from './talent-tokens';
+import { extractTalentValueTokens, fillTalentDescription } from '$lib/game-engine/component-format';
 
-describe('getTalentValueTokens', () => {
-	it('recovers percent tokens for Valor (Healer) Module Damage', () => {
-		const tokens = getTalentValueTokens();
-		expect(tokens['healer-talent017']).toEqual(['LevelValuePercent', 'PointValuePercent']);
-	});
+describe('exported talent value tokens', () => {
+	const talentById = new Map(getGameDataBundle().talents.map((talent) => [talent.id, talent]));
 
-	it('recovers absolute tokens for Ability Cooldown talents', () => {
-		const tokens = getTalentValueTokens();
-		expect(tokens['healer-talent019']).toEqual(['LevelValueAbs', 'PointValueAbs']);
-	});
-
-	it('covers every runtime talent that renders value placeholders', () => {
-		const tokens = getTalentValueTokens();
-		const bundle = getGameDataBundle();
-
-		// Known drift between the raw drop and the generated runtime: the drone
-		// deploy-range talent was reworded in the raw data and no longer carries
-		// placeholders, so it legitimately has no token data.
-		const knownDrift = new Set(['drone-talent027']);
-
-		for (const talent of bundle.talents) {
-			if (knownDrift.has(talent.id)) continue;
-			const placeholderCount = (talent.description.match(/\bvalue\b/gi) ?? []).length;
-			if (placeholderCount === 0) continue;
-			expect(tokens[talent.id], `${talent.id} is missing token data`).toBeDefined();
-			expect(
-				tokens[talent.id].length,
-				`${talent.id} token count differs from its value placeholders`
-			).toBe(placeholderCount);
+	it('covers every runtime talent template placeholder in order', () => {
+		for (const talent of talentById.values()) {
+			const templateTokens = extractTalentValueTokens(talent.descriptionTemplate ?? '');
+			expect(talent.valueTokens ?? [], `${talent.id} token drift`).toEqual(templateTokens);
 		}
+	});
+
+	it('includes the percent and absolute semantics for Seeker talents', () => {
+		expect(talentById.get('seeker-talent003')?.valueTokens).toEqual([
+			'LevelValuePercentMultiplyDecrease',
+			'PointValuePercentMultiplyDecrease'
+		]);
+		expect(talentById.get('seeker-talent009')?.valueTokens).toEqual([
+			'LevelValueAbs',
+			'PointValueAbs'
+		]);
+	});
+
+	it('formats Seeker multiplier values using the exported tokens', () => {
+		const talent = talentById.get('seeker-talent003');
+		expect(talent).toBeDefined();
+		if (!talent) return;
+
+		const description = fillTalentDescription(
+			talent.description,
+			talent.pointValues,
+			talent.valueTokens ?? [],
+			5,
+			5
+		);
+		expect(description).toContain('15% (+3% per point)');
 	});
 });

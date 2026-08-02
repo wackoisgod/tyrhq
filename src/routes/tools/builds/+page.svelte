@@ -559,19 +559,13 @@
 	}
 
 	function formatTalentDescription(
-		talentId: string,
 		description: string,
 		pointValues: number[],
+		valueTokens: import('$lib/game-engine/component-format').TalentValueToken[],
 		currentPoints: number,
 		nodeMaxPoints: number
 	) {
-		return fillTalentDescription(
-			description,
-			pointValues,
-			data.talentValueTokens[talentId] ?? [],
-			currentPoints,
-			nodeMaxPoints
-		);
+		return fillTalentDescription(description, pointValues, valueTokens, currentPoints, nodeMaxPoints);
 	}
 
 	function otherSlotsComponentIds(slotIndex: number): Set<string> {
@@ -1077,7 +1071,7 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.id, node.talent.description, node.talent.pointValues, points, node.maxPoints)}
+										{formatTalentDescription(node.talent.description, node.talent.pointValues, node.talent.valueTokens ?? [], points, node.maxPoints)}
 									</p>
 									{#if node.talent.supplementalDescription}
 										<!-- Supplemental text never carries value placeholders — render it verbatim so

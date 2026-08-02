@@ -1,57 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import rawComponentData from '$lib/data/raw/ComponentData.json';
+import { getGameDataBundle } from '$lib/data/game-data';
+import { extractTalentValueTokens } from '$lib/game-engine/component-format';
 
-import { componentValueTokens, getGameDataBundle } from '$lib/data/game-data';
+describe('exported component value tokens', () => {
+	const componentById = new Map(getGameDataBundle().components.map((component) => [component.id, component]));
 
-type RawComponentEntry = {
-	Name: string;
-	ComponentDescription: string;
-};
-
-const tokenPattern = /\{(LevelValue(?:Abs|Percent(?:Multiply(?:Decrease|Increase))?)?)\}/g;
-
-function rawTokensById(): Map<string, string[]> {
-	const map = new Map<string, string[]>();
-	for (const entry of rawComponentData as RawComponentEntry[]) {
-		const id = entry.Name.split('.').at(-1)?.toLowerCase() ?? '';
-		const tokens = Array.from(entry.ComponentDescription.matchAll(tokenPattern), (m) => m[1]);
-		map.set(id, tokens);
-	}
-	return map;
-}
-
-describe('componentValueTokens', () => {
-	it('matches the placeholder tokens in the raw ComponentData drop', () => {
-		const raw = rawTokensById();
-
-		for (const [id, tokens] of raw) {
-			const distinct = [...new Set(tokens)];
-			// The single-token map design relies on each component using one placeholder kind.
-			expect(distinct.length, `${id} mixes placeholder tokens; the map needs reworking`)
-				.toBeLessThanOrEqual(1);
-
-			const token = distinct[0];
-			if (token && token !== 'LevelValue') {
-				expect(componentValueTokens.get(id), `${id} is missing its ${token} map entry`).toBe(
-					token
-				);
-			}
+	it('keeps every exported template aligned with its ordered token list', () => {
+		for (const component of componentById.values()) {
+			const templateTokens = extractTalentValueTokens(component.descriptionTemplate ?? '');
+			expect(component.valueTokens ?? [], `${component.id} token drift`).toEqual(templateTokens);
 		}
 	});
 
-	it('has no entries for components absent from the raw drop', () => {
-		const raw = rawTokensById();
-		for (const id of componentValueTokens.keys()) {
-			expect(raw.has(id), `${id} is not in the raw ComponentData drop`).toBe(true);
-		}
+	it('renders newly exported multiplier tokens without a manual id map', () => {
+		expect(componentById.get('energyvent')?.description).toContain('by 3.5%');
+		expect(componentById.get('energyvent')?.description).not.toContain('by 1.03');
+		expect(componentById.get('sidescrapegear')?.description).toContain('by 35%');
+		expect(componentById.get('sidescrapegear')?.description).not.toContain('by 1.35');
 	});
-});
 
-describe('normalized component descriptions', () => {
-	const componentById = new Map(getGameDataBundle().components.map((c) => [c.id, c]));
-
-	it('renders Kinetic Absorber with absolute seconds like the game (no negative sign)', () => {
+	it('renders Kinetic Absorber with absolute seconds like the game', () => {
 		const description = componentById.get('kineticabsorber')?.description ?? '';
 		expect(description).toContain('by 1 seconds');
 		expect(description).not.toContain('-1');

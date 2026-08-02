@@ -1097,3 +1097,61 @@ describe('formatStatValue', () => {
 		expect(formatStatValue(4.5, 's')).toBe('4.50 s');
 	});
 });
+
+describe('exported effect bindings', () => {
+	it('keeps permanent component modifiers when conditional effects are disabled', () => {
+		const standard = makeAmmo('standard', 'Standard');
+		const passiveEffect = makeEffect('passive-health', 'MaxHealth', 'AddBase', 100);
+		passiveEffect.modifiers[0] = {
+			...passiveEffect.modifiers[0],
+			magnitude: 'opaque-exported-magnitude',
+			scalableFloatValue: 100
+		};
+		const conditionalEffect = makeEffect('conditional-health', 'MaxHealth', 'AddBase', 200);
+		const component: ComponentRecord = {
+			...makeComponent(
+				'mixed-component',
+				'MIXED COMPONENT',
+				['passive-health', 'conditional-health'],
+				[1],
+				'Provides a passive bonus and a larger bonus after taking damage.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.OnDamageTaken'],
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'passive-health',
+					effectPath: passiveEffect.path
+				},
+				{
+					eventTag: 'Gameplay.Event.OnDamageTaken',
+					effectId: 'conditional-health',
+					effectPath: conditionalEffect.path
+				}
+			]
+		};
+		const vehicle = makeVehicle('mixed', { MaxHealth: 1000 }, 'standard', 'tree_mixed');
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [standard],
+				components: [component],
+				talents: [],
+				effects: [passiveEffect, conditionalEffect],
+				trees: [makeTree('tree_mixed', 'mixed', [])]
+			})
+		);
+		const selection: PlannerSelection = {
+			vehicleId: 'mixed',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['mixed-component'],
+			talentPoints: {}
+		};
+
+		expect(computeBuild(catalog, selection)?.stats.MaxHealth).toBeCloseTo(1300, 4);
+		expect(
+			computeBuild(catalog, selection, { includeConditionalEffects: false })?.stats.MaxHealth
+		).toBeCloseTo(1100, 4);
+	});
+});

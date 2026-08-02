@@ -12,6 +12,7 @@ import {
 describe('isPublicApiResourceName', () => {
 	it('accepts configured resources', () => {
 		expect(isPublicApiResourceName('vehicles')).toBe(true);
+		expect(isPublicApiResourceName('effects')).toBe(true);
 		expect(isPublicApiResourceName('unknown')).toBe(false);
 	});
 });
@@ -45,6 +46,24 @@ describe('listPublicApiResource', () => {
 	});
 });
 
+describe('exported runtime fields', () => {
+	it('publishes component templates and structured effect bindings', () => {
+		const result = getPublicApiResourceById('components', 'agitator');
+		expect(result?.descriptionTemplate).toContain('{LevelValuePercentMultiplyIncrease}');
+		expect(result?.valueTokens).toEqual(['LevelValuePercentMultiplyIncrease']);
+		expect(Array.isArray(result?.effectBindings)).toBe(true);
+	});
+
+	it('publishes rich effect records', () => {
+		const result = listPublicApiResource(
+			'effects',
+			new URL('https://tyr-hq.test/api/v1/effects?limit=1')
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data[0]?.durationPolicy).toBeDefined();
+	});
+});
 describe('getPublicApiResourceById', () => {
 	it('returns a canonical map record by id', () => {
 		const maps = listPublicApiResource('maps', new URL('https://tyr-hq.test/api/v1/maps?limit=1'));
@@ -66,6 +85,8 @@ describe('createOpenApiDocument', () => {
 
 		expect(document.openapi).toBe('3.1.0');
 		expect(document.paths['/api/v1/vehicles']).toBeDefined();
+		expect(document.paths['/api/v1/effects']).toBeDefined();
+		expect(document.components.schemas.EffectBinding).toBeDefined();
 		expect(document.components.securitySchemes.BearerAuth).toBeDefined();
 	});
 });
@@ -77,6 +98,8 @@ describe('getPublicApiDatasetMeta', () => {
 		expect(meta.apiVersion).toBe('v1');
 		expect(meta.datasetRevision).toContain('schema-');
 		expect(meta.resourceCounts.vehicles).toBeGreaterThan(0);
+		expect(meta.resourceCounts.effects).toBeGreaterThan(0);
+		expect(meta.sourceChangelist).toBe(32942);
 	});
 
 	it('reuses the generated timestamp as its last-modified value', () => {

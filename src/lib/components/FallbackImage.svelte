@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-
-	type ImageKind = 'vehicle' | 'component' | 'ammo' | 'talent' | 'ability' | 'generic';
+	import { hasGameImageAsset, type GameImageKind } from '$lib/data/asset-availability';
 
 	let {
 		src,
@@ -18,7 +17,7 @@
 		alt?: string;
 		title?: string;
 		class?: string;
-		kind?: ImageKind;
+		kind?: GameImageKind;
 		label?: string;
 		style?: string;
 		forceFallback?: boolean;
@@ -69,9 +68,10 @@
 	);
 
 	const effectiveTitle = $derived((title || label || alt).trim());
+	const manifestMissing = $derived(!hasGameImageAsset(kind, src));
 
 	$effect(() => {
-		if (forceFallback) {
+		if (forceFallback || manifestMissing) {
 			failed = true;
 			return;
 		}
@@ -113,7 +113,7 @@
 	}
 </script>
 
-{#if failed || forceFallback || !mounted}
+{#if failed || forceFallback || manifestMissing || !mounted}
 	<span
 		class={`ui-fallback-icon ${toneClass} ${className}`}
 		title={effectiveTitle}

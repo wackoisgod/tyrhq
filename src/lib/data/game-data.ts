@@ -1,9 +1,6 @@
 import runtimeData from '$gamedata/generated/runtime.json';
 
-import {
-	fillGeneratedComponentDescription,
-	type ComponentValueToken
-} from '$lib/game-engine/component-format';
+import { fillTemplatedComponentDescription } from '$lib/game-engine/component-format';
 import { compareStatKeys } from '$lib/game-engine/tank-compare';
 import type {
 	AmmoSummary,
@@ -21,37 +18,6 @@ type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
 	ammo: Array<Omit<GameDataBundle['ammo'][number], 'displayName'> & { displayName?: string }>;
 };
 
-/**
- * The runtime bundle flattens component description placeholders (e.g. {LevelValuePercent},
- * {LevelValueAbs}) to the literal word "value", losing how the point value must be scaled
- * for display. This map restores each component's placeholder token from the raw
- * ComponentData drop. Components absent here use plain `LevelValue` (raw number) semantics.
- * `component-tokens.test.ts` asserts this map stays in sync with the raw data.
- */
-export const componentValueTokens = new Map<string, ComponentValueToken>([
-	['adaptivehardening', 'LevelValuePercent'],
-	['agitator', 'LevelValuePercentMultiplyIncrease'],
-	['bulkheads', 'LevelValuePercentMultiplyIncrease'],
-	['camoweb', 'LevelValuePercentMultiplyIncrease'],
-	['coreinjector', 'LevelValuePercentMultiplyDecrease'],
-	['driftsparker', 'LevelValuePercentMultiplyIncrease'],
-	['energyexpander', 'LevelValuePercentMultiplyIncrease'],
-	['extendedgearing', 'LevelValuePercentMultiplyIncrease'],
-	['hotchamber', 'LevelValuePercentMultiplyIncrease'],
-	['kineticabsorber', 'LevelValueAbs'],
-	['phasemodule', 'LevelValueAbs'],
-	['powerconverter', 'LevelValuePercentMultiplyDecrease'],
-	['quickslot', 'LevelValuePercentMultiplyDecrease'],
-	['reactivemodules', 'LevelValuePercent'],
-	['repairmechanism', 'LevelValuePercentMultiplyDecrease'],
-	['sensitivesights', 'LevelValuePercentMultiplyIncrease'],
-	['signatureobscurer', 'LevelValueAbs'],
-	['stablerangefinder', 'LevelValuePercentMultiplyDecrease'],
-	['synchronizer', 'LevelValuePercentMultiplyIncrease'],
-	['vulnbreaker', 'LevelValuePercent'],
-	['weaknessanalyzer', 'LevelValueAbs']
-]);
-
 function deriveAmmoDisplayName(key: string, fallbackName: string) {
 	const rawName = key.split('.').at(-1) ?? fallbackName;
 	return rawName
@@ -61,10 +27,9 @@ function deriveAmmoDisplayName(key: string, fallbackName: string) {
 }
 
 function normalizeComponentDescription(component: GameDataBundle['components'][number]) {
-	return fillGeneratedComponentDescription(
-		component.description,
-		component.pointValues,
-		componentValueTokens.get(component.id)
+	return fillTemplatedComponentDescription(
+		component.descriptionTemplate || component.description,
+		component.pointValues
 	);
 }
 
@@ -131,6 +96,8 @@ function toComponentSummary(): ComponentSummary[] {
 		slug: component.slug,
 		name: component.name,
 		description: component.description,
+		descriptionTemplate: component.descriptionTemplate,
+		valueTokens: component.valueTokens,
 		categoryId: component.categoryId,
 		category: component.category,
 		pointValues: component.pointValues
@@ -144,6 +111,8 @@ function toTalentSummary(): TalentSummary[] {
 		slug: talent.slug,
 		name: talent.name,
 		description: talent.description,
+		descriptionTemplate: talent.descriptionTemplate,
+		valueTokens: talent.valueTokens,
 		maxPoints: talent.maxPoints
 	}));
 }

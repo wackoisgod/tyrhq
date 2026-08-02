@@ -1,5 +1,4 @@
 import { getGameDataBundle } from '$lib/data/game-data';
-import { getTalentValueTokens } from '$lib/server/talent-tokens';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -62,7 +61,6 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
 	return {
 		bundle,
-		talentValueTokens: getTalentValueTokens(),
 		initialVehicleId: loadedBuild ? loadedBuild.vehicle_id : initialVehicleId,
 		lockedVehicleId,
 		loadedBuild,

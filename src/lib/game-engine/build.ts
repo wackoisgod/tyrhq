@@ -1,6 +1,7 @@
 import type {
 	AmmoRecord,
 	ComponentRecord,
+	EffectBinding,
 	EffectRecord,
 	GameDataBundle,
 	TalentRecord,
@@ -315,6 +316,13 @@ function extractScalableFloatValue(magnitudeText?: string) {
 }
 
 function getModifierValue(modifier: EffectRecord['modifiers'][number]) {
+	if (
+		typeof modifier.scalableFloatValue === 'number' &&
+		Number.isFinite(modifier.scalableFloatValue)
+	) {
+		return modifier.scalableFloatValue;
+	}
+
 	const magnitudeType = modifier.magnitudeType.toLowerCase();
 	if (magnitudeType && magnitudeType !== 'scalablefloat') return null;
 	return extractScalableFloatValue(modifier.magnitude);
@@ -643,6 +651,51 @@ function getTalentPointValue(talent: TalentRecord, points: number) {
  */
 const BASELINE_TALENT_EVENT_TAGS = new Set<string>(['Gameplay.Event.LoadoutApplied']);
 
+function isConditionalEventTag(eventTag: string) {
+	return Boolean(eventTag) && !BASELINE_TALENT_EVENT_TAGS.has(eventTag);
+}
+
+type BoundEffect = {
+	effect: EffectRecord;
+	conditional: boolean;
+};
+
+/** Preserve the exported event-to-effect relationship instead of treating both arrays as a cross-product. */
+function getBoundEffects(
+	effectIds: readonly string[],
+	effectBindings: readonly EffectBinding[] | undefined,
+	effectById: Map<string, EffectRecord>,
+	fallbackConditional: boolean
+): BoundEffect[] {
+	if (!effectBindings?.length) {
+		return [...new Set(effectIds)]
+			.map((effectId) => effectById.get(effectId))
+			.filter((effect): effect is EffectRecord => Boolean(effect))
+			.map((effect) => ({ effect, conditional: fallbackConditional }));
+	}
+
+	const eventTagsByEffectId = new Map<string, Set<string>>();
+	for (const binding of effectBindings) {
+		if (!binding.effectId) continue;
+		const tags = eventTagsByEffectId.get(binding.effectId) ?? new Set<string>();
+		tags.add(binding.eventTag ?? '');
+		eventTagsByEffectId.set(binding.effectId, tags);
+	}
+
+	return [...eventTagsByEffectId.entries()]
+		.map(([effectId, eventTags]) => {
+			const effect = effectById.get(effectId);
+			if (!effect) return null;
+			return {
+				effect,
+				// If one GE is bound to both setup and gameplay events, keep it conditional.
+				// This avoids treating event-driven tracker effects as permanent bonuses.
+				conditional: [...eventTags].some(isConditionalEventTag)
+			};
+		})
+		.filter((value): value is BoundEffect => Boolean(value));
+}
+
 function normalizeDescriptionForConditionalHeuristic(raw: string): string {
 	return raw
 		.replace(/<[^>]+>/g, ' ')
@@ -831,11 +884,20 @@ export function computeBuild(
 		if (!componentId) continue;
 		const component = catalog.componentById.get(componentId);
 		if (!component) continue;
-		if (!includeConditionalEffects && isConditionalComponent(component)) continue;
 
 		const description = component.description || '';
 		const allowsStacking = componentSupportsMaxStacks(component);
-		const conditional = isConditionalComponent(component);
+		const componentIsConditional = isConditionalComponent(component);
+		const boundEffects = getBoundEffects(
+			component.effectIds,
+			component.effectBindings,
+			catalog.effectById,
+			componentIsConditional
+		);
+		const applicableEffects = includeConditionalEffects
+			? boundEffects
+			: boundEffects.filter((binding) => !binding.conditional);
+		if (applicableEffects.length === 0) continue;
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
 		// True once we see a concrete, data-driven modifier — even one targeting an attribute we
@@ -843,11 +905,9 @@ export function computeBuild(
 		// component is fully described by its GE data, so we must NOT fall back to fuzzy
 		// description parsing (which would misread trigger wording like "land a penetration").
 		let hasDataDrivenModifier = false;
-		const componentEffects = [...new Set(component.effectIds)]
-			.map((effectId) => catalog.effectById.get(effectId))
-			.filter((effect): effect is EffectRecord => Boolean(effect));
+		const componentEffects = applicableEffects.map((binding) => binding.effect);
 
-		for (const effect of componentEffects) {
+		for (const { effect, conditional } of applicableEffects) {
 			const effectName = getEffectName(effect.path);
 			if (!effectName || /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
 
@@ -890,6 +950,7 @@ export function computeBuild(
 		}
 
 		if (!appliedAny && !hasDataDrivenModifier) {
+			const conditional = applicableEffects.some((binding) => binding.conditional);
 			const fallbackStacks = getFallbackStackCount(
 				componentEffects,
 				description,
@@ -906,18 +967,25 @@ export function computeBuild(
 		if (points <= 0) continue;
 		const talent = catalog.talentById.get(talentId);
 		if (!talent) continue;
-		if (!includeConditionalEffects && isConditionalTalent(talent)) continue;
 
 		const value = getTalentPointValue(talent, points);
 		if (!value || Number.isNaN(value)) continue;
 
-		const conditional = isConditionalTalent(talent);
+		const talentIsConditional = isConditionalTalent(talent);
+		const boundEffects = getBoundEffects(
+			talent.effectIds,
+			talent.effectBindings,
+			catalog.effectById,
+			talentIsConditional
+		);
+		const applicableEffects = includeConditionalEffects
+			? boundEffects
+			: boundEffects.filter((binding) => !binding.conditional);
+		if (applicableEffects.length === 0) continue;
 		const source = `Talent: ${talent.name} (${points})`;
 		const allowMaxStacks = assumeMaxStacks && descriptionIndicatesStacking(talent.description);
 
-		for (const effectId of [...new Set(talent.effectIds)]) {
-			const effect = catalog.effectById.get(effectId);
-			if (!effect) continue;
+		for (const { effect, conditional } of applicableEffects) {
 			const stackCount = getEventStackCount(effect, allowMaxStacks);
 			for (const modifier of effect.modifiers) {
 				const attribute = normalizeAttributeKey(modifier.attribute);
