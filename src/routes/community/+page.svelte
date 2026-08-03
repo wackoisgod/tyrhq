@@ -13,17 +13,26 @@
 		}
 	}
 
-	function formatWhen(startsIso: string): string {
+	function dateChip(startsIso: string): { month: string; day: number } {
 		const starts = new Date(startsIso);
-		return `${starts.toLocaleDateString(undefined, {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric'
-		})} · ${starts.toLocaleTimeString(undefined, {
-			hour: 'numeric',
-			minute: '2-digit',
-			timeZoneName: 'short'
-		})}`;
+		return {
+			month: starts.toLocaleDateString(undefined, { month: 'short' }),
+			day: starts.getDate()
+		};
+	}
+
+	function timeMeta(startsIso: string, location: string | null): string {
+		const starts = new Date(startsIso);
+		const parts = [
+			starts.toLocaleDateString(undefined, { weekday: 'short' }),
+			starts.toLocaleTimeString(undefined, {
+				hour: 'numeric',
+				minute: '2-digit',
+				timeZoneName: 'short'
+			})
+		];
+		if (location) parts.push(location);
+		return parts.join(' · ');
 	}
 
 	function isLive(startsIso: string, endsIso: string | null): boolean {
@@ -85,31 +94,44 @@
 		{:else}
 			<ul class="mt-3 flex flex-col">
 				{#each data.upcomingEvents as event (event.id)}
+					{@const chip = dateChip(event.starts_at)}
 					<li class="border-t border-[var(--hud-variant)]/50">
-						<a
-							href="/community/events"
-							class="flex flex-wrap items-center gap-3 py-2.5 transition hover:text-[var(--hud-teal)]"
-						>
+						<a href="/community/events" class="group flex items-center gap-4 py-3">
 							<span
-								class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								class="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-sm bg-[var(--hud-inset)]"
 							>
-								{formatWhen(event.starts_at)}
+								<span
+									class="font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--hud-dim)]"
+								>
+									{chip.month}
+								</span>
+								<span
+									class="font-[var(--font-display)] text-lg font-bold leading-none text-[var(--hud-teal)]"
+								>
+									{chip.day}
+								</span>
 							</span>
-							<span class="text-sm font-semibold text-[var(--hud-text)]">{event.title}</span>
-							{#if isLive(event.starts_at, event.ends_at)}
-								<span
-									class="rounded-sm bg-[var(--hud-lime)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-lime)]"
-								>
-									Live now
+							<span class="min-w-0 flex-1">
+								<span class="flex items-center gap-2">
+									<span
+										class="truncate text-sm font-semibold text-[var(--hud-text)] transition group-hover:text-[var(--hud-teal)]"
+									>
+										{event.title}
+									</span>
+									{#if isLive(event.starts_at, event.ends_at)}
+										<span
+											class="shrink-0 rounded-sm bg-[var(--hud-lime)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-lime)]"
+										>
+											Live now
+										</span>
+									{/if}
 								</span>
-							{/if}
-							{#if event.location}
 								<span
-									class="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+									class="mt-1 block truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--hud-dim)]"
 								>
-									{event.location}
+									{timeMeta(event.starts_at, event.location)}
 								</span>
-							{/if}
+							</span>
 						</a>
 					</li>
 				{/each}

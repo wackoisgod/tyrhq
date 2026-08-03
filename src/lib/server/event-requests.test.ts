@@ -128,6 +128,25 @@ describe('validateEventInput', () => {
 		).toThrowError(/future/);
 	});
 
+	it('allows a past start when allowPastStart is set (editing a live event)', () => {
+		const result = validateEventInput(
+			{ ...base, startsAt: '2026-08-01T09:00:00.000Z' },
+			now,
+			{ allowPastStart: true }
+		);
+		expect(result.startsAt).toBe('2026-08-01T09:00:00.000Z');
+	});
+
+	it('still enforces duration limits with allowPastStart', () => {
+		expect(() =>
+			validateEventInput(
+				{ ...base, startsAt: '2026-08-01T09:00:00.000Z', endsAt: '2026-09-15T09:00:00.000Z' },
+				now,
+				{ allowPastStart: true }
+			)
+		).toThrowError(/at most 30 days/);
+	});
+
 	it('rejects a start more than a year out', () => {
 		expect(() =>
 			validateEventInput({ ...base, startsAt: '2027-09-01T12:00:00.000Z' }, now)
