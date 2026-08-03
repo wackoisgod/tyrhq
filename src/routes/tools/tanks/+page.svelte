@@ -144,21 +144,20 @@
 									<span class="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)]">Dif</span>
 									<DifficultyMeter value={tank.stats.difficulty} size="sm" />
 								</div>
-								{#if tank.isWorkInProgress}
-									<div
-										class="alpha-program-mark absolute bottom-2 right-2"
-										title="Alpha Program vehicle"
-										aria-label="Alpha Program vehicle"
-									>
-										<span class="alpha-program-chip__icon" aria-hidden="true"></span>
-									</div>
-								{/if}
 							</div>
 							<div class="px-3 py-2.5">
-								<div
-									class="font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--hud-text)]"
-								>
-									{tank.name}
+								<div class="flex items-center justify-between gap-2">
+									<div
+										class="truncate font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--hud-text)]"
+									>
+										{tank.name}
+									</div>
+									{#if tank.isWorkInProgress}
+										<span class="alpha-program-tag shrink-0" title="Alpha Program vehicle">
+											<span class="alpha-program-tag__icon" aria-hidden="true"></span>
+											Alpha
+										</span>
+									{/if}
 								</div>
 								<div class="mt-1 flex gap-3 font-mono text-[10px] tabular-nums text-[var(--hud-dim)]">
 									<span>HP <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.health)}</span></span>

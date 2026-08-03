@@ -322,21 +322,29 @@ input[type="radio"] {
 	height: 0.75rem;
 }
 
-.alpha-program-mark {
+.alpha-program-tag {
 	display: inline-flex;
-	width: 1.5rem;
-	height: 1.5rem;
 	align-items: center;
-	justify-content: center;
-	background: #ff7c26;
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 220, 197, 0.18),
-		0 6px 14px rgba(0, 0, 0, 0.35);
+	gap: 0.32rem;
+	padding: 0.2rem 0.42rem;
+	background: rgba(255, 124, 38, 0.1);
+	box-shadow: inset 0 0 0 1px rgba(255, 124, 38, 0.38);
+	font-family: var(--font-mono);
+	font-size: 0.5rem;
+	line-height: 1;
+	font-weight: 800;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: #ffab70;
 }
 
-.alpha-program-mark .alpha-program-chip__icon {
-	width: 0.8rem;
-	height: 0.8rem;
+.alpha-program-tag__icon {
+	width: 0.62rem;
+	height: 0.62rem;
+	flex: none;
+	background-color: #ff7c26;
+	-webkit-mask: url('/images/icons/alpha-program.png') center / contain no-repeat;
+	mask: url('/images/icons/alpha-program.png') center / contain no-repeat;
 }
 
 .ui-fallback-icon {
