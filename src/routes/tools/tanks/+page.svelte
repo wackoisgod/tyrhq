@@ -162,7 +162,7 @@
 								>
 									{tank.name}
 								</div>
-								<div class="mt-1 flex gap-3 font-mono text-[10px] tabular-nums text-[var(--hud-dim)] {tank.isWorkInProgress ? 'pr-8 md:pr-0' : ''}">
+								<div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] tabular-nums text-[var(--hud-dim)] {tank.isWorkInProgress ? 'pr-8' : ''}">
 									<span>HP <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.health)}</span></span>
 									<span>DMG <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.damage)}</span></span>
 									<span>PEN <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.penetration)}</span></span>
