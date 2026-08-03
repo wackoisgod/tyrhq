@@ -33,17 +33,6 @@
 	}
 
 	function getTankTheme(tank: TankSummary) {
-		if (tank.isWorkInProgress) {
-			return {
-				panel:
-					'background: linear-gradient(140deg, rgba(255,124,38,0.22) 0%, rgba(31,27,32,0.94) 46%, rgba(12,13,22,0.98) 100%);',
-				accent: 'text-[#ffab70]',
-				chip: 'border-[#ff7c26]/40 bg-[#ff7c26]/10 text-[var(--hud-text)]',
-				line: 'bg-[#ff7c26]/90',
-				glow: 'rgba(255, 124, 38, 0.16)'
-			};
-		}
-
 		if (tank.classId === 'heavy') {
 			return {
 				panel:
@@ -124,7 +113,7 @@
 					{#each tanks as tank}
 						<a
 							href={`/tools/tanks/${tank.slug}`}
-							class="group relative flex h-full flex-col overflow-hidden rounded-sm bg-[var(--hud-panel-mid)] shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(69,73,50,0.2)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.3)] hover:brightness-110{tank.isWorkInProgress ? ' alpha-program-card' : ''}"
+							class="group relative flex h-full flex-col overflow-hidden rounded-sm bg-[var(--hud-panel-mid)] shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_0_0_1px_rgba(69,73,50,0.2)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.3)] hover:brightness-110"
 						>
 							<div
 								class="relative aspect-[16/10] overflow-hidden bg-[var(--hud-surface)]"
@@ -169,7 +158,7 @@
 									<span>SPD <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.maxSpeed)}</span></span>
 								</div>
 							</div>
-							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${getTankTheme(tank).line}`}></div>
+							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${tank.isWorkInProgress ? 'bg-[#ff7c26]/90' : getTankTheme(tank).line}`}></div>
 							{#if tank.isWorkInProgress}
 								<div
 									class="alpha-program-corner"
