@@ -146,20 +146,12 @@
 								</div>
 							</div>
 							<div class="px-3 py-2.5">
-								<div class="flex items-center justify-between gap-2">
-									<div
-										class="truncate font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--hud-text)]"
-									>
-										{tank.name}
-									</div>
-									{#if tank.isWorkInProgress}
-										<span class="alpha-program-tag shrink-0" title="Alpha Program vehicle">
-											<span class="alpha-program-tag__icon" aria-hidden="true"></span>
-											Alpha
-										</span>
-									{/if}
+								<div
+									class="font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--hud-text)]"
+								>
+									{tank.name}
 								</div>
-								<div class="mt-1 flex gap-3 font-mono text-[10px] tabular-nums text-[var(--hud-dim)]">
+								<div class="mt-1 flex gap-3 font-mono text-[10px] tabular-nums text-[var(--hud-dim)] {tank.isWorkInProgress ? 'pr-8 md:pr-0' : ''}">
 									<span>HP <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.health)}</span></span>
 									<span>DMG <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.damage)}</span></span>
 									<span>PEN <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.penetration)}</span></span>
@@ -167,6 +159,15 @@
 								</div>
 							</div>
 							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${getTankTheme(tank).line}`}></div>
+							{#if tank.isWorkInProgress}
+								<div
+									class="alpha-program-corner"
+									title="Alpha Program vehicle"
+									aria-label="Alpha Program vehicle"
+								>
+									<span class="alpha-program-corner__icon" aria-hidden="true"></span>
+								</div>
+							{/if}
 						</a>
 					{/each}
 				</div>
