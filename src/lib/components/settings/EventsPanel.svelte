@@ -60,6 +60,17 @@
 	let busyId = $state<string | null>(null);
 	let actionError = $state('');
 
+	// The form stays collapsed behind "Create New Event" unless a deep-linked
+	// edit opened the panel with a prefilled event.
+	let formOpen = $state(Boolean(initialEdit));
+
+	function openCreate() {
+		clearForm();
+		formError = '';
+		formSuccess = '';
+		formOpen = true;
+	}
+
 	function clearForm() {
 		title = '';
 		description = '';
@@ -82,6 +93,7 @@
 		endsAt = event.ends_at ? toLocalInputValue(event.ends_at) : '';
 		formError = '';
 		formSuccess = '';
+		formOpen = true;
 		requestAnimationFrame(() => {
 			document
 				.getElementById('community-events')
@@ -89,10 +101,10 @@
 		});
 	}
 
-	function cancelEdit() {
+	function cancelForm() {
 		clearForm();
 		formError = '';
-		formSuccess = '';
+		formOpen = false;
 	}
 
 	async function submitEvent(e: SubmitEvent) {
@@ -124,6 +136,7 @@
 			}
 			const wasEditing = editingId !== null;
 			clearForm();
+			formOpen = false;
 			if (wasEditing) {
 				formSuccess = isElevated
 					? 'Event updated.'
@@ -203,7 +216,14 @@
 				{/if}
 			</p>
 		</div>
-		<a href="/community/events" class="hud-cta px-4 py-2 text-sm">View Calendar</a>
+		<div class="flex flex-wrap items-center gap-2">
+			{#if eventsEnabled && !formOpen}
+				<button type="button" onclick={openCreate} class="hud-cta px-4 py-2 text-sm">
+					Create New Event
+				</button>
+			{/if}
+			<a href="/community/events" class="hud-cta-ghost px-4 py-2 text-sm">View Calendar</a>
+		</div>
 	</div>
 
 	{#if !eventsEnabled}
@@ -211,6 +231,13 @@
 			Events are unavailable — this deployment is running without a database.
 		</p>
 	{:else}
+		{#if formSuccess && !formOpen}
+			<p class="mt-6 rounded-sm bg-[var(--hud-teal)]/10 p-3 text-sm text-[var(--hud-teal)]">
+				{formSuccess}
+			</p>
+		{/if}
+
+		{#if formOpen}
 		<form
 			onsubmit={submitEvent}
 			class="mt-6 rounded-sm bg-[var(--hud-panel-mid)] p-6"
@@ -324,11 +351,6 @@
 					{formError}
 				</p>
 			{/if}
-			{#if formSuccess}
-				<p class="mt-4 rounded-sm bg-[var(--hud-teal)]/10 p-3 text-sm text-[var(--hud-teal)]">
-					{formSuccess}
-				</p>
-			{/if}
 
 			<div class="mt-5 flex flex-wrap items-center gap-2">
 				<button
@@ -346,13 +368,12 @@
 								? 'Publish event'
 								: 'Submit for review'}
 				</button>
-				{#if editingId}
-					<button type="button" onclick={cancelEdit} class="hud-cta-ghost px-4 py-2 text-xs">
-						Cancel edit
-					</button>
-				{/if}
+				<button type="button" onclick={cancelForm} class="hud-cta-ghost px-4 py-2 text-xs">
+					Cancel
+				</button>
 			</div>
 		</form>
+		{/if}
 
 		{#if actionError}
 			<p class="mt-4 rounded-sm bg-[var(--hud-enemy)]/10 p-3 text-sm text-[var(--hud-enemy)]">
