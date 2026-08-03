@@ -268,12 +268,7 @@ input[type="radio"] {
 	bottom: 0;
 	width: 2rem;
 	height: 2rem;
-	background: linear-gradient(
-		135deg,
-		rgba(255, 226, 200, 0.9) calc(50% - 1px),
-		#ff9440 calc(50% + 1px),
-		#ff7c26 100%
-	);
+	background: #ff7c26;
 	clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 

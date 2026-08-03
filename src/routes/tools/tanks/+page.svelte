@@ -158,7 +158,7 @@
 									<span>SPD <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.maxSpeed)}</span></span>
 								</div>
 							</div>
-							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${tank.isWorkInProgress ? 'bg-[#ff7c26]/90' : getTankTheme(tank).line}`}></div>
+							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${tank.isWorkInProgress ? 'bg-[#ff7c26]' : getTankTheme(tank).line}`}></div>
 							{#if tank.isWorkInProgress}
 								<div
 									class="alpha-program-corner"
