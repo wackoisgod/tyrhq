@@ -173,8 +173,8 @@
 						Write For Tyr HQ
 					</h2>
 					<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
-						Submit guides and news posts directly from the site — no GitHub, no PR. A reviewer
-						will publish your draft or send notes back.
+						Submit guides, news posts, and community events directly from the site — no GitHub,
+						no PR. A reviewer will publish your draft or send notes back.
 					</p>
 				</div>
 				<a href="/contribute/new" class="hud-cta px-4 py-2 text-sm">Write a new article</a>
@@ -195,6 +195,20 @@
 					</p>
 				</a>
 
+				<a
+					href="/contribute/events"
+					class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						My events
+					</p>
+					<p class="mt-2 text-sm text-[var(--hud-text)]">
+						Submit tournaments and meetups for the community calendar, and track their review.
+					</p>
+				</a>
+
 				{#if data.role === 'contributor' || data.role === 'admin'}
 					<a
 						href="/admin/submissions"
@@ -212,6 +226,27 @@
 						</p>
 						<p class="mt-2 text-sm text-[var(--hud-text)]">
 							Review pending submissions, request changes, or approve and publish.
+						</p>
+					</a>
+				{/if}
+
+				{#if data.role === 'contributor' || data.role === 'admin'}
+					<a
+						href="/admin/events"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Event queue
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								{data.role === 'admin' ? 'ADMIN' : 'REVIEWER'}
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Approve or reject community-submitted events before they hit the calendar.
 						</p>
 					</a>
 				{/if}

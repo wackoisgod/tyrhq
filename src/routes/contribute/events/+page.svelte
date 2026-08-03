@@ -392,7 +392,7 @@
 								</span>
 								<span class="text-sm font-semibold text-[var(--hud-text)]">{event.title}</span>
 								<span
-									class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+									class="font-mono text-xs uppercase tracking-[0.08em] text-[var(--hud-muted)]"
 								>
 									{formatWhen(event.starts_at, event.ends_at)}
 								</span>

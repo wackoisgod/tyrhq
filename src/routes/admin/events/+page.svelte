@@ -87,7 +87,7 @@
 				>
 					<div class="flex flex-wrap items-center gap-3">
 						<span
-							class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+							class="font-mono text-xs uppercase tracking-[0.08em] text-[var(--hud-muted)]"
 						>
 							{formatWhen(event.starts_at, event.ends_at)}
 						</span>
