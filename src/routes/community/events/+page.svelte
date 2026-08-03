@@ -226,13 +226,15 @@
 										Hosted by {event.submitter_display}
 									</span>
 								{/if}
-								{#if isElevated}
+								{#if isElevated || event.submitter_id === data.currentUserId}
 									<a
 										href="/contribute/events?edit={event.id}"
 										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
 									>
 										Edit
 									</a>
+								{/if}
+								{#if isElevated}
 									<button
 										type="button"
 										disabled={busyId === event.id}

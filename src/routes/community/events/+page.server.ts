@@ -12,6 +12,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		past,
 		role,
 		signedIn: Boolean(user),
+		currentUserId: user?.id ?? null,
 		eventsEnabled: isSupabaseAdminConfigured()
 	};
 };
