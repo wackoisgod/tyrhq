@@ -284,6 +284,33 @@ export async function createEvent(
 }
 
 /**
+ * Fetch a single event for editing. Submitters can load their own events;
+ * reviewers/admins can load any event.
+ */
+export async function getEventForActor(
+	eventId: string,
+	actor: { id: string; role: ProfileRole }
+): Promise<CommunityEventRecord> {
+	const admin = requireAdmin();
+	const { data, error } = await admin
+		.from('community_events')
+		.select(EVENT_COLUMNS)
+		.eq('id', eventId)
+		.maybeSingle<EventJoinRow>();
+	if (error) {
+		console.error('[events] getEventForActor failed', error);
+		throw new CommunityEventError('Could not look up the event.', 500);
+	}
+	if (!data) throw new CommunityEventError('Event not found.', 404);
+
+	const elevated = actor.role === 'contributor' || actor.role === 'admin';
+	if (!elevated && data.submitter_id !== actor.id) {
+		throw new CommunityEventError('You can only edit your own events.', 403);
+	}
+	return toRecord(data);
+}
+
+/**
  * Edit an event. Submitters can edit their own events; reviewers/admins can
  * edit any event. An edit by a regular user always puts the event (back) in
  * the pending queue — approved events leave the public calendar until

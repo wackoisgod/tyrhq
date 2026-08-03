@@ -7,118 +7,8 @@
 
 	const isElevated = $derived(data.role === 'contributor' || data.role === 'admin');
 
-	const STATUS_CLASS: Record<string, string> = {
-		pending: 'bg-[var(--hud-teal)]/15 text-[var(--hud-teal)]',
-		approved: 'bg-[var(--hud-teal)] text-[var(--hud-on-teal)]',
-		rejected: 'bg-[var(--hud-enemy)]/15 text-[var(--hud-enemy)]'
-	};
-
-	let title = $state('');
-	let description = $state('');
-	let location = $state('');
-	let url = $state('');
-	let startsAt = $state('');
-	let endsAt = $state('');
-
-	let editingId = $state<string | null>(null);
-	let editingStatus = $state<string | null>(null);
-	let submitting = $state(false);
-	let formError = $state('');
-	let formSuccess = $state('');
 	let busyId = $state<string | null>(null);
 	let actionError = $state('');
-
-	type EventRow = (typeof data.upcoming)[number];
-
-	function clearForm() {
-		title = '';
-		description = '';
-		location = '';
-		url = '';
-		startsAt = '';
-		endsAt = '';
-		editingId = null;
-		editingStatus = null;
-	}
-
-	/** ISO timestamp → datetime-local input value in the viewer's timezone. */
-	function toLocalInputValue(iso: string): string {
-		const d = new Date(iso);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	}
-
-	function startEdit(event: EventRow) {
-		editingId = event.id;
-		editingStatus = event.status;
-		title = event.title;
-		description = event.description ?? '';
-		location = event.location ?? '';
-		url = event.url ?? '';
-		startsAt = toLocalInputValue(event.starts_at);
-		endsAt = event.ends_at ? toLocalInputValue(event.ends_at) : '';
-		formError = '';
-		formSuccess = '';
-		requestAnimationFrame(() => {
-			document
-				.getElementById('event-form')
-				?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		});
-	}
-
-	function cancelEdit() {
-		clearForm();
-		formError = '';
-		formSuccess = '';
-	}
-
-	async function submitEvent(e: SubmitEvent) {
-		e.preventDefault();
-		if (submitting) return;
-		submitting = true;
-		formError = '';
-		formSuccess = '';
-		const wasEditingApproved = editingStatus === 'approved';
-		try {
-			const res = await fetch(
-				editingId ? `/api/community/events/${editingId}` : '/api/community/events',
-				{
-					method: editingId ? 'PATCH' : 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({
-						title,
-						description: description || null,
-						location: location || null,
-						url: url || null,
-						startsAt: new Date(startsAt).toISOString(),
-						endsAt: endsAt ? new Date(endsAt).toISOString() : null
-					})
-				}
-			);
-			if (!res.ok) {
-				formError = await res.text();
-				return;
-			}
-			const wasEditing = editingId !== null;
-			clearForm();
-			if (wasEditing) {
-				formSuccess = isElevated
-					? 'Event updated.'
-					: wasEditingApproved
-						? 'Changes saved — the event returns to the calendar once re-approved.'
-						: 'Changes saved — your event is awaiting review.';
-			} else {
-				formSuccess = isElevated
-					? 'Event published.'
-					: 'Event submitted — it will appear once a reviewer approves it.';
-			}
-			await invalidateAll();
-		} catch (err) {
-			formError = err instanceof Error ? err.message : 'Could not submit the event.';
-		} finally {
-			submitting = false;
-		}
-	}
 
 	async function removeEvent(id: string, confirmText: string) {
 		if (busyId) return;
@@ -221,24 +111,23 @@
 	<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
 		Comms Network // Ops Calendar
 	</p>
-	<h1
-		class="mt-2 font-[var(--font-display)] text-4xl font-bold uppercase tracking-[0.08em] text-[var(--hud-text)]"
-	>
-		Community Events
-	</h1>
+	<div class="mt-2 flex flex-wrap items-end justify-between gap-3">
+		<h1
+			class="font-[var(--font-display)] text-4xl font-bold uppercase tracking-[0.08em] text-[var(--hud-text)]"
+		>
+			Community Events
+		</h1>
+		<a
+			href={data.signedIn ? '/contribute/events' : '/auth?next=%2Fcontribute%2Fevents'}
+			class="hud-cta-outline px-4 py-2 text-xs"
+		>
+			{data.signedIn ? 'Submit an event' : 'Sign in to submit an event'}
+		</a>
+	</div>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
 		Tournaments, custom lobbies, and community meetups — run by players, listed in one place.
-		{#if data.signedIn}
-			{#if isElevated}
-				Events you post go live immediately.
-			{:else}
-				Submit your event below; it appears on the calendar once a reviewer approves it.
-			{/if}
-		{:else}
-			<a href="/auth?next=/community/events" class="text-[var(--hud-teal)] hover:underline"
-				>Sign in</a
-			> to submit an event.
-		{/if}
+		Manage your own submissions from
+		<a href="/contribute/events" class="text-[var(--hud-teal)] hover:underline">My events</a>.
 	</p>
 
 	{#if !data.eventsEnabled}
@@ -275,7 +164,10 @@
 						style="box-shadow: var(--hud-surface-ghost);"
 					>
 						<p class="text-[var(--hud-muted)]">
-							No events on the calendar yet. Know of one? Submit it below.
+							No events on the calendar yet. Know of one?
+							<a href="/contribute/events" class="text-[var(--hud-teal)] hover:underline"
+								>Submit it here.</a
+							>
 						</p>
 					</div>
 				{:else}
@@ -335,13 +227,12 @@
 									</span>
 								{/if}
 								{#if isElevated}
-									<button
-										type="button"
-										onclick={() => startEdit(event)}
+									<a
+										href="/contribute/events?edit={event.id}"
 										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
 									>
 										Edit
-									</button>
+									</a>
 									<button
 										type="button"
 										disabled={busyId === event.id}
@@ -363,214 +254,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Submit form -->
-		{#if data.signedIn}
-			<div class="mt-10" id="event-form">
-				<div
-					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
-				>
-					<span>
-						{editingId ? 'Edit event' : isElevated ? 'Post an event' : 'Submit an event'}
-					</span>
-					{#if !isElevated}
-						<span
-							class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]"
-						>
-							{editingId && editingStatus === 'approved'
-								? 'saving sends it back through review'
-								: 'reviewed before publishing'}
-						</span>
-					{/if}
-				</div>
-
-				<form
-					onsubmit={submitEvent}
-					class="rounded-sm bg-[var(--hud-panel)] p-6"
-					style="box-shadow: var(--hud-surface-ghost);"
-				>
-					<div class="grid gap-4 md:grid-cols-2">
-						<label class="flex flex-col gap-1 md:col-span-2">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Title
-							</span>
-							<input
-								type="text"
-								bind:value={title}
-								required
-								minlength="3"
-								maxlength="140"
-								placeholder="e.g. Friday Night Custom Lobby"
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							/>
-						</label>
-
-						<label class="flex flex-col gap-1 md:col-span-2">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Description
-							</span>
-							<textarea
-								bind:value={description}
-								rows="3"
-								maxlength="2000"
-								placeholder="What's happening, who can join, how to sign up…"
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							></textarea>
-						</label>
-
-						<label class="flex flex-col gap-1">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Location <span class="normal-case tracking-normal">(optional)</span>
-							</span>
-							<input
-								type="text"
-								bind:value={location}
-								maxlength="120"
-								placeholder="e.g. EU servers, Official Discord"
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							/>
-						</label>
-
-						<label class="flex flex-col gap-1">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Link <span class="normal-case tracking-normal">(optional, https)</span>
-							</span>
-							<input
-								type="url"
-								bind:value={url}
-								maxlength="1024"
-								placeholder="https://discord.gg/…"
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							/>
-						</label>
-
-						<label class="flex flex-col gap-1">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Starts <span class="normal-case tracking-normal">(your local time)</span>
-							</span>
-							<input
-								type="datetime-local"
-								bind:value={startsAt}
-								required
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							/>
-						</label>
-
-						<label class="flex flex-col gap-1">
-							<span
-								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-							>
-								Ends <span class="normal-case tracking-normal">(optional)</span>
-							</span>
-							<input
-								type="datetime-local"
-								bind:value={endsAt}
-								class="hud-input rounded-sm px-3 py-2 text-sm"
-							/>
-						</label>
-					</div>
-
-					{#if formError}
-						<p class="mt-4 rounded-sm bg-[var(--hud-enemy)]/10 p-3 text-sm text-[var(--hud-enemy)]">
-							{formError}
-						</p>
-					{/if}
-					{#if formSuccess}
-						<p class="mt-4 rounded-sm bg-[var(--hud-teal)]/10 p-3 text-sm text-[var(--hud-teal)]">
-							{formSuccess}
-						</p>
-					{/if}
-
-					<div class="mt-5 flex flex-wrap items-center gap-2">
-						<button
-							type="submit"
-							disabled={submitting}
-							class="hud-cta-outline px-5 py-2 text-xs disabled:opacity-50"
-						>
-							{submitting
-								? 'Saving…'
-								: editingId
-									? isElevated
-										? 'Save changes'
-										: 'Save & resubmit'
-									: isElevated
-										? 'Publish event'
-										: 'Submit for review'}
-						</button>
-						{#if editingId}
-							<button type="button" onclick={cancelEdit} class="hud-cta-ghost px-4 py-2 text-xs">
-								Cancel edit
-							</button>
-						{/if}
-					</div>
-				</form>
-			</div>
-		{/if}
-
-		<!-- Your submissions -->
-		{#if data.signedIn && data.mine.length > 0}
-			<div class="mt-10">
-				<div
-					class="mb-3 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
-				>
-					Your submissions
-				</div>
-				<ul class="flex flex-col gap-3">
-					{#each data.mine as event (event.id)}
-						<li
-							class="rounded-sm bg-[var(--hud-panel)] p-4"
-							style="box-shadow: var(--hud-surface-ghost);"
-						>
-							<div class="flex flex-wrap items-center gap-3">
-								<span
-									class="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider {STATUS_CLASS[event.status] ?? ''}"
-								>
-									{event.status}
-								</span>
-								<span class="text-sm font-semibold text-[var(--hud-text)]">{event.title}</span>
-								<span
-									class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
-								>
-									{formatWhen(event.starts_at, event.ends_at)}
-								</span>
-								<button
-									type="button"
-									onclick={() => startEdit(event)}
-									class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
-								>
-									Edit
-								</button>
-								{#if event.status === 'pending'}
-									<button
-										type="button"
-										disabled={busyId === event.id}
-										onclick={() => removeEvent(event.id, `Withdraw "${event.title}"?`)}
-										class="hud-cta-ghost px-3 py-1 text-[10px] disabled:opacity-50"
-									>
-										Withdraw
-									</button>
-								{/if}
-							</div>
-							{#if event.status === 'rejected' && event.review_notes}
-								<p class="mt-2 text-xs leading-5 text-[var(--hud-muted)]">
-									Reviewer note: {event.review_notes}
-								</p>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
 
 		<!-- Past events -->
 		{#if data.past.length > 0}

@@ -75,9 +75,12 @@
 		>
 			My contributions
 		</h1>
-		<a href="/contribute/new" class="hud-cta px-5 py-3 text-sm">
-			Write A New Article
-		</a>
+		<div class="flex flex-wrap items-center gap-2">
+			<a href="/contribute/events" class="hud-cta-ghost px-4 py-2 text-xs">My events</a>
+			<a href="/contribute/new" class="hud-cta px-5 py-3 text-sm">
+				Write A New Article
+			</a>
+		</div>
 	</div>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
 		Submit guides and articles directly from the site. Drafts save as you go; once you submit
