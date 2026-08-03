@@ -21,7 +21,7 @@ This repository is the website codebase. It is not affiliated with, endorsed by,
 - **Articles and guides** authored through an in-site WYSIWYG-ish markdown editor with live preview, server-side sanitization, and a reviewer queue (no GitHub required for content)
 - **Suggested edits** on existing published articles, reviewer-side rendered diff, full revision history per article
 - **Role gradient**: User / Reviewer (`contributor`) / Admin — admins manage roles, reviewers moderate content
-- **Community events**: a public events calendar at `/community/events`, authored from `/contribute/events` — reviewers and admins post events directly, signed-in users submit events into a moderation queue at `/admin/events`; submitters can edit their events, with regular-user edits going back through review
+- **Community events**: a public events calendar at `/community/events`, authored from the "My Events" panel on the profile page (`/settings`) — reviewers and admins post events directly, signed-in users submit events into a moderation queue at `/admin/events`; submitters can edit their events, with regular-user edits going back through review
 - Public read-only API at `/api/v1/*` with Swagger docs at `/api/docs`
 - Optional account system for saved builds and API key management
 - Optional live map room features powered by Supabase

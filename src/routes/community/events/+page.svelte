@@ -118,7 +118,9 @@
 			Community Events
 		</h1>
 		<a
-			href={data.signedIn ? '/contribute/events' : '/auth?next=%2Fcontribute%2Fevents'}
+			href={data.signedIn
+				? '/settings#community-events'
+				: `/auth?next=${encodeURIComponent('/settings#community-events')}`}
 			class="hud-cta-outline px-4 py-2 text-xs"
 		>
 			{data.signedIn ? 'Submit an event' : 'Sign in to submit an event'}
@@ -127,7 +129,9 @@
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
 		Tournaments, custom lobbies, and community meetups — run by players, listed in one place.
 		Manage your own submissions from
-		<a href="/contribute/events" class="text-[var(--hud-teal)] hover:underline">My events</a>.
+		<a href="/settings#community-events" class="text-[var(--hud-teal)] hover:underline"
+			>My events</a
+		> in your profile.
 	</p>
 
 	{#if !data.eventsEnabled}
@@ -165,8 +169,9 @@
 					>
 						<p class="text-[var(--hud-muted)]">
 							No events on the calendar yet. Know of one?
-							<a href="/contribute/events" class="text-[var(--hud-teal)] hover:underline"
-								>Submit it here.</a
+							<a
+								href="/settings#community-events"
+								class="text-[var(--hud-teal)] hover:underline">Submit it here.</a
 							>
 						</p>
 					</div>
@@ -228,7 +233,7 @@
 								{/if}
 								{#if isElevated || event.submitter_id === data.currentUserId}
 									<a
-										href="/contribute/events?edit={event.id}"
+										href="/settings?editEvent={event.id}#community-events"
 										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
 									>
 										Edit

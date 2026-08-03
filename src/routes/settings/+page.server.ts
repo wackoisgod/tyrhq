@@ -1,16 +1,45 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { loadProfile } from '$lib/server/settings';
+import {
+	CommunityEventError,
+	getEventForActor,
+	listEventsForUser,
+	type CommunityEventRecord
+} from '$lib/server/events';
+import { isSupabaseAdminConfigured } from '$lib/server/supabase-admin';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const { session, user, role } = await locals.safeGetSession();
 	if (!session || !user) redirect(303, '/auth');
 
 	const profile = await loadProfile(locals, user.id);
 	const isOnboarding = !profile.display_name;
 
-	return { profile, isOnboarding, role };
+	// Deep link from the public calendar's "Edit" action (?editEvent=<id>)
+	// prefills the My Events form.
+	const editId = url.searchParams.get('editEvent');
+	let editEvent: CommunityEventRecord | null = null;
+	if (editId) {
+		try {
+			editEvent = await getEventForActor(editId, { id: user.id, role });
+		} catch (err) {
+			if (err instanceof CommunityEventError) throw error(err.statusCode, err.message);
+			throw err;
+		}
+	}
+
+	const events = await listEventsForUser(user.id);
+
+	return {
+		profile,
+		isOnboarding,
+		role,
+		events,
+		editEvent,
+		eventsEnabled: isSupabaseAdminConfigured()
+	};
 };
 
 export const actions: Actions = {

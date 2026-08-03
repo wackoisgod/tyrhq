@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import SettingsNav from '$lib/components/settings/SettingsNav.svelte';
+	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
 
 	let { data, form } = $props();
 
@@ -195,20 +196,6 @@
 					</p>
 				</a>
 
-				<a
-					href="/contribute/events"
-					class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
-				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
-					>
-						My events
-					</p>
-					<p class="mt-2 text-sm text-[var(--hud-text)]">
-						Submit tournaments and meetups for the community calendar, and track their review.
-					</p>
-				</a>
-
 				{#if data.role === 'contributor' || data.role === 'admin'}
 					<a
 						href="/admin/submissions"
@@ -296,5 +283,12 @@
 				{/if}
 			</div>
 		</div>
+
+		<EventsPanel
+			events={data.events}
+			editEvent={data.editEvent}
+			role={data.role}
+			eventsEnabled={data.eventsEnabled}
+		/>
 	{/if}
 </section>
