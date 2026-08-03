@@ -35,6 +35,30 @@
 		request.
 	</p>
 
+	<a
+		href="/community/events"
+		class="mt-8 block rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+		style="box-shadow: var(--hud-surface-ghost);"
+	>
+		<div class="flex flex-wrap items-center gap-3">
+			<span
+				class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+			>
+				New
+			</span>
+			<span class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+				Ops Calendar
+			</span>
+		</div>
+		<h2 class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]">
+			Community Events
+		</h2>
+		<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+			Tournaments, custom lobbies, and meetups — see what's coming up, or submit your own event
+			for the calendar.
+		</p>
+	</a>
+
 	{#if groups.length === 0}
 		<div
 			class="mt-8 rounded-sm bg-[var(--hud-panel)] p-8 text-center"

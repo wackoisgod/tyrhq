@@ -21,6 +21,7 @@ This repository is the website codebase. It is not affiliated with, endorsed by,
 - **Articles and guides** authored through an in-site WYSIWYG-ish markdown editor with live preview, server-side sanitization, and a reviewer queue (no GitHub required for content)
 - **Suggested edits** on existing published articles, reviewer-side rendered diff, full revision history per article
 - **Role gradient**: User / Reviewer (`contributor`) / Admin — admins manage roles, reviewers moderate content
+- **Community events**: a public events calendar at `/community/events` — reviewers and admins post events directly, signed-in users submit events into a moderation queue at `/admin/events`
 - Public read-only API at `/api/v1/*` with Swagger docs at `/api/docs`
 - Optional account system for saved builds and API key management
 - Optional live map room features powered by Supabase
@@ -120,6 +121,13 @@ Current migration set:
 - `007_contributions.sql` — `profiles.role` column plus `articles`, `article_revisions`, `article_submissions`, `submission_events` tables and their RLS policies
 - `008_rename_news_to_article.sql` — renames the legacy `'news'` content type to `'article'` to match the public `/articles` URL
 - `009_drop_self_approval_check.sql` — removes a CHECK constraint that blocked legitimate admin self-approval (the rule is enforced in the application layer instead)
+- `010_article_stars.sql`
+- `011_flyout_section.sql`
+- `012_article_images.sql`
+- `013_patch_notes.sql`
+- `014_pinned_guides.sql`
+- `015_reviewer_suggested_edits.sql`
+- `016_community_events.sql` — `community_events` table and RLS policies backing the community events calendar and its moderation queue
 
 This repository does not include a local Supabase CLI project config, so apply these migrations using your preferred Supabase workflow.
 
@@ -176,8 +184,8 @@ npm run sync:data
 
 Three roles are defined on `profiles.role`:
 
-- **`user`** — default. Can read everything, submit drafts, and suggest edits to existing articles.
-- **`contributor`** (shown as "Reviewer" in the UI) — can also approve / request changes / reject submissions, withdraw articles, and restore withdrawn articles.
+- **`user`** — default. Can read everything, submit drafts, suggest edits to existing articles, and submit community events for review.
+- **`contributor`** (shown as "Reviewer" in the UI) — can also approve / request changes / reject submissions, withdraw articles, restore withdrawn articles, and post/approve/remove community events.
 - **`admin`** — can also manage roles via `/admin/users`, and is exempt from the no-self-approval rule on submissions.
 
 The first admin is set via SQL (see [Database Setup](#database-setup)). Subsequent admins and reviewers are promoted from `/admin/users`.
