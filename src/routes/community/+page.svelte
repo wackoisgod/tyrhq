@@ -87,7 +87,7 @@
 		{#if data.upcomingEvents.length === 0}
 			<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
 				Tournaments, custom lobbies, and meetups — nothing scheduled right now. Know of an event?
-				<a href="/community/events" class="text-[var(--hud-teal)] hover:underline"
+				<a href="/settings#community-events" class="text-[var(--hud-teal)] hover:underline"
 					>Submit it for the calendar.</a
 				>
 			</p>
@@ -127,7 +127,7 @@
 									{/if}
 								</span>
 								<span
-									class="mt-1 block truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--hud-dim)]"
+									class="mt-1 block truncate font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--hud-muted)]"
 								>
 									{timeMeta(event.starts_at, event.location)}
 								</span>
@@ -140,7 +140,7 @@
 				href="/community/events"
 				class="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--hud-teal)] hover:underline"
 			>
-				Full calendar &amp; event submission →
+				Full events calendar →
 			</a>
 		{/if}
 	</div>
