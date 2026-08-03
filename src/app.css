@@ -262,6 +262,14 @@ input[type="radio"] {
 		inset 0 0 0 1px rgba(160, 170, 217, 0.14);
 }
 
+.alpha-program-card::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: radial-gradient(115% 85% at 100% 100%, rgba(255, 124, 38, 0.2), transparent 52%);
+}
+
 .alpha-program-corner {
 	position: absolute;
 	right: 0;
