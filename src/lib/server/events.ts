@@ -87,13 +87,23 @@ export interface ValidatedEventInput {
 	endsAt: string | null;
 }
 
+export interface ValidateEventOptions {
+	/**
+	 * Skip the start-must-be-in-the-future check. Used when editing an event
+	 * whose start time is unchanged, so a live or recently started event can
+	 * still have its details corrected.
+	 */
+	allowPastStart?: boolean;
+}
+
 /**
  * Normalise and validate raw event input. Pure — throws CommunityEventError
  * (422) on the first problem so callers can surface it verbatim in the form.
  */
 export function validateEventInput(
 	input: CommunityEventInput,
-	now: Date = new Date()
+	now: Date = new Date(),
+	options: ValidateEventOptions = {}
 ): ValidatedEventInput {
 	const title = input.title.trim();
 	if (title.length < EVENT_LIMITS.titleMin) {
@@ -148,7 +158,7 @@ export function validateEventInput(
 		throw new CommunityEventError('Start time must be a valid date.', 422);
 	}
 	const graceMs = EVENT_LIMITS.startGraceMinutes * 60_000;
-	if (startsAtMs < now.getTime() - graceMs) {
+	if (!options.allowPastStart && startsAtMs < now.getTime() - graceMs) {
 		throw new CommunityEventError('Start time must be in the future.', 422);
 	}
 	if (startsAtMs > now.getTime() + EVENT_LIMITS.maxLeadDays * 86_400_000) {
@@ -191,9 +201,8 @@ const RATE_LIMITS = {
 	maxCreatedPerDay: 5
 } as const;
 
-async function assertEventRateLimits(submitterId: string): Promise<void> {
+async function assertPendingCap(submitterId: string): Promise<void> {
 	const admin = requireAdmin();
-
 	const { count: pendingCount, error: pendingError } = await admin
 		.from('community_events')
 		.select('id', { head: true, count: 'exact' })
@@ -209,6 +218,12 @@ async function assertEventRateLimits(submitterId: string): Promise<void> {
 			429
 		);
 	}
+}
+
+async function assertEventRateLimits(submitterId: string): Promise<void> {
+	const admin = requireAdmin();
+
+	await assertPendingCap(submitterId);
 
 	const since = new Date(Date.now() - 86_400_000).toISOString();
 	const { count: dayCount, error: dayError } = await admin
@@ -264,6 +279,79 @@ export async function createEvent(
 	if (error || !data) {
 		console.error('[events] createEvent failed', error);
 		throw new CommunityEventError('Could not create the event.', 500);
+	}
+	return toRecord(data);
+}
+
+/**
+ * Edit an event. Submitters can edit their own events; reviewers/admins can
+ * edit any event. An edit by a regular user always puts the event (back) in
+ * the pending queue — approved events leave the public calendar until
+ * re-approved, and rejected events are resubmitted — so approval always
+ * covers the content that is actually shown. Elevated edits keep the
+ * current status.
+ */
+export async function updateEvent(
+	eventId: string,
+	input: CommunityEventInput,
+	actor: { id: string; role: ProfileRole }
+): Promise<CommunityEventRecord> {
+	const admin = requireAdmin();
+
+	const { data: existing, error: lookupError } = await admin
+		.from('community_events')
+		.select('id, status, submitter_id, starts_at')
+		.eq('id', eventId)
+		.maybeSingle<{
+			id: string;
+			status: CommunityEventStatus;
+			submitter_id: string;
+			starts_at: string;
+		}>();
+	if (lookupError) {
+		console.error('[events] updateEvent lookup failed', lookupError);
+		throw new CommunityEventError('Could not look up the event.', 500);
+	}
+	if (!existing) throw new CommunityEventError('Event not found.', 404);
+
+	const elevated = actor.role === 'contributor' || actor.role === 'admin';
+	if (!elevated && existing.submitter_id !== actor.id) {
+		throw new CommunityEventError('You can only edit your own events.', 403);
+	}
+
+	// A live/past event can keep its start time while its details are fixed;
+	// any *changed* start time must pass the normal future-window checks.
+	const startUnchanged = Date.parse(input.startsAt) === Date.parse(existing.starts_at);
+	const validated = validateEventInput(input, new Date(), { allowPastStart: startUnchanged });
+
+	const resubmitting = !elevated && existing.status !== 'pending';
+	if (resubmitting) await assertPendingCap(actor.id);
+
+	const patch: Record<string, unknown> = {
+		title: validated.title,
+		description: validated.description,
+		location: validated.location,
+		url: validated.url,
+		starts_at: validated.startsAt,
+		ends_at: validated.endsAt
+	};
+	if (!elevated) {
+		patch.status = 'pending';
+		patch.decided_by = null;
+		patch.decided_at = null;
+		patch.review_notes = null;
+	}
+
+	const { data, error } = await admin
+		.from('community_events')
+		.update(patch)
+		.eq('id', eventId)
+		.select(EVENT_COLUMNS)
+		.single<EventJoinRow>();
+
+	if (error || !data) {
+		console.error('[events] updateEvent failed', error);
+		throw new CommunityEventError('Could not update the event.', 500);
 	}
 	return toRecord(data);
 }

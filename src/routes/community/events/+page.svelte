@@ -20,11 +20,57 @@
 	let startsAt = $state('');
 	let endsAt = $state('');
 
+	let editingId = $state<string | null>(null);
+	let editingStatus = $state<string | null>(null);
 	let submitting = $state(false);
 	let formError = $state('');
 	let formSuccess = $state('');
 	let busyId = $state<string | null>(null);
 	let actionError = $state('');
+
+	type EventRow = (typeof data.upcoming)[number];
+
+	function clearForm() {
+		title = '';
+		description = '';
+		location = '';
+		url = '';
+		startsAt = '';
+		endsAt = '';
+		editingId = null;
+		editingStatus = null;
+	}
+
+	/** ISO timestamp → datetime-local input value in the viewer's timezone. */
+	function toLocalInputValue(iso: string): string {
+		const d = new Date(iso);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	function startEdit(event: EventRow) {
+		editingId = event.id;
+		editingStatus = event.status;
+		title = event.title;
+		description = event.description ?? '';
+		location = event.location ?? '';
+		url = event.url ?? '';
+		startsAt = toLocalInputValue(event.starts_at);
+		endsAt = event.ends_at ? toLocalInputValue(event.ends_at) : '';
+		formError = '';
+		formSuccess = '';
+		requestAnimationFrame(() => {
+			document
+				.getElementById('event-form')
+				?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		});
+	}
+
+	function cancelEdit() {
+		clearForm();
+		formError = '';
+		formSuccess = '';
+	}
 
 	async function submitEvent(e: SubmitEvent) {
 		e.preventDefault();
@@ -32,32 +78,40 @@
 		submitting = true;
 		formError = '';
 		formSuccess = '';
+		const wasEditingApproved = editingStatus === 'approved';
 		try {
-			const res = await fetch('/api/community/events', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					title,
-					description: description || null,
-					location: location || null,
-					url: url || null,
-					startsAt: new Date(startsAt).toISOString(),
-					endsAt: endsAt ? new Date(endsAt).toISOString() : null
-				})
-			});
+			const res = await fetch(
+				editingId ? `/api/community/events/${editingId}` : '/api/community/events',
+				{
+					method: editingId ? 'PATCH' : 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						title,
+						description: description || null,
+						location: location || null,
+						url: url || null,
+						startsAt: new Date(startsAt).toISOString(),
+						endsAt: endsAt ? new Date(endsAt).toISOString() : null
+					})
+				}
+			);
 			if (!res.ok) {
 				formError = await res.text();
 				return;
 			}
-			title = '';
-			description = '';
-			location = '';
-			url = '';
-			startsAt = '';
-			endsAt = '';
-			formSuccess = isElevated
-				? 'Event published.'
-				: 'Event submitted — it will appear once a reviewer approves it.';
+			const wasEditing = editingId !== null;
+			clearForm();
+			if (wasEditing) {
+				formSuccess = isElevated
+					? 'Event updated.'
+					: wasEditingApproved
+						? 'Changes saved — the event returns to the calendar once re-approved.'
+						: 'Changes saved — your event is awaiting review.';
+			} else {
+				formSuccess = isElevated
+					? 'Event published.'
+					: 'Event submitted — it will appear once a reviewer approves it.';
+			}
 			await invalidateAll();
 		} catch (err) {
 			formError = err instanceof Error ? err.message : 'Could not submit the event.';
@@ -283,10 +337,17 @@
 								{#if isElevated}
 									<button
 										type="button"
+										onclick={() => startEdit(event)}
+										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
+									>
+										Edit
+									</button>
+									<button
+										type="button"
 										disabled={busyId === event.id}
 										onclick={() =>
 											removeEvent(event.id, `Remove "${event.title}" from the calendar?`)}
-										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px] disabled:opacity-50"
+										class="hud-cta-ghost px-3 py-1 text-[10px] disabled:opacity-50"
 									>
 										Remove
 									</button>
@@ -305,16 +366,20 @@
 
 		<!-- Submit form -->
 		{#if data.signedIn}
-			<div class="mt-10">
+			<div class="mt-10" id="event-form">
 				<div
 					class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
 				>
-					<span>{isElevated ? 'Post an event' : 'Submit an event'}</span>
+					<span>
+						{editingId ? 'Edit event' : isElevated ? 'Post an event' : 'Submit an event'}
+					</span>
 					{#if !isElevated}
 						<span
 							class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]"
 						>
-							reviewed before publishing
+							{editingId && editingStatus === 'approved'
+								? 'saving sends it back through review'
+								: 'reviewed before publishing'}
 						</span>
 					{/if}
 				</div>
@@ -426,18 +491,27 @@
 						</p>
 					{/if}
 
-					<div class="mt-5">
+					<div class="mt-5 flex flex-wrap items-center gap-2">
 						<button
 							type="submit"
 							disabled={submitting}
 							class="hud-cta-outline px-5 py-2 text-xs disabled:opacity-50"
 						>
 							{submitting
-								? 'Submitting…'
-								: isElevated
-									? 'Publish event'
-									: 'Submit for review'}
+								? 'Saving…'
+								: editingId
+									? isElevated
+										? 'Save changes'
+										: 'Save & resubmit'
+									: isElevated
+										? 'Publish event'
+										: 'Submit for review'}
 						</button>
+						{#if editingId}
+							<button type="button" onclick={cancelEdit} class="hud-cta-ghost px-4 py-2 text-xs">
+								Cancel edit
+							</button>
+						{/if}
 					</div>
 				</form>
 			</div>
@@ -469,12 +543,19 @@
 								>
 									{formatWhen(event.starts_at, event.ends_at)}
 								</span>
+								<button
+									type="button"
+									onclick={() => startEdit(event)}
+									class="hud-cta-ghost ml-auto px-3 py-1 text-[10px]"
+								>
+									Edit
+								</button>
 								{#if event.status === 'pending'}
 									<button
 										type="button"
 										disabled={busyId === event.id}
 										onclick={() => removeEvent(event.id, `Withdraw "${event.title}"?`)}
-										class="hud-cta-ghost ml-auto px-3 py-1 text-[10px] disabled:opacity-50"
+										class="hud-cta-ghost px-3 py-1 text-[10px] disabled:opacity-50"
 									>
 										Withdraw
 									</button>
