@@ -39,9 +39,10 @@
 			hour: 'numeric',
 			minute: '2-digit'
 		};
-		const startLabel = new Date(startsIso).toLocaleString(undefined, opts);
-		if (!endsIso) return startLabel;
-		return `${startLabel} → ${new Date(endsIso).toLocaleString(undefined, opts)}`;
+		// Trailing timezone name makes clear the queue shows the reviewer's local time.
+		const tzOpts: Intl.DateTimeFormatOptions = { ...opts, timeZoneName: 'short' };
+		if (!endsIso) return new Date(startsIso).toLocaleString(undefined, tzOpts);
+		return `${new Date(startsIso).toLocaleString(undefined, opts)} → ${new Date(endsIso).toLocaleString(undefined, tzOpts)}`;
 	}
 </script>
 

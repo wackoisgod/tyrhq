@@ -19,7 +19,11 @@
 			weekday: 'short',
 			month: 'short',
 			day: 'numeric'
-		})} · ${starts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+		})} · ${starts.toLocaleTimeString(undefined, {
+			hour: 'numeric',
+			minute: '2-digit',
+			timeZoneName: 'short'
+		})}`;
 	}
 
 	function isLive(startsIso: string, endsIso: string | null): boolean {
