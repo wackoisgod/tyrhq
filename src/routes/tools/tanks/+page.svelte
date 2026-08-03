@@ -144,6 +144,15 @@
 									<span class="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)]">Dif</span>
 									<DifficultyMeter value={tank.stats.difficulty} size="sm" />
 								</div>
+								{#if tank.isWorkInProgress}
+									<div
+										class="alpha-program-mark absolute bottom-2 right-2"
+										title="Alpha Program vehicle"
+										aria-label="Alpha Program vehicle"
+									>
+										<span class="alpha-program-chip__icon" aria-hidden="true"></span>
+									</div>
+								{/if}
 							</div>
 							<div class="px-3 py-2.5">
 								<div
@@ -158,18 +167,6 @@
 									<span>SPD <span class="text-[var(--hud-muted)]">{formatCardValue(tank.stats.maxSpeed)}</span></span>
 								</div>
 							</div>
-							{#if tank.isWorkInProgress}
-								<div
-									class="alpha-program-chip absolute bottom-2 right-2"
-									title="Alpha Program vehicle"
-									aria-label="Alpha Program vehicle"
-								>
-									<span class="alpha-program-chip__label">Alpha</span>
-									<span class="alpha-program-chip__mark">
-										<span class="alpha-program-chip__icon" aria-hidden="true"></span>
-									</span>
-								</div>
-							{/if}
 							<div class={`absolute inset-x-0 bottom-0 h-[3px] ${getTankTheme(tank).line}`}></div>
 						</a>
 					{/each}
