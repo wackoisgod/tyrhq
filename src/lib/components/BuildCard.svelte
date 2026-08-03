@@ -50,7 +50,7 @@
 			{/if}
 		</div>
 
-		{#if build.components.length > 0 || build.ammo.length > 0 || build.isAlphaProgram}
+		{#if build.components.length > 0 || build.ammo.length > 0}
 			<div class="flex flex-wrap items-end gap-2">
 				<div class="flex flex-wrap items-center gap-1">
 					{#each build.components as component, index (`${component.id}-${index}`)}
@@ -84,20 +84,17 @@
 						</div>
 					{/each}
 				</div>
-
-				{#if build.isAlphaProgram}
-					<div
-						class="alpha-program-chip alpha-program-chip--compact shrink-0"
-						title="Alpha Program vehicle"
-						aria-label="Alpha Program vehicle"
-					>
-						<span class="alpha-program-chip__label">Alpha</span>
-						<span class="alpha-program-chip__mark">
-							<span class="alpha-program-chip__icon" aria-hidden="true"></span>
-						</span>
-					</div>
-				{/if}
 			</div>
 		{/if}
 	</div>
+
+	{#if build.isAlphaProgram}
+		<div
+			class="alpha-program-corner"
+			title="Alpha Program vehicle"
+			aria-label="Alpha Program vehicle"
+		>
+			<span class="alpha-program-corner__icon" aria-hidden="true"></span>
+		</div>
+	{/if}
 </a>

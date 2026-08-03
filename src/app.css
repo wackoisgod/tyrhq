@@ -262,64 +262,25 @@ input[type="radio"] {
 		inset 0 0 0 1px rgba(160, 170, 217, 0.14);
 }
 
-.alpha-program-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.45rem;
-	padding: 0.24rem 0.24rem 0.24rem 0.6rem;
-	background: linear-gradient(180deg, rgba(18, 23, 35, 0.96), rgba(12, 16, 26, 0.9));
-	box-shadow:
-		inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-		0 12px 26px rgba(0, 0, 0, 0.24);
-	border: 1px solid rgba(255, 124, 38, 0.18);
-}
-
-.alpha-program-chip--compact {
-	gap: 0.35rem;
-	padding: 0.18rem 0.18rem 0.18rem 0.5rem;
-}
-
-.alpha-program-chip__label {
-	font-family: var(--font-mono);
-	font-size: 0.5rem;
-	line-height: 1;
-	font-weight: 800;
-	letter-spacing: 0.2em;
-	text-transform: uppercase;
-	color: rgba(255, 225, 205, 0.9);
-}
-
-.alpha-program-chip--compact .alpha-program-chip__label {
-	font-size: 0.46rem;
-}
-
-.alpha-program-chip__mark {
-	display: inline-flex;
-	width: 1.95rem;
-	height: 1.95rem;
-	align-items: center;
-	justify-content: center;
+.alpha-program-corner {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	width: 2rem;
+	height: 2rem;
 	background: #ff7c26;
-	box-shadow: inset 0 0 0 1px rgba(255, 220, 197, 0.18);
+	clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
-.alpha-program-chip--compact .alpha-program-chip__mark {
-	width: 1.5rem;
-	height: 1.5rem;
-}
-
-.alpha-program-chip__icon {
-	width: 0.95rem;
-	height: 0.95rem;
-	flex: none;
+.alpha-program-corner__icon {
+	position: absolute;
+	right: 0.24rem;
+	bottom: 0.24rem;
+	width: 0.8rem;
+	height: 0.8rem;
 	background-color: #1b2230;
 	-webkit-mask: url('/images/icons/alpha-program.png') center / contain no-repeat;
 	mask: url('/images/icons/alpha-program.png') center / contain no-repeat;
-}
-
-.alpha-program-chip--compact .alpha-program-chip__icon {
-	width: 0.75rem;
-	height: 0.75rem;
 }
 
 .ui-fallback-icon {
