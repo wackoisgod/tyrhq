@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { communityGroups } from '$lib/content/community';
 
+	let { data } = $props();
+
 	const groups = communityGroups.filter((group) => group.links.length > 0);
 
 	function displayHost(href: string): string {
@@ -9,6 +11,20 @@
 		} catch {
 			return href;
 		}
+	}
+
+	function formatWhen(startsIso: string): string {
+		const starts = new Date(startsIso);
+		return `${starts.toLocaleDateString(undefined, {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric'
+		})} · ${starts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+	}
+
+	function isLive(startsIso: string, endsIso: string | null): boolean {
+		const now = Date.now();
+		return new Date(startsIso).getTime() <= now && (!endsIso || new Date(endsIso).getTime() >= now);
 	}
 </script>
 
@@ -35,9 +51,8 @@
 		request.
 	</p>
 
-	<a
-		href="/community/events"
-		class="mt-8 block rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+	<div
+		class="mt-8 rounded-sm bg-[var(--hud-panel)] p-6"
 		style="box-shadow: var(--hud-surface-ghost);"
 	>
 		<div class="flex flex-wrap items-center gap-3">
@@ -51,13 +66,58 @@
 			</span>
 		</div>
 		<h2 class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]">
-			Community Events
+			<a href="/community/events" class="transition hover:text-[var(--hud-teal)]">
+				Community Events
+			</a>
 		</h2>
-		<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
-			Tournaments, custom lobbies, and meetups — see what's coming up, or submit your own event
-			for the calendar.
-		</p>
-	</a>
+
+		{#if data.upcomingEvents.length === 0}
+			<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+				Tournaments, custom lobbies, and meetups — nothing scheduled right now. Know of an event?
+				<a href="/community/events" class="text-[var(--hud-teal)] hover:underline"
+					>Submit it for the calendar.</a
+				>
+			</p>
+		{:else}
+			<ul class="mt-3 flex flex-col">
+				{#each data.upcomingEvents as event (event.id)}
+					<li class="border-t border-[var(--hud-variant)]/50">
+						<a
+							href="/community/events"
+							class="flex flex-wrap items-center gap-3 py-2.5 transition hover:text-[var(--hud-teal)]"
+						>
+							<span
+								class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+							>
+								{formatWhen(event.starts_at)}
+							</span>
+							<span class="text-sm font-semibold text-[var(--hud-text)]">{event.title}</span>
+							{#if isLive(event.starts_at, event.ends_at)}
+								<span
+									class="rounded-sm bg-[var(--hud-lime)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-lime)]"
+								>
+									Live now
+								</span>
+							{/if}
+							{#if event.location}
+								<span
+									class="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]"
+								>
+									{event.location}
+								</span>
+							{/if}
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<a
+				href="/community/events"
+				class="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--hud-teal)] hover:underline"
+			>
+				Full calendar &amp; event submission →
+			</a>
+		{/if}
+	</div>
 
 	{#if groups.length === 0}
 		<div
