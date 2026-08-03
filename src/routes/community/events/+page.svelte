@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { spanDayKeys } from '$lib/utils/event-days';
+	import MiniCalendar from './MiniCalendar.svelte';
 
 	let { data } = $props();
 
@@ -92,13 +94,51 @@
 			year: 'numeric'
 		};
 		const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
-		const startLabel = `${starts.toLocaleDateString(undefined, dateOpts)} · ${starts.toLocaleTimeString(undefined, timeOpts)}`;
-		if (!endsIso) return startLabel;
+		// The last time in the label carries the viewer's timezone name so it's
+		// obvious every listed time is local.
+		const timeTzOpts: Intl.DateTimeFormatOptions = { ...timeOpts, timeZoneName: 'short' };
+		const startDate = starts.toLocaleDateString(undefined, dateOpts);
+		if (!endsIso) return `${startDate} · ${starts.toLocaleTimeString(undefined, timeTzOpts)}`;
 		const ends = new Date(endsIso);
 		const sameDay = starts.toDateString() === ends.toDateString();
 		return sameDay
-			? `${startLabel} – ${ends.toLocaleTimeString(undefined, timeOpts)}`
-			: `${startLabel} → ${ends.toLocaleDateString(undefined, dateOpts)} · ${ends.toLocaleTimeString(undefined, timeOpts)}`;
+			? `${startDate} · ${starts.toLocaleTimeString(undefined, timeOpts)} – ${ends.toLocaleTimeString(undefined, timeTzOpts)}`
+			: `${startDate} · ${starts.toLocaleTimeString(undefined, timeOpts)} → ${ends.toLocaleDateString(undefined, dateOpts)} · ${ends.toLocaleTimeString(undefined, timeTzOpts)}`;
+	}
+
+	const calendarEvents = $derived([
+		...data.upcoming.map((event) => ({
+			id: event.id,
+			starts_at: event.starts_at,
+			ends_at: event.ends_at,
+			finished: false
+		})),
+		...data.past.map((event) => ({
+			id: event.id,
+			starts_at: event.starts_at,
+			ends_at: event.ends_at,
+			finished: true
+		}))
+	]);
+
+	let flashDay = $state<string | null>(null);
+	let flashTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function selectDay(key: string) {
+		flashDay = key;
+		clearTimeout(flashTimer);
+		flashTimer = setTimeout(() => {
+			flashDay = null;
+		}, 2500);
+		requestAnimationFrame(() => {
+			document
+				.querySelector(`[data-days~="${key}"]`)
+				?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		});
+	}
+
+	function onDay(event: { starts_at: string; ends_at: string | null }): boolean {
+		return flashDay !== null && spanDayKeys(event.starts_at, event.ends_at).includes(flashDay);
 	}
 
 	function isLive(startsIso: string, endsIso: string | null): boolean {
@@ -170,24 +210,27 @@
 			>
 				<span>Upcoming &amp; Live</span>
 				<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
-					{data.upcoming.length} scheduled
+					{data.upcoming.length} scheduled · times shown in your local timezone
 				</span>
 			</div>
 
-			{#if data.upcoming.length === 0}
-				<div
-					class="rounded-sm bg-[var(--hud-panel)] p-8 text-center"
-					style="box-shadow: var(--hud-surface-ghost);"
-				>
-					<p class="text-[var(--hud-muted)]">
-						No events on the calendar yet. Know of one? Submit it below.
-					</p>
-				</div>
-			{:else}
-				<div class="flex flex-col gap-4">
+			<div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
+				{#if data.upcoming.length === 0}
+					<div
+						class="rounded-sm bg-[var(--hud-panel)] p-8 text-center"
+						style="box-shadow: var(--hud-surface-ghost);"
+					>
+						<p class="text-[var(--hud-muted)]">
+							No events on the calendar yet. Know of one? Submit it below.
+						</p>
+					</div>
+				{:else}
+					<div class="flex flex-col gap-4">
 					{#each data.upcoming as event (event.id)}
 						<div
-							class="rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+							class="event-card rounded-sm bg-[var(--hud-panel)] p-6 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+							class:event-flash={onDay(event)}
+							data-days={spanDayKeys(event.starts_at, event.ends_at).join(' ')}
 							style="box-shadow: var(--hud-surface-ghost);"
 						>
 							<div class="flex flex-wrap items-center gap-3">
@@ -251,8 +294,13 @@
 							</div>
 						</div>
 					{/each}
+					</div>
+				{/if}
+
+				<div class="md:sticky md:top-4">
+					<MiniCalendar events={calendarEvents} onselectday={selectDay} />
 				</div>
-			{/if}
+			</div>
 		</div>
 
 		<!-- Submit form -->
@@ -343,7 +391,7 @@
 							<span
 								class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 							>
-								Starts
+								Starts <span class="normal-case tracking-normal">(your local time)</span>
 							</span>
 							<input
 								type="datetime-local"
@@ -455,6 +503,8 @@
 					{#each data.past as event (event.id)}
 						<li
 							class="flex flex-wrap items-center gap-3 rounded-sm bg-[var(--hud-panel)] px-4 py-3 opacity-70"
+							class:event-flash={onDay(event)}
+							data-days={spanDayKeys(event.starts_at, event.ends_at).join(' ')}
 							style="box-shadow: var(--hud-surface-ghost);"
 						>
 							<span
@@ -477,3 +527,10 @@
 		{/if}
 	{/if}
 </section>
+
+<style>
+	.event-flash {
+		outline: 1px solid var(--hud-teal);
+		outline-offset: 2px;
+	}
+</style>
