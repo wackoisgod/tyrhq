@@ -975,7 +975,10 @@
 		onhover(null);
 	}
 
-	function handlePointerDown(event: any) {
+	// Fired only for genuine clicks/taps (pointer moved less than the interactivity
+	// plugin's distance threshold), so orbit drags that start on the hull never pin.
+	// This is also what makes pinning work on touch, where hover never fires.
+	function handleClick(event: any) {
 		if (!armorVisualizerActive) return;
 		if (!isPrimaryIntersection(event)) return;
 		onclick(getHitInfo(event));
@@ -1164,7 +1167,7 @@
 			onpointermove: handlePointerMove,
 			onpointerout: handlePointerLeave,
 			onpointerleave: handlePointerLeave,
-			onpointerdown: handlePointerDown,
+			onclick: handleClick,
 			onpointermissed: () => onclick(null)
 		});
 
