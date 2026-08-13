@@ -5,6 +5,7 @@ import type { RequestHandler } from './$types';
 import {
 	createBuildBodySchema,
 	deleteBuildBodySchema,
+	normalizeBuildNotes,
 	normalizeBuildTitle,
 	parseJsonBody,
 	updateBuildBodySchema
@@ -40,7 +41,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			title: normalizeBuildTitle(body.title),
 			vehicle_id: body.vehicleId,
 			selection: body.selection,
-			is_public: body.isPublic ?? false
+			is_public: body.isPublic ?? false,
+			notes: normalizeBuildNotes(body.notes)
 		})
 		.select()
 		.single();
@@ -76,6 +78,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 			vehicle_id: body.vehicleId,
 			selection: body.selection,
 			is_public: body.isPublic ?? false,
+			notes: normalizeBuildNotes(body.notes),
 			updated_at: new Date().toISOString()
 		})
 		.eq('id', body.id)

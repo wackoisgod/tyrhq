@@ -21,6 +21,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		is_public: boolean;
 		user_id: string;
 		star_count: number;
+		notes: string;
 	} | null = null;
 	let creatorName: string | null = null;
 	let userHasStarred = false;
@@ -29,7 +30,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// RLS allows access if user owns it OR it's public
 		const { data } = await locals.supabase
 			.from('builds')
-			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, profiles(display_name)')
+			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, notes, profiles(display_name)')
 			.eq('slug', slug)
 			.single();
 
@@ -59,12 +60,26 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			? initialVehicleId
 			: null;
 
+	// Personal per-tank notes so the planner can surface the pilot's own
+	// playstyle reminders for whichever vehicle is selected
+	let tankNotes: Record<string, string> = {};
+	if (user && locals.supabase) {
+		const { data: noteRows } = await locals.supabase
+			.from('tank_notes')
+			.select('vehicle_id, notes')
+			.eq('user_id', user.id);
+		tankNotes = Object.fromEntries(
+			(noteRows ?? []).map((row) => [row.vehicle_id, row.notes as string])
+		);
+	}
+
 	return {
 		bundle,
 		initialVehicleId: loadedBuild ? loadedBuild.vehicle_id : initialVehicleId,
 		lockedVehicleId,
 		loadedBuild,
 		creatorName,
-		userHasStarred
+		userHasStarred,
+		tankNotes
 	};
 };

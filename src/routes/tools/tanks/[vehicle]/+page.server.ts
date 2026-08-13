@@ -43,6 +43,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		profiles: { display_name: string } | { display_name: string }[] | null;
 	}> = [];
 
+	let tankNote = '';
+
 	if (locals.supabase) {
 		const { user } = await locals.safeGetSession();
 
@@ -54,6 +56,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				.eq('user_id', user.id)
 				.eq('vehicle_id', vehicle.id);
 			userBuildCount = count ?? 0;
+
+			const { data: noteRow } = await locals.supabase
+				.from('tank_notes')
+				.select('notes')
+				.eq('user_id', user.id)
+				.eq('vehicle_id', vehicle.id)
+				.maybeSingle();
+			tankNote = noteRow?.notes ?? '';
 		}
 
 		// Fetch all public builds for this vehicle
@@ -94,6 +104,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		nativeComponents,
 		armorAvailable: hasVehicleArmorAssets(vehicle.id),
 		userBuildCount,
+		tankNote,
 		publicBuilds,
 		componentNames,
 		ammoNames,

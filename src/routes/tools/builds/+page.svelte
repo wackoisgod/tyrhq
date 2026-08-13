@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import { MAX_BUILD_NOTES_LENGTH } from '$lib/builds/constants';
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import {
 		canIncrementTalentPoint,
@@ -39,6 +40,7 @@
 	let saveSuccess = $state<string | null>(null);
 	let copyLinkLabel = $state('Copy Share Link');
 	let buildName = $state('');
+	let buildNotes = $state('');
 	let exporting = $state(false);
 	let exportError = $state<string | null>(null);
 	let exportCode = $state('');
@@ -67,8 +69,22 @@
 				isPublic: data.loadedBuild.is_public
 			};
 			buildName = data.loadedBuild.title;
+			buildNotes = data.loadedBuild.notes ?? '';
 		}
 	});
+
+	/**
+	 * Whether the notes editor is shown: new builds and builds you own. Viewing
+	 * someone else's build shows their notes read-only until "Save as New" forks
+	 * it into your own copy (editingBuild then points at the fork).
+	 */
+	const canEditNotes = $derived(
+		Boolean(data.user) &&
+			(!data.loadedBuild ||
+				data.loadedBuild.user_id === data.user?.id ||
+				(editingBuild !== null && editingBuild.id !== data.loadedBuild.id))
+	);
+	const creatorNotes = $derived(data.loadedBuild?.notes?.trim() ?? '');
 
 	async function toggleStar() {
 		if (!data.user || !data.loadedBuild || starring) return;
@@ -118,7 +134,8 @@
 					title,
 					vehicleId: selection.vehicleId,
 					selection,
-					isPublic
+					isPublic,
+					notes: buildNotes.trim()
 				})
 			});
 			if (!res.ok) {
@@ -135,6 +152,7 @@
 				isPublic: build.is_public
 			};
 			buildName = build.title;
+			buildNotes = build.notes ?? '';
 			clearDraft();
 			saveSuccess = isPublic
 				? `Build shared! Link: /builds/${build.slug}`
@@ -214,6 +232,7 @@
 	function newBuild() {
 		editingBuild = null;
 		buildName = '';
+		buildNotes = '';
 		clearDraft();
 		selection = getDefaultSelection(catalog);
 		saveError = null;
@@ -403,6 +422,9 @@
 
 	const currentVehicle = $derived(
 		selection ? (catalog.vehicleById.get(selection.vehicleId) ?? catalog.vehicles[0]) : catalog.vehicles[0]
+	);
+	const personalTankNote = $derived(
+		selection && data.user ? ((data.tankNotes ?? {})[selection.vehicleId] ?? '') : ''
 	);
 	const talentNodes = $derived(selection ? getPlannerTalentsForVehicle(catalog, selection.vehicleId) : []);
 	const talentGridDims = $derived.by(() => {
@@ -959,6 +981,81 @@
 					</label>
 				</div>
 			</section>
+
+			{#if data.user || creatorNotes}
+				<section
+					class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-6"
+					style="box-shadow: var(--hud-notch-shadow);"
+				>
+					<div
+						class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
+					>
+						<span>Briefing</span>
+						<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
+							PLAYSTYLE_NOTES · {currentVehicle.name}
+						</span>
+					</div>
+
+					<div class="grid gap-5 {data.user ? 'lg:grid-cols-2' : ''}">
+						<div>
+							{#if canEditNotes}
+								<label class="grid gap-2">
+									<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]">
+										Build Notes
+									</span>
+									<textarea
+										bind:value={buildNotes}
+										maxlength={MAX_BUILD_NOTES_LENGTH}
+										rows="4"
+										placeholder="How is this build meant to be played? Positioning, combos, when to commit…"
+										class="min-h-[7rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+									></textarea>
+								</label>
+								<div class="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]">
+									<span>Saved with the build — anyone who opens a shared build sees these notes.</span>
+									<span class="font-mono tabular-nums">{buildNotes.length}/{MAX_BUILD_NOTES_LENGTH}</span>
+								</div>
+							{:else if creatorNotes}
+								<div
+									class="rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+								>
+									<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
+										Creator's Notes{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+									</div>
+									<p class="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+								</div>
+							{:else}
+								<p class="text-sm text-[var(--hud-muted)]">
+									The build creator hasn't added playstyle notes.
+								</p>
+							{/if}
+						</div>
+
+						{#if data.user}
+							<div>
+								<div class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]">
+									My Tank Notes
+								</div>
+								{#if personalTankNote}
+									<p
+										class="mt-2 whitespace-pre-line rounded-sm bg-[var(--hud-inset)] p-4 text-sm leading-6 text-[var(--hud-muted)] shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+									>{personalTankNote}</p>
+								{:else}
+									<p class="mt-2 text-sm text-[var(--hud-muted)]">
+										No personal notes for {currentVehicle.name} yet — keep playstyle reminders on its tank page.
+									</p>
+								{/if}
+								<a
+									href={`/tools/tanks/${currentVehicle.slug}#tank-notes`}
+									class="mt-2 inline-block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+								>
+									{personalTankNote ? 'Edit' : 'Add'} tank notes &rarr;
+								</a>
+							</div>
+						{/if}
+					</div>
+				</section>
+			{/if}
 
 			<section
 				class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-6"

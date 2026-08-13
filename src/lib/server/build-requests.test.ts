@@ -73,6 +73,35 @@ describe('validateCreateBuildBody', () => {
 
 		expect(result.success).toBe(false);
 	});
+
+	it('accepts playstyle notes and trims them', () => {
+		const selection = getDefaultSelection(catalog, vehicle.id);
+		const result = validateCreateBuildBody({
+			title: 'Frontline Setup',
+			vehicleId: vehicle.id,
+			selection,
+			isPublic: true,
+			notes: '  Hold the second line until your ability is up.  '
+		});
+
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.notes).toBe('Hold the second line until your ability is up.');
+		}
+	});
+
+	it('rejects notes over the length limit', () => {
+		const selection = getDefaultSelection(catalog, vehicle.id);
+		const result = validateCreateBuildBody({
+			title: 'Frontline Setup',
+			vehicleId: vehicle.id,
+			selection,
+			isPublic: false,
+			notes: 'x'.repeat(2001)
+		});
+
+		expect(result.success).toBe(false);
+	});
 });
 
 describe('validateToggleBuildStarBody', () => {
