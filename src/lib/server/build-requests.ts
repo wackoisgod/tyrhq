@@ -1,7 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import { DEFAULT_BUILD_TITLE, MAX_BUILD_TITLE_LENGTH } from '$lib/builds/constants';
+import {
+	DEFAULT_BUILD_TITLE,
+	MAX_BUILD_NOTES_LENGTH,
+	MAX_BUILD_TITLE_LENGTH
+} from '$lib/builds/constants';
 import { getGameDataBundle } from '$lib/data/game-data';
 import {
 	MAX_TOTAL_TALENT_POINTS,
@@ -183,7 +187,15 @@ const buildBodyBaseSchema = z
 			.optional(),
 		vehicleId: z.string().min(1, 'vehicleId is required'),
 		selection: selectionSchema,
-		isPublic: z.boolean().optional()
+		isPublic: z.boolean().optional(),
+		notes: z
+			.string()
+			.trim()
+			.max(
+				MAX_BUILD_NOTES_LENGTH,
+				`notes must be ${MAX_BUILD_NOTES_LENGTH} characters or fewer`
+			)
+			.optional()
 	})
 	.strict();
 
@@ -217,7 +229,7 @@ export const updateBuildBodySchema = buildBodyBaseSchema
 	.superRefine(refineBuildBody);
 
 export const exportBuildBodySchema = buildBodyBaseSchema
-	.omit({ isPublic: true })
+	.omit({ isPublic: true, notes: true })
 	.superRefine(refineBuildBody);
 
 export const deleteBuildBodySchema = z
@@ -248,6 +260,21 @@ function formatValidationError(validationError: z.ZodError) {
 
 export function normalizeBuildTitle(title?: string) {
 	return title?.trim() ? title.trim() : DEFAULT_BUILD_TITLE;
+}
+
+/**
+ * True when a Supabase/PostgREST error means the builds.notes column does not
+ * exist — i.e. migration 017 has not been applied to that database yet.
+ * Callers retry without notes so builds keep working on such deployments
+ * (e.g. preview builds pointed at a not-yet-migrated database).
+ */
+export function isMissingBuildNotesColumnError(cause: unknown): boolean {
+	if (!cause || typeof cause !== 'object') return false;
+	const { code, message } = cause as { code?: string; message?: string };
+	// 42703 = undefined column in a select; PGRST204 = unknown column in an
+	// insert/update payload
+	if (code !== '42703' && code !== 'PGRST204') return false;
+	return typeof message === 'string' ? message.includes('notes') : true;
 }
 
 export async function parseJsonBody<T>(request: Request, schema: z.ZodType<T>) {

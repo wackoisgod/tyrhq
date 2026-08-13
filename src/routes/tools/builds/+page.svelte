@@ -1,5 +1,8 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import Editor from '$lib/contribute/Editor.svelte';
+	import { MAX_BUILD_NOTES_LENGTH } from '$lib/builds/constants';
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import {
 		canIncrementTalentPoint,
@@ -39,6 +42,9 @@
 	let saveSuccess = $state<string | null>(null);
 	let copyLinkLabel = $state('Copy Share Link');
 	let buildName = $state('');
+	let buildNotes = $state('');
+	/** Whether the collapsible build-notes editor row is expanded */
+	let buildNotesOpen = $state(false);
 	let exporting = $state(false);
 	let exportError = $state<string | null>(null);
 	let exportCode = $state('');
@@ -67,8 +73,26 @@
 				isPublic: data.loadedBuild.is_public
 			};
 			buildName = data.loadedBuild.title;
+			buildNotes = data.loadedBuild.notes ?? '';
+			buildNotesOpen = Boolean(data.loadedBuild.notes);
 		}
 	});
+
+	/**
+	 * Whether the notes editor is shown: new builds and builds you own. Viewing
+	 * someone else's build shows their notes read-only until "Save as New" forks
+	 * it into your own copy (editingBuild then points at the fork).
+	 */
+	const canEditNotes = $derived(
+		Boolean(data.user) &&
+			(!data.loadedBuild ||
+				data.loadedBuild.user_id === data.user?.id ||
+				(editingBuild !== null && editingBuild.id !== data.loadedBuild.id))
+	);
+	const creatorNotes = $derived(data.loadedBuild?.notes?.trim() ?? '');
+	/** Sanitized, stat-resolved HTML for the loaded build's notes (may be empty
+	 * for notes saved before the markdown upgrade — fall back to plain text). */
+	const creatorNotesHtml = $derived(data.loadedBuild?.notes_html ?? '');
 
 	async function toggleStar() {
 		if (!data.user || !data.loadedBuild || starring) return;
@@ -118,7 +142,8 @@
 					title,
 					vehicleId: selection.vehicleId,
 					selection,
-					isPublic
+					isPublic,
+					notes: buildNotes.trim()
 				})
 			});
 			if (!res.ok) {
@@ -135,6 +160,7 @@
 				isPublic: build.is_public
 			};
 			buildName = build.title;
+			buildNotes = build.notes ?? '';
 			clearDraft();
 			saveSuccess = isPublic
 				? `Build shared! Link: /builds/${build.slug}`
@@ -214,6 +240,7 @@
 	function newBuild() {
 		editingBuild = null;
 		buildName = '';
+		buildNotes = '';
 		clearDraft();
 		selection = getDefaultSelection(catalog);
 		saveError = null;
@@ -403,6 +430,9 @@
 
 	const currentVehicle = $derived(
 		selection ? (catalog.vehicleById.get(selection.vehicleId) ?? catalog.vehicles[0]) : catalog.vehicles[0]
+	);
+	const personalTankNote = $derived(
+		selection && data.user ? ((data.tankNotes ?? {})[selection.vehicleId] ?? '') : ''
 	);
 	const talentNodes = $derived(selection ? getPlannerTalentsForVehicle(catalog, selection.vehicleId) : []);
 	const talentGridDims = $derived.by(() => {
@@ -884,6 +914,15 @@
 					</div>
 				</div>
 
+				{#if data.buildLoadFailed}
+					<div
+						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						Couldn't load that build — it may be private (sign in to see your own builds), deleted,
+						or the link is invalid. Showing the planner without it.
+					</div>
+				{/if}
+
 				{#if saveError}
 					<div
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
@@ -958,6 +997,91 @@
 						</div>
 					</label>
 				</div>
+
+				{#if data.user}
+					<div class="mt-4 grid gap-1 border-t border-[var(--hud-variant)] pt-3">
+						{#if canEditNotes}
+							<details class="group" bind:open={buildNotesOpen}>
+								<summary
+									class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+								>
+									<svg
+										class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+										viewBox="0 0 16 16"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="m6 4 4 4-4 4" />
+									</svg>
+									Build Notes
+									<span
+										class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+									>
+										{buildNotes.trim()
+											? `${buildNotes.trim().length} chars`
+											: 'optional — how is this build meant to be played?'}
+									</span>
+								</summary>
+								<div class="pb-1 pl-5 pt-1">
+									<Editor
+										bind:value={buildNotes}
+										compact
+										maxLength={MAX_BUILD_NOTES_LENGTH}
+										placeholder="How is this build meant to be played? Markdown supported — link guides, embed videos, add callouts and live :stat values, just like articles."
+									/>
+									<div
+										class="mt-1 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]"
+									>
+										<span>Saved with the build — anyone who opens a shared build sees these notes.</span>
+										<span class="font-mono tabular-nums">{buildNotes.length}/{MAX_BUILD_NOTES_LENGTH}</span>
+									</div>
+								</div>
+							</details>
+						{/if}
+
+						<details class="group">
+							<summary
+								class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+							>
+								<svg
+									class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+									viewBox="0 0 16 16"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m6 4 4 4-4 4" />
+								</svg>
+								My Tank Notes
+								<span
+									class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+								>
+									{personalTankNote ? currentVehicle.name : `none for ${currentVehicle.name} yet`}
+								</span>
+							</summary>
+							<div class="pb-1 pl-5 pt-1">
+								{#if personalTankNote}
+									<p
+										class="whitespace-pre-line rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-muted)] shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+									>{personalTankNote}</p>
+								{/if}
+								<a
+									href={`/tools/tanks/${currentVehicle.slug}#tank-notes`}
+									class="mt-1.5 inline-block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+								>
+									{personalTankNote ? 'Edit' : 'Add'} tank notes on the {currentVehicle.name} page &rarr;
+								</a>
+							</div>
+						</details>
+					</div>
+				{/if}
 			</section>
 
 			<section
@@ -1344,6 +1468,27 @@
 					</div>
 				</div>
 			</section>
+
+			{#if !canEditNotes && creatorNotes}
+				<section
+					class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"
+					style="box-shadow: var(--hud-notch-shadow);"
+				>
+					<div
+						class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						<span>Briefing</span>
+						<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
+							CREATOR_NOTES{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+						</span>
+					</div>
+					{#if creatorNotesHtml}
+						<ArticleBody html={creatorNotesHtml} />
+					{:else}
+						<p class="whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+					{/if}
+				</section>
+			{/if}
 
 			<section
 				class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"
