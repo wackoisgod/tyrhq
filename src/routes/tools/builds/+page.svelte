@@ -923,23 +923,6 @@
 					</div>
 				{/if}
 
-				{#if !canEditNotes && creatorNotes}
-					<div
-						class="mt-4 rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
-					>
-						<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
-							Creator's Notes{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
-						</div>
-						{#if creatorNotesHtml}
-							<div class="mt-1.5 text-sm">
-								<ArticleBody html={creatorNotesHtml} />
-							</div>
-						{:else}
-							<p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
-						{/if}
-					</div>
-				{/if}
-
 				{#if saveError}
 					<div
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
@@ -1485,6 +1468,27 @@
 					</div>
 				</div>
 			</section>
+
+			{#if !canEditNotes && creatorNotes}
+				<section
+					class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"
+					style="box-shadow: var(--hud-notch-shadow);"
+				>
+					<div
+						class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						<span>Briefing</span>
+						<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
+							CREATOR_NOTES{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+						</span>
+					</div>
+					{#if creatorNotesHtml}
+						<ArticleBody html={creatorNotesHtml} />
+					{:else}
+						<p class="whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+					{/if}
+				</section>
+			{/if}
 
 			<section
 				class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"
