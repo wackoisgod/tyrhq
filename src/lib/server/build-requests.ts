@@ -266,6 +266,21 @@ export function normalizeBuildNotes(notes?: string) {
 	return notes?.trim() ?? '';
 }
 
+/**
+ * True when a Supabase/PostgREST error means the builds.notes column does not
+ * exist — i.e. migration 017 has not been applied to that database yet.
+ * Callers retry without notes so builds keep working on such deployments
+ * (e.g. preview builds pointed at a not-yet-migrated database).
+ */
+export function isMissingBuildNotesColumnError(cause: unknown): boolean {
+	if (!cause || typeof cause !== 'object') return false;
+	const { code, message } = cause as { code?: string; message?: string };
+	// 42703 = undefined column in a select; PGRST204 = unknown column in an
+	// insert/update payload
+	if (code !== '42703' && code !== 'PGRST204') return false;
+	return typeof message === 'string' ? message.includes('notes') : true;
+}
+
 export async function parseJsonBody<T>(request: Request, schema: z.ZodType<T>) {
 	let body: unknown;
 

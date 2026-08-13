@@ -41,6 +41,8 @@
 	let copyLinkLabel = $state('Copy Share Link');
 	let buildName = $state('');
 	let buildNotes = $state('');
+	/** Whether the collapsible build-notes editor row is expanded */
+	let buildNotesOpen = $state(false);
 	let exporting = $state(false);
 	let exportError = $state<string | null>(null);
 	let exportCode = $state('');
@@ -70,6 +72,7 @@
 			};
 			buildName = data.loadedBuild.title;
 			buildNotes = data.loadedBuild.notes ?? '';
+			buildNotesOpen = Boolean(data.loadedBuild.notes);
 		}
 	});
 
@@ -906,6 +909,26 @@
 					</div>
 				</div>
 
+				{#if data.buildLoadFailed}
+					<div
+						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						Couldn't load that build — it may be private (sign in to see your own builds), deleted,
+						or the link is invalid. Showing the planner without it.
+					</div>
+				{/if}
+
+				{#if !canEditNotes && creatorNotes}
+					<div
+						class="mt-4 rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+					>
+						<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
+							Creator's Notes{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+						</div>
+						<p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+					</div>
+				{/if}
+
 				{#if saveError}
 					<div
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
@@ -980,82 +1003,93 @@
 						</div>
 					</label>
 				</div>
-			</section>
 
-			{#if data.user || creatorNotes}
-				<section
-					class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-6"
-					style="box-shadow: var(--hud-notch-shadow);"
-				>
-					<div
-						class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]"
-					>
-						<span>Briefing</span>
-						<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
-							PLAYSTYLE_NOTES · {currentVehicle.name}
-						</span>
-					</div>
-
-					<div class="grid gap-5 {data.user ? 'lg:grid-cols-2' : ''}">
-						<div>
-							{#if canEditNotes}
-								<label class="grid gap-2">
-									<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]">
-										Build Notes
+				{#if data.user}
+					<div class="mt-4 grid gap-1 border-t border-[var(--hud-variant)] pt-3">
+						{#if canEditNotes}
+							<details class="group" bind:open={buildNotesOpen}>
+								<summary
+									class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+								>
+									<svg
+										class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+										viewBox="0 0 16 16"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="m6 4 4 4-4 4" />
+									</svg>
+									Build Notes
+									<span
+										class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+									>
+										{buildNotes.trim()
+											? `${buildNotes.trim().length} chars`
+											: 'optional — how is this build meant to be played?'}
 									</span>
+								</summary>
+								<div class="pb-1 pl-5 pt-1">
 									<textarea
 										bind:value={buildNotes}
 										maxlength={MAX_BUILD_NOTES_LENGTH}
-										rows="4"
-										placeholder="How is this build meant to be played? Positioning, combos, when to commit…"
-										class="min-h-[7rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+										rows="3"
+										placeholder="Positioning, combos, when to commit…"
+										class="min-h-[5.5rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
 									></textarea>
-								</label>
-								<div class="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]">
-									<span>Saved with the build — anyone who opens a shared build sees these notes.</span>
-									<span class="font-mono tabular-nums">{buildNotes.length}/{MAX_BUILD_NOTES_LENGTH}</span>
-								</div>
-							{:else if creatorNotes}
-								<div
-									class="rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
-								>
-									<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
-										Creator's Notes{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+									<div
+										class="mt-1 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]"
+									>
+										<span>Saved with the build — anyone who opens a shared build sees these notes.</span>
+										<span class="font-mono tabular-nums">{buildNotes.length}/{MAX_BUILD_NOTES_LENGTH}</span>
 									</div>
-									<p class="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
 								</div>
-							{:else}
-								<p class="text-sm text-[var(--hud-muted)]">
-									The build creator hasn't added playstyle notes.
-								</p>
-							{/if}
-						</div>
+							</details>
+						{/if}
 
-						{#if data.user}
-							<div>
-								<div class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]">
-									My Tank Notes
-								</div>
+						<details class="group">
+							<summary
+								class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+							>
+								<svg
+									class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+									viewBox="0 0 16 16"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m6 4 4 4-4 4" />
+								</svg>
+								My Tank Notes
+								<span
+									class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+								>
+									{personalTankNote ? currentVehicle.name : `none for ${currentVehicle.name} yet`}
+								</span>
+							</summary>
+							<div class="pb-1 pl-5 pt-1">
 								{#if personalTankNote}
 									<p
-										class="mt-2 whitespace-pre-line rounded-sm bg-[var(--hud-inset)] p-4 text-sm leading-6 text-[var(--hud-muted)] shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+										class="whitespace-pre-line rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-muted)] shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
 									>{personalTankNote}</p>
-								{:else}
-									<p class="mt-2 text-sm text-[var(--hud-muted)]">
-										No personal notes for {currentVehicle.name} yet — keep playstyle reminders on its tank page.
-									</p>
 								{/if}
 								<a
 									href={`/tools/tanks/${currentVehicle.slug}#tank-notes`}
-									class="mt-2 inline-block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+									class="mt-1.5 inline-block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
 								>
-									{personalTankNote ? 'Edit' : 'Add'} tank notes &rarr;
+									{personalTankNote ? 'Edit' : 'Add'} tank notes on the {currentVehicle.name} page &rarr;
 								</a>
 							</div>
-						{/if}
+						</details>
 					</div>
-				</section>
-			{/if}
+				{/if}
+			</section>
 
 			<section
 				class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-6"

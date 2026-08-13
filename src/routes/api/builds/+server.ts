@@ -5,6 +5,7 @@ import type { RequestHandler } from './$types';
 import {
 	createBuildBodySchema,
 	deleteBuildBodySchema,
+	isMissingBuildNotesColumnError,
 	normalizeBuildNotes,
 	normalizeBuildTitle,
 	parseJsonBody,
@@ -33,19 +34,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const slug = generateSlug();
 
-	const { data, error: dbError } = await locals.supabase
+	const insertRow = {
+		user_id: user.id,
+		slug,
+		title: normalizeBuildTitle(body.title),
+		vehicle_id: body.vehicleId,
+		selection: body.selection,
+		is_public: body.isPublic ?? false
+	};
+
+	let { data, error: dbError } = await locals.supabase
 		.from('builds')
-		.insert({
-			user_id: user.id,
-			slug,
-			title: normalizeBuildTitle(body.title),
-			vehicle_id: body.vehicleId,
-			selection: body.selection,
-			is_public: body.isPublic ?? false,
-			notes: normalizeBuildNotes(body.notes)
-		})
+		.insert({ ...insertRow, notes: normalizeBuildNotes(body.notes) })
 		.select()
 		.single();
+
+	if (dbError && isMissingBuildNotesColumnError(dbError)) {
+		// Database has not run migration 017 yet — save without notes
+		({ data, error: dbError } = await locals.supabase
+			.from('builds')
+			.insert(insertRow)
+			.select()
+			.single());
+	}
 
 	if (dbError) return failBuildsRequest('Failed to create build', dbError);
 	return json(data, { status: 201 });
@@ -71,20 +82,32 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
 	const body = await parseJsonBody(request, updateBuildBodySchema);
 
-	const { data, error: dbError } = await locals.supabase
+	const updateRow = {
+		title: normalizeBuildTitle(body.title),
+		vehicle_id: body.vehicleId,
+		selection: body.selection,
+		is_public: body.isPublic ?? false,
+		updated_at: new Date().toISOString()
+	};
+
+	let { data, error: dbError } = await locals.supabase
 		.from('builds')
-		.update({
-			title: normalizeBuildTitle(body.title),
-			vehicle_id: body.vehicleId,
-			selection: body.selection,
-			is_public: body.isPublic ?? false,
-			notes: normalizeBuildNotes(body.notes),
-			updated_at: new Date().toISOString()
-		})
+		.update({ ...updateRow, notes: normalizeBuildNotes(body.notes) })
 		.eq('id', body.id)
 		.eq('user_id', user.id)
 		.select()
 		.single();
+
+	if (dbError && isMissingBuildNotesColumnError(dbError)) {
+		// Database has not run migration 017 yet — save without notes
+		({ data, error: dbError } = await locals.supabase
+			.from('builds')
+			.update(updateRow)
+			.eq('id', body.id)
+			.eq('user_id', user.id)
+			.select()
+			.single());
+	}
 
 	if (dbError) return failBuildsRequest('Failed to update build', dbError);
 	return json(data);

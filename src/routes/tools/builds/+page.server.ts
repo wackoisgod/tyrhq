@@ -1,4 +1,5 @@
 import { getGameDataBundle } from '$lib/data/game-data';
+import { isMissingBuildNotesColumnError } from '$lib/server/build-requests';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -28,11 +29,27 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
 	if (slug && locals.supabase) {
 		// RLS allows access if user owns it OR it's public
-		const { data } = await locals.supabase
+		const buildQuery = await locals.supabase
 			.from('builds')
 			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, notes, profiles(display_name)')
 			.eq('slug', slug)
 			.single();
+
+		let data = buildQuery.data;
+		if (!data && isMissingBuildNotesColumnError(buildQuery.error)) {
+			// Database has not run migration 017 yet — retry without notes so
+			// builds still open instead of silently falling back to a blank one
+			const legacyQuery = await locals.supabase
+				.from('builds')
+				.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, profiles(display_name)')
+				.eq('slug', slug)
+				.single();
+			data = legacyQuery.data ? { ...legacyQuery.data, notes: '' } : null;
+		}
+
+		if (!data && buildQuery.error) {
+			console.error(`[planner] Failed to load build "${slug}"`, buildQuery.error);
+		}
 
 		if (data) {
 			loadedBuild = data;
@@ -78,6 +95,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		initialVehicleId: loadedBuild ? loadedBuild.vehicle_id : initialVehicleId,
 		lockedVehicleId,
 		loadedBuild,
+		// A build was requested but could not be loaded (private, deleted, bad
+		// link, or the database is unreachable) — surface it instead of quietly
+		// showing a blank planner
+		buildLoadFailed: Boolean(slug) && !loadedBuild,
 		creatorName,
 		userHasStarred,
 		tankNotes
