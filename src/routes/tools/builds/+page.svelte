@@ -1,5 +1,7 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import Editor from '$lib/contribute/Editor.svelte';
 	import { MAX_BUILD_NOTES_LENGTH } from '$lib/builds/constants';
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import {
@@ -88,6 +90,9 @@
 				(editingBuild !== null && editingBuild.id !== data.loadedBuild.id))
 	);
 	const creatorNotes = $derived(data.loadedBuild?.notes?.trim() ?? '');
+	/** Sanitized, stat-resolved HTML for the loaded build's notes (may be empty
+	 * for notes saved before the markdown upgrade — fall back to plain text). */
+	const creatorNotesHtml = $derived(data.loadedBuild?.notes_html ?? '');
 
 	async function toggleStar() {
 		if (!data.user || !data.loadedBuild || starring) return;
@@ -925,7 +930,13 @@
 						<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
 							Creator's Notes{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
 						</div>
-						<p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+						{#if creatorNotesHtml}
+							<div class="mt-1.5 text-sm">
+								<ArticleBody html={creatorNotesHtml} />
+							</div>
+						{:else}
+							<p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+						{/if}
 					</div>
 				{/if}
 
@@ -1033,13 +1044,12 @@
 									</span>
 								</summary>
 								<div class="pb-1 pl-5 pt-1">
-									<textarea
+									<Editor
 										bind:value={buildNotes}
-										maxlength={MAX_BUILD_NOTES_LENGTH}
-										rows="3"
-										placeholder="Positioning, combos, when to commit…"
-										class="min-h-[5.5rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
-									></textarea>
+										compact
+										maxLength={MAX_BUILD_NOTES_LENGTH}
+										placeholder="How is this build meant to be played? Markdown supported — link guides, embed videos, add callouts and live :stat values, just like articles."
+									/>
 									<div
 										class="mt-1 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]"
 									>

@@ -262,10 +262,6 @@ export function normalizeBuildTitle(title?: string) {
 	return title?.trim() ? title.trim() : DEFAULT_BUILD_TITLE;
 }
 
-export function normalizeBuildNotes(notes?: string) {
-	return notes?.trim() ?? '';
-}
-
 /**
  * True when a Supabase/PostgREST error means the builds.notes column does not
  * exist — i.e. migration 017 has not been applied to that database yet.

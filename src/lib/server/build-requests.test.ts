@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_BUILD_NOTES_LENGTH } from '$lib/builds/constants';
 import { getGameDataBundle } from '$lib/data/game-data';
 import { createPlannerCatalog, getDefaultSelection } from '$lib/game-engine/build';
 
@@ -97,7 +98,7 @@ describe('validateCreateBuildBody', () => {
 			vehicleId: vehicle.id,
 			selection,
 			isPublic: false,
-			notes: 'x'.repeat(2001)
+			notes: 'x'.repeat(MAX_BUILD_NOTES_LENGTH + 1)
 		});
 
 		expect(result.success).toBe(false);

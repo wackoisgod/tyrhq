@@ -1,5 +1,6 @@
 import { getGameDataBundle } from '$lib/data/game-data';
 import { isMissingBuildNotesColumnError } from '$lib/server/build-requests';
+import { renderGameStatRefs } from '$lib/server/game-data-refs';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -23,6 +24,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		user_id: string;
 		star_count: number;
 		notes: string;
+		notes_html: string;
 	} | null = null;
 	let creatorName: string | null = null;
 	let userHasStarred = false;
@@ -31,7 +33,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// RLS allows access if user owns it OR it's public
 		const buildQuery = await locals.supabase
 			.from('builds')
-			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, notes, profiles(display_name)')
+			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, notes, notes_html, profiles(display_name)')
 			.eq('slug', slug)
 			.single();
 
@@ -44,7 +46,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 				.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, profiles(display_name)')
 				.eq('slug', slug)
 				.single();
-			data = legacyQuery.data ? { ...legacyQuery.data, notes: '' } : null;
+			data = legacyQuery.data ? { ...legacyQuery.data, notes: '', notes_html: '' } : null;
+		}
+
+		// Fill live :stat references with current game-data values (same as
+		// article rendering) before the notes HTML reaches the page
+		if (data?.notes_html) {
+			data = { ...data, notes_html: renderGameStatRefs(data.notes_html) };
 		}
 
 		if (!data && buildQuery.error) {

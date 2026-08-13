@@ -6,11 +6,12 @@ import {
 	createBuildBodySchema,
 	deleteBuildBodySchema,
 	isMissingBuildNotesColumnError,
-	normalizeBuildNotes,
 	normalizeBuildTitle,
 	parseJsonBody,
 	updateBuildBodySchema
 } from '$lib/server/build-requests';
+import { renderBuildNotes, type RenderedBuildNotes } from '$lib/server/build-notes';
+import { ContentValidationError } from '$lib/server/content-sanitize';
 
 function generateSlug(): string {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -26,6 +27,18 @@ function failBuildsRequest(message: string, cause: unknown) {
 	return error(500, 'Builds are unavailable right now');
 }
 
+/** Render notes markdown to sanitized HTML, mapping author mistakes to a 400. */
+async function renderBuildNotesOrFail(rawNotes: string | undefined): Promise<RenderedBuildNotes> {
+	try {
+		return await renderBuildNotes(rawNotes);
+	} catch (cause) {
+		if (cause instanceof ContentValidationError) {
+			error(400, `notes: ${cause.message}`);
+		}
+		throw cause;
+	}
+}
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const { session, user } = await locals.safeGetSession();
 	if (!session || !user) return error(401, 'Authentication required');
@@ -34,6 +47,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const slug = generateSlug();
 
+	const noteContent = await renderBuildNotesOrFail(body.notes);
 	const insertRow = {
 		user_id: user.id,
 		slug,
@@ -45,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let { data, error: dbError } = await locals.supabase
 		.from('builds')
-		.insert({ ...insertRow, notes: normalizeBuildNotes(body.notes) })
+		.insert({ ...insertRow, notes: noteContent.notes, notes_html: noteContent.notesHtml })
 		.select()
 		.single();
 
@@ -82,6 +96,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
 	const body = await parseJsonBody(request, updateBuildBodySchema);
 
+	const noteContent = await renderBuildNotesOrFail(body.notes);
 	const updateRow = {
 		title: normalizeBuildTitle(body.title),
 		vehicle_id: body.vehicleId,
@@ -92,7 +107,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
 	let { data, error: dbError } = await locals.supabase
 		.from('builds')
-		.update({ ...updateRow, notes: normalizeBuildNotes(body.notes) })
+		.update({ ...updateRow, notes: noteContent.notes, notes_html: noteContent.notesHtml })
 		.eq('id', body.id)
 		.eq('user_id', user.id)
 		.select()

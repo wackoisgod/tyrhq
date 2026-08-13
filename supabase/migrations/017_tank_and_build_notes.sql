@@ -1,10 +1,16 @@
 -- Playstyle notes: per-build (author intent, travels with shared builds) and
 -- per-tank (personal notepad, private to each user).
 
--- Author notes on builds. Readable by whoever can read the build row, so
--- creator intent shows up when a shared build is opened.
+-- Author notes on builds. Markdown source plus server-sanitized HTML (same
+-- pipeline as articles/guides — GFM, callouts, YouTube, live :stat refs).
+-- Readable by whoever can read the build row, so creator intent shows up when
+-- a shared build is opened. notes_html is derived server-side from notes on
+-- every save; it is never accepted from the client.
 alter table public.builds
-    add column notes text not null default '' check (char_length(notes) <= 2000);
+    add column notes text not null default '' check (char_length(notes) <= 10000);
+
+alter table public.builds
+    add column notes_html text not null default '';
 
 -- Personal per-tank notes. vehicle_id is a game-data identifier (validated
 -- app-side against the vehicle catalog), not a foreign key.
