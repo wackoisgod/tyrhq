@@ -262,6 +262,27 @@
 
 				{#if data.role === 'admin'}
 					<a
+						href="/admin/community-links"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Community links
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								ADMIN
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Curate the Discords, fan sites, and tools listed on the community page.
+						</p>
+					</a>
+				{/if}
+
+				{#if data.role === 'admin'}
+					<a
 						href="/admin/users"
 						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
 					>
