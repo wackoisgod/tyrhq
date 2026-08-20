@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { communityGroups } from '$lib/content/community';
-
 	let { data } = $props();
 
-	const groups = communityGroups.filter((group) => group.links.length > 0);
+	// Admin-curated in /admin/community-links; a group with no links is hidden.
+	const groups = $derived(data.communityGroups.filter((group) => group.links.length > 0));
 
 	function displayHost(href: string): string {
 		try {
@@ -60,8 +59,7 @@
 	</h1>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
 		Where the Tyr community gathers — official channels, player-run Discords, and fan-made sites
-		and tools. Run a community space that belongs here? Reach out on Discord or open a pull
-		request.
+		and tools. Run a community space that belongs here? Reach out on Discord and we'll add it.
 	</p>
 
 	<div
