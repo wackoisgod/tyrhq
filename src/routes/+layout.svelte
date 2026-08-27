@@ -138,14 +138,6 @@
 				<div class="tyr-actions">
 					<div class="tyr-header-actions">
 						<a
-							href={siteCopy.wishlistUrl}
-							target="_blank"
-							rel="noreferrer"
-							class="hud-cta-outline tyr-header-button px-6 py-3"
-						>
-							Wishlist On Steam
-						</a>
-						<a
 							href={siteCopy.playtestUrl}
 							target="_blank"
 							rel="noreferrer"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCompareTanks } from '$lib/data/game-data';
+import { getCompareTanks, getGameDataBundle } from '$lib/data/game-data';
+import { calculateRealAccelerationMps2 } from '$lib/data/vehicle-real-acceleration';
 import { statDefinitionByKey } from './stat-definitions';
 import {
 	bestCompareValue,
@@ -53,6 +54,14 @@ describe('compare stat definitions', () => {
 			expect(entry.better, entry.key).toBe('higher');
 		}
 	});
+
+	it('uses the explicit exported vehicle weight field', () => {
+		const vehiclesById = new Map(getGameDataBundle().vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
+		for (const tank of getCompareTanks()) {
+			expect(tank.stats.weightKg).toBe(vehiclesById.get(tank.id)?.weightKg);
+		}
+	});
 });
 
 describe('bestCompareValue', () => {
@@ -86,11 +95,42 @@ describe('row visibility and formatting', () => {
 		expect(shouldShowCompareRow([-11, -6])).toBe(true);
 	});
 
-	it('scales mass from kilograms to tonnes for display', () => {
-		const mass = compareSections
+	it('shows weight in grouped kilograms without ranking it', () => {
+		const weight = compareSections
 			.flatMap((section) => section.rows)
-			.find((entry) => entry.key === 'Mass');
-		expect(mass).toBeDefined();
-		expect(scaleCompareValue(mass!, 46000)).toBe(46);
+			.find((entry) => entry.key === 'weightKg');
+		expect(weight).toMatchObject({
+			label: 'Weight',
+			unit: 'kg',
+			better: 'none',
+			groupThousands: true
+		});
+		expect(scaleCompareValue(weight!, 46000)).toBe(46000);
+	});
+
+	it('uses the spreadsheet-backed real acceleration value', () => {
+		const vehiclesById = new Map(getGameDataBundle().vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
+		for (const tank of getCompareTanks()) {
+			const vehicle = vehiclesById.get(tank.id);
+			expect(vehicle).toBeDefined();
+			expect(tank.stats.realAccelerationMps2).toBe(
+				calculateRealAccelerationMps2(
+					vehicle?.stats.MaxSpeed ?? 0,
+					vehicle?.stats.AccelerationTime ?? 0
+				)
+			);
+		}
+	});
+
+	it('treats higher real acceleration as better', () => {
+		const realAcceleration = compareSections
+			.flatMap((section) => section.rows)
+			.find((entry) => entry.key === 'realAccelerationMps2');
+		expect(realAcceleration).toMatchObject({
+			label: 'Real Acceleration',
+			unit: 'm/s²',
+			better: 'higher'
+		});
 	});
 });

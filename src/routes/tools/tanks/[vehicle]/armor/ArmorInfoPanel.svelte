@@ -14,7 +14,7 @@
 
 <script lang="ts">
 	import type { TankSummary } from '$lib/types/game';
-	import type { ArmorHitInfo } from './types';
+	import { getArmorModuleLabel, type ArmorHitInfo } from './types';
 
 	let {
 		tank,
@@ -60,13 +60,16 @@
 
 		{#if display}
 			{@const result = resultLabels[display.result] ?? resultLabels.no_pen}
+			{@const moduleLabel = display.result === 'module'
+				? getArmorModuleLabel(display.module)
+				: undefined}
 			<div class="mt-4 space-y-3">
 				<div
 					class="rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_var(--hud-ghost)]"
 				>
 					<div class="text-xs uppercase tracking-[0.22em] text-[var(--hud-dim)]">Result</div>
 					<div class="mt-1 font-[var(--font-display)] text-lg font-bold uppercase {result.color}">
-						{result.label}
+						{moduleLabel ? `${moduleLabel} MODULE` : result.label}
 					</div>
 				</div>
 

@@ -123,6 +123,7 @@ function makeVehicle(id: string, stats: Record<string, number>, defaultAmmo: str
 		classLabel: 'Medium',
 		isWorkInProgress: false,
 		selectable: true,
+		weightKg: 20_000,
 		stats,
 		ability: {
 			name: 'Commander Ability',

@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { T, useTask, useThrelte } from '@threlte/core';
 	import { OrbitControls, interactivity, useFBO, useInteractivity } from '@threlte/extras';
-	import type { ArmorHitInfo } from './types';
+	import {
+		getArmorModuleForTriangle,
+		type ArmorData,
+		type ArmorHitInfo
+	} from './types';
 	import {
 		BufferAttribute,
 		BufferGeometry,
@@ -30,16 +34,6 @@
 	} from 'three';
 	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 	import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-
-	type ArmorData = {
-		vehicleId: string;
-		textureWidth: number;
-		textureHeight: number;
-		triangles: [number, number][];
-		isModule: number[];
-		isAbsorb?: number[];
-		sectionIds?: number[];
-	};
 
 	type DeployedClipName = 'enter' | 'idle' | 'exit';
 	type DeployedAnimationSet = Partial<Record<DeployedClipName, AnimationClip>>;
@@ -925,11 +919,13 @@
 		const isAbsorb = armorData.isAbsorb?.[faceIndex] ?? 0;
 
 		if (isModule) {
+			const module = getArmorModuleForTriangle(armorData, faceIndex);
 			return {
 				thickness: 0,
 				angle: 0,
 				isFiftyFifty: false,
-				result: isAbsorb ? 'absorb' : 'module'
+				result: isAbsorb ? 'absorb' : 'module',
+				module
 			};
 		}
 

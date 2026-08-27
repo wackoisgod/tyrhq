@@ -68,15 +68,32 @@
 		{ label: 'Reload', value: data.tank.stats.reloadTime, unit: 's' },
 		{ label: 'Vision', value: data.tank.stats.vision, unit: 'm' },
 		{ label: 'Detection', value: data.tank.stats.detection, unit: 'm' },
-		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' }
+		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' },
+		{ label: 'Weight', value: data.tank.weightKg, unit: 'kg', groupThousands: true },
+		{
+			label: 'Real Acceleration',
+			value: data.tank.stats.realAccelerationMps2,
+			unit: 'm/s²',
+			precision: 2
+		}
 	]);
 	const hasAbilityDetails = $derived(
 		Boolean(data.tank.ability?.description || data.tank.ability?.icon)
 	);
 
-	function formatValue(value: number | undefined, unit: string) {
+	function formatValue(
+		value: number | undefined,
+		unit: string,
+		groupThousands = false,
+		precision = 1
+	) {
 		if (value == null) return '0';
-		return `${Number.isInteger(value) ? value : value.toFixed(1).replace(/\.0$/, '')}${unit ? ` ${unit}` : ''}`;
+		const formatted = groupThousands
+			? value.toLocaleString('en-US', { maximumFractionDigits: 1 })
+			: Number.isInteger(value)
+				? value
+				: value.toFixed(precision).replace(/\.0+$/, '');
+		return `${formatted}${unit ? ` ${unit}` : ''}`;
 	}
 
 	function getTankTheme(tank: TankSummary) {
@@ -202,12 +219,12 @@
 					<div class="rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)]">
 						<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">{stat.label}</div>
 						<div class="mt-1 text-xl font-semibold text-[var(--hud-text)]">
-							{formatValue(stat.value, stat.unit)}
+							{formatValue(stat.value, stat.unit, stat.groupThousands, stat.precision)}
 						</div>
 					</div>
 				{/each}
 				<div
-					class="flex items-center justify-between gap-3 rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)] sm:col-span-3"
+					class="flex items-center justify-between gap-3 rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)]"
 				>
 					<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">Difficulty</div>
 					<DifficultyMeter value={data.tank.stats.difficulty} size="md" showValue />

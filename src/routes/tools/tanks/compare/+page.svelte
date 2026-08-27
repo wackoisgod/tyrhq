@@ -90,6 +90,13 @@
 		return selectedTanks.map((tank) => scaleCompareValue(rowDef, tank.stats[rowDef.key]));
 	}
 
+	function formatCompareValue(value: number, rowDef: CompareRowDef) {
+		if (!rowDef.groupThousands) return formatStatValue(value, rowDef.unit);
+		if (!Number.isFinite(value)) return '-';
+		const formatted = value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+		return rowDef.unit ? `${formatted} ${rowDef.unit}` : formatted;
+	}
+
 	function rowBarWidths(values: number[]) {
 		// Proportional underbars only make sense for non-negative rows (gun
 		// depression is negative); the highlight still marks the winner there.
@@ -426,7 +433,7 @@
 											<div
 												class={`whitespace-nowrap font-mono text-sm tabular-nums ${isBest ? 'font-bold text-[var(--hud-lime)]' : 'text-[var(--hud-text)]'}`}
 											>
-												{formatStatValue(value, rowDef.unit)}
+												{formatCompareValue(value, rowDef)}
 											</div>
 											{#if bars}
 												<div class="mt-1 h-[3px] w-full max-w-[9rem] bg-[var(--hud-inset)]">

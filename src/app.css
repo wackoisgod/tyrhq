@@ -1566,7 +1566,7 @@ input[type="radio"] {
 	justify-content: center;
 	overflow: hidden;
 	padding: clamp(1.5rem, 1rem + 1.6vw, 2.6rem);
-	background: #0d111a url('/images/tyr-open-playtest-hero.webp') 68% center / cover no-repeat;
+	background: #0d111a;
 	box-shadow:
 		var(--hud-notch-shadow),
 		inset 0 0 0 1px rgba(160, 170, 217, 0.14),
@@ -1575,7 +1575,7 @@ input[type="radio"] {
 
 .tyr-signal-card::before {
 	position: absolute;
-	z-index: -1;
+	z-index: 1;
 	inset: 0;
 	content: '';
 	background:
@@ -1586,12 +1586,42 @@ input[type="radio"] {
 
 .tyr-signal-card::after {
 	position: absolute;
-	z-index: -1;
+	z-index: 3;
 	inset: 0;
 	content: '';
 	background: linear-gradient(90deg, var(--hud-teal) 0 3px, transparent 3px 100%);
 	opacity: 0.8;
 	pointer-events: none;
+}
+
+.tyr-signal-card > :not(.tyr-signal-card__media) {
+	position: relative;
+	z-index: 2;
+}
+
+.tyr-signal-card__backdrop {
+	position: absolute;
+	z-index: 0;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 58% center;
+	pointer-events: none;
+	user-select: none;
+}
+
+.tyr-signal-card__vehicle {
+	position: absolute;
+	z-index: 0;
+	right: -34%;
+	bottom: -8%;
+	width: 112%;
+	max-width: none;
+	opacity: 0.48;
+	filter: drop-shadow(0 24px 32px rgba(0, 0, 0, 0.7));
+	pointer-events: none;
+	user-select: none;
 }
 
 .tyr-signal-card .tyr-signal-title {
@@ -1606,7 +1636,7 @@ input[type="radio"] {
 }
 
 @media (min-width: 768px) {
-	.tyr-signal-card > * {
+	.tyr-signal-card > :not(.tyr-signal-card__media) {
 		width: min(64%, 43rem);
 	}
 
@@ -1619,6 +1649,13 @@ input[type="radio"] {
 		background:
 			linear-gradient(90deg, rgba(9, 14, 23, 0.98) 0%, rgba(12, 18, 29, 0.96) 42%, rgba(12, 18, 29, 0.62) 68%, rgba(12, 18, 29, 0.18) 100%),
 			linear-gradient(0deg, rgba(7, 11, 18, 0.7) 0%, transparent 55%);
+	}
+
+	.tyr-signal-card__vehicle {
+		right: -12%;
+		bottom: -12%;
+		width: 74%;
+		opacity: 0.92;
 	}
 }
 

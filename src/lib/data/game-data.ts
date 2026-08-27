@@ -2,6 +2,7 @@ import runtimeData from '$gamedata/generated/runtime.json';
 
 import { fillTemplatedComponentDescription } from '$lib/game-engine/component-format';
 import { compareStatKeys } from '$lib/game-engine/tank-compare';
+import { calculateRealAccelerationMps2 } from './vehicle-real-acceleration';
 import type {
 	AmmoSummary,
 	CompareTank,
@@ -59,10 +60,15 @@ function toTankSummary(): TankSummary[] {
 		classLabel: vehicle.classLabel,
 		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
 		selectable: vehicle.selectable,
+		weightKg: Number(vehicle.weightKg ?? 0),
 		stats: {
 			health: Number(vehicle.stats.MaxHealth ?? 0),
 			maxSpeed: Number(vehicle.stats.MaxSpeed ?? 0),
 			reverseSpeed: Number(vehicle.stats.MaxReverseSpeed ?? 0),
+			realAccelerationMps2: calculateRealAccelerationMps2(
+				Number(vehicle.stats.MaxSpeed ?? 0),
+				Number(vehicle.stats.AccelerationTime ?? 0)
+			),
 			reloadTime: Number(vehicle.stats.ReloadTime ?? 0),
 			damage: Number(vehicle.stats.ShellDamage ?? 0),
 			penetration: Number(vehicle.stats.ShellPenetration ?? 0),
@@ -150,7 +156,19 @@ export function getCompareTanks(): CompareTank[] {
 		classLabel: vehicle.classLabel,
 		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
 		stats: Object.fromEntries(
-			compareStatKeys.map((key) => [key, Number(vehicle.stats[key] ?? 0)])
+			compareStatKeys.map((key) => [
+				key,
+				Number(
+					key === 'weightKg'
+						? vehicle.weightKg
+						: key === 'realAccelerationMps2'
+							? calculateRealAccelerationMps2(
+									Number(vehicle.stats.MaxSpeed ?? 0),
+									Number(vehicle.stats.AccelerationTime ?? 0)
+								)
+							: (vehicle.stats[key] ?? 0)
+				)
+			])
 		),
 		ability: vehicle.ability
 	}));

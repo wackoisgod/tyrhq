@@ -106,10 +106,6 @@ export const footerSections = [
 				href: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
 				label: 'Play Now'
 			},
-			{
-				href: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
-				label: 'Wishlist'
-			},
 			{ href: 'https://store.steampowered.com/news/app/2445260', label: 'News Hub' }
 		]
 	},
@@ -134,7 +130,6 @@ export const siteCopy = {
 	rightsDisclaimer:
 		'Tyr and all related names, logos, game assets, and references remain the property of Stoke Games.',
 	playtestUrl: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
-	wishlistUrl: 'https://store.steampowered.com/app/2445260/Tyr/?utm_source=playtyr&utm_content=playtyr-home',
 	newsUrl: 'https://store.steampowered.com/news/app/2445260',
 	discordUrl: 'https://discord.com/invite/tyr',
 	repoUrl

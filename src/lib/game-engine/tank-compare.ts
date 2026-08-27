@@ -3,7 +3,7 @@ import { statDefinitionByKey } from './stat-definitions';
 export type CompareBetter = 'higher' | 'lower' | 'none';
 
 export type CompareRowDef = {
-	/** Raw vehicle stat key (matches `VehicleRecord.stats`). */
+	/** Comparison payload key (normally `VehicleRecord.stats`, with explicit derived fields where noted). */
 	key: string;
 	label: string;
 	unit?: string;
@@ -11,6 +11,8 @@ export type CompareRowDef = {
 	better: CompareBetter;
 	/** Multiply the raw stat before display (e.g. kg → t). */
 	scale?: number;
+	/** Add thousands separators for large values such as weight in kilograms. */
+	groupThousands?: boolean;
 	/** Tooltip shown on the row label for stats whose direction isn't obvious. */
 	hint?: string;
 };
@@ -29,6 +31,7 @@ function row(key: string, overrides: Partial<Omit<CompareRowDef, 'key'>> = {}): 
 		unit: 'unit' in overrides ? overrides.unit : definition?.unit,
 		better: overrides.better ?? (definition?.lowerBetter ? 'lower' : 'higher'),
 		scale: overrides.scale,
+		groupThousands: overrides.groupThousands,
 		hint: overrides.hint
 	};
 }
@@ -67,8 +70,13 @@ export const compareSections: CompareSectionDef[] = [
 		title: 'Survivability',
 		rows: [
 			row('MaxHealth'),
-			// Heavier soaks rams but turns slower, so mass is informational only.
-			row('Mass', { label: 'Mass', unit: 't', scale: 0.001, better: 'none' })
+			// Weight is informational only: heavier vehicles soak rams but turn slower.
+			row('weightKg', {
+				label: 'Weight',
+				unit: 'kg',
+				better: 'none',
+				groupThousands: true
+			})
 		]
 	},
 	{
@@ -79,6 +87,11 @@ export const compareSections: CompareSectionDef[] = [
 			row('MaxReverseSpeed'),
 			row('MaxStrafingSpeed'),
 			row('AccelerationTime'),
+			row('realAccelerationMps2', {
+				label: 'Real Acceleration',
+				unit: 'm/s²',
+				better: 'higher'
+			}),
 			row('HullTraverseSpeed'),
 			row('TurretTraverseSpeed')
 		]
@@ -100,7 +113,7 @@ export const compareSections: CompareSectionDef[] = [
 	}
 ];
 
-/** Every raw stat key the compare page reads; the server load trims payload to these. */
+/** Every value key the compare page reads; the server load trims payload to these. */
 export const compareStatKeys: readonly string[] = [
 	'DifficultyRating',
 	...compareRatingRows.map((entry) => entry.key),

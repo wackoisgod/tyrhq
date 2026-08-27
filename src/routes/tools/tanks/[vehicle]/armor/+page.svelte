@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ArmorViewer from './ArmorViewer.svelte';
 	import ArmorInfoPanel, { resultLabels } from './ArmorInfoPanel.svelte';
-	import type { ArmorHitInfo } from './types';
+	import { getArmorModuleLabel, type ArmorHitInfo } from './types';
 
 	let { data } = $props();
 
@@ -160,6 +160,9 @@
 				<div class="pointer-events-none absolute inset-x-3 bottom-3 lg:hidden">
 					{#if displayedArmor}
 						{@const result = resultLabels[displayedArmor.result] ?? resultLabels.no_pen}
+						{@const moduleLabel = displayedArmor.result === 'module'
+							? getArmorModuleLabel(displayedArmor.module)
+							: undefined}
 						<div
 							class="flex items-center justify-between gap-3 rounded-sm border border-[var(--hud-ghost)] bg-[rgba(13,17,26,0.88)] px-3 py-2 backdrop-blur-sm"
 						>
@@ -170,7 +173,7 @@
 								<div
 									class="truncate font-[var(--font-display)] text-base font-bold uppercase {result.color}"
 								>
-									{result.label}
+									{moduleLabel ? `${moduleLabel} MODULE` : result.label}
 								</div>
 								{#if displayedArmor.result !== 'module' && displayedArmor.result !== 'absorb'}
 									<div class="font-[var(--font-mono)] text-xs text-[var(--hud-muted)]">

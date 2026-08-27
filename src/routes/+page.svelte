@@ -56,15 +56,27 @@
 <section class="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-8 md:px-6 md:pb-12">
 	<div class="tyr-section-heading">
 		<div class="tyr-shell-accent">
-			<div class="tyr-shell-kicker">Playtest Live</div>
-			<h1 class="tyr-section-title">Deployment Open</h1>
+			<div class="tyr-shell-kicker">Early Access // September 2</div>
+			<h1 class="tyr-section-title">Launch Incoming</h1>
 		</div>
 	</div>
 
 	<div class="tyr-briefing-row">
 	<section class="tyr-signal-card">
+		<img
+			src="/images/maps/lobby/ravine.png"
+			alt=""
+			aria-hidden="true"
+			class="tyr-signal-card__backdrop tyr-signal-card__media"
+		/>
+		<img
+			src="/images/vehicles/ranger.png"
+			alt=""
+			aria-hidden="true"
+			class="tyr-signal-card__vehicle tyr-signal-card__media"
+		/>
 		<div class="tyr-signal-meta">
-			<span>Open Playtest</span>
+			<span>Final Playtest</span>
 			<span>//</span>
 			<span>Live Now</span>
 		</div>

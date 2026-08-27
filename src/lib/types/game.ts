@@ -15,10 +15,12 @@ export type TankSummary = {
 	classLabel: string;
 	isWorkInProgress: boolean;
 	selectable: boolean;
+	weightKg: number;
 	stats: {
 		health: number;
 		maxSpeed: number;
 		reverseSpeed: number;
+		realAccelerationMps2: number;
 		reloadTime: number;
 		damage: number;
 		penetration: number;
@@ -123,6 +125,7 @@ export type VehicleRecord = {
 	classLabel: string;
 	isWorkInProgress: boolean;
 	selectable: boolean;
+	weightKg: number;
 	stats: Record<string, number>;
 	ability: VehicleAbility;
 	loadout: {

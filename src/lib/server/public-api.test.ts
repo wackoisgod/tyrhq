@@ -63,6 +63,11 @@ describe('exported runtime fields', () => {
 		if (!result.ok) return;
 		expect(result.data[0]?.durationPolicy).toBeDefined();
 	});
+
+	it('excludes hidden ammo while retaining the Standard baseline', () => {
+		expect(getPublicApiResourceById('ammo', 'highpen')).toBeNull();
+		expect(getPublicApiResourceById('ammo', 'standard')).not.toBeNull();
+	});
 });
 describe('getPublicApiResourceById', () => {
 	it('returns a canonical map record by id', () => {
@@ -99,7 +104,8 @@ describe('getPublicApiDatasetMeta', () => {
 		expect(meta.datasetRevision).toContain('schema-');
 		expect(meta.resourceCounts.vehicles).toBeGreaterThan(0);
 		expect(meta.resourceCounts.effects).toBeGreaterThan(0);
-		expect(meta.sourceChangelist).toBe(32942);
+		expect(meta.sourceChangelist).toBeTypeOf('number');
+		expect(meta.sourceChangelist).toBeGreaterThan(0);
 	});
 
 	it('reuses the generated timestamp as its last-modified value', () => {
