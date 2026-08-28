@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { registerArticleCustomElements } from './custom-elements';
+	import GuidePicker from './GuidePicker.svelte';
 	import ImagePicker from './ImagePicker.svelte';
 	import { uploadArticleImage } from './upload-image';
 
@@ -20,8 +21,17 @@
 	let {
 		value = $bindable(''),
 		placeholder = 'Write your article here. Use the toolbar above for formatting.',
-		submissionId = ''
-	}: { value: string; placeholder?: string; submissionId?: string } = $props();
+		submissionId = '',
+		compact = false,
+		maxLength
+	}: {
+		value: string;
+		placeholder?: string;
+		submissionId?: string;
+		/** Smaller editing surface for inline uses like build notes. */
+		compact?: boolean;
+		maxLength?: number;
+	} = $props();
 
 	let textarea: HTMLTextAreaElement | undefined = $state();
 	let imageInput: HTMLInputElement | undefined = $state();
@@ -34,6 +44,7 @@
 	let uploadError = $state('');
 	let dragActive = $state(false);
 	let pickerOpen = $state(false);
+	let guidePickerOpen = $state(false);
 
 	onMount(() => {
 		registerArticleCustomElements();
@@ -139,6 +150,24 @@
 		const after = value.slice(end);
 		value = `${before}[${selected}](${url})${after}`;
 		queueMicrotask(() => textarea?.focus());
+	}
+
+	function onGuidePick(guide: { slug: string; title: string }) {
+		if (!textarea) return;
+		const start = textarea.selectionStart;
+		const end = textarea.selectionEnd;
+		// Selected text becomes the link label; otherwise use the guide's title
+		const selected = value.slice(start, end) || guide.title;
+		const before = value.slice(0, start);
+		const after = value.slice(end);
+		const snippet = `[${selected}](/guides/${guide.slug})`;
+		value = `${before}${snippet}${after}`;
+		queueMicrotask(() => {
+			if (!textarea) return;
+			textarea.focus();
+			const cursor = before.length + snippet.length;
+			textarea.setSelectionRange(cursor, cursor);
+		});
 	}
 
 	async function uploadImageFile(file: File) {
@@ -277,6 +306,14 @@
 		<button
 			type="button"
 			class="tb-btn"
+			onclick={() => (guidePickerOpen = true)}
+			title="Link a published guide"
+		>
+			📖 Guide
+		</button>
+		<button
+			type="button"
+			class="tb-btn"
 			onclick={pickImage}
 			disabled={uploadingImage}
 			title="Upload an image"
@@ -330,7 +367,8 @@
 			bind:this={textarea}
 			bind:value
 			{placeholder}
-			class="hud-input min-h-[420px] w-full resize-y rounded-sm p-3 font-mono text-sm leading-6 {dragActive
+			maxlength={maxLength}
+			class="hud-input {compact ? 'min-h-[200px]' : 'min-h-[420px]'} w-full resize-y rounded-sm p-3 font-mono text-sm leading-6 {dragActive
 				? 'shadow-[inset_0_0_0_2px_var(--hud-teal)]'
 				: ''}"
 			spellcheck="true"
@@ -341,7 +379,7 @@
 		></textarea>
 
 		{#if showPreview}
-			<div class="min-h-[420px] rounded-sm bg-[var(--hud-inset)] p-3">
+			<div class="{compact ? 'min-h-[200px]' : 'min-h-[420px]'} rounded-sm bg-[var(--hud-inset)] p-3">
 				<div
 					class="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 				>
@@ -364,6 +402,7 @@
 </div>
 
 <ImagePicker bind:open={pickerOpen} onPick={onLibraryPick} />
+<GuidePicker bind:open={guidePickerOpen} onPick={onGuidePick} />
 
 <style>
 	.tb-btn {

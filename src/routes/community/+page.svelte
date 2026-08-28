@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { communityGroups } from '$lib/content/community';
+	let { data } = $props();
 
-	const groups = communityGroups.filter((group) => group.links.length > 0);
+	// Admin-curated in /admin/community-links; a group with no links is hidden.
+	const groups = $derived(data.communityGroups.filter((group) => group.links.length > 0));
 
 	function displayHost(href: string): string {
 		try {
@@ -9,6 +10,33 @@
 		} catch {
 			return href;
 		}
+	}
+
+	function dateChip(startsIso: string): { month: string; day: number } {
+		const starts = new Date(startsIso);
+		return {
+			month: starts.toLocaleDateString(undefined, { month: 'short' }),
+			day: starts.getDate()
+		};
+	}
+
+	function timeMeta(startsIso: string, location: string | null): string {
+		const starts = new Date(startsIso);
+		const parts = [
+			starts.toLocaleDateString(undefined, { weekday: 'short' }),
+			starts.toLocaleTimeString(undefined, {
+				hour: 'numeric',
+				minute: '2-digit',
+				timeZoneName: 'short'
+			})
+		];
+		if (location) parts.push(location);
+		return parts.join(' · ');
+	}
+
+	function isLive(startsIso: string, endsIso: string | null): boolean {
+		const now = Date.now();
+		return new Date(startsIso).getTime() <= now && (!endsIso || new Date(endsIso).getTime() >= now);
 	}
 </script>
 
@@ -31,9 +59,89 @@
 	</h1>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
 		Where the Tyr community gathers — official channels, player-run Discords, and fan-made sites
-		and tools. Run a community space that belongs here? Reach out on Discord or open a pull
-		request.
+		and tools. Run a community space that belongs here? Reach out on Discord and we'll add it.
 	</p>
+
+	<div
+		class="mt-8 rounded-sm bg-[var(--hud-panel)] p-6"
+		style="box-shadow: var(--hud-surface-ghost);"
+	>
+		<div class="flex flex-wrap items-center gap-3">
+			<span
+				class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-teal)]"
+			>
+				New
+			</span>
+			<span class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">
+				Ops Calendar
+			</span>
+		</div>
+		<h2 class="mt-2 font-[var(--font-display)] text-xl font-semibold text-[var(--hud-text)]">
+			<a href="/community/events" class="transition hover:text-[var(--hud-teal)]">
+				Community Events
+			</a>
+		</h2>
+
+		{#if data.upcomingEvents.length === 0}
+			<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+				Tournaments, custom lobbies, and meetups — nothing scheduled right now. Know of an event?
+				<a href="/settings#community-events" class="text-[var(--hud-teal)] hover:underline"
+					>Submit it for the calendar.</a
+				>
+			</p>
+		{:else}
+			<ul class="mt-3 flex flex-col">
+				{#each data.upcomingEvents as event (event.id)}
+					{@const chip = dateChip(event.starts_at)}
+					<li class="border-t border-[var(--hud-variant)]/50">
+						<a href="/community/events" class="group flex items-center gap-4 py-3">
+							<span
+								class="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-sm bg-[var(--hud-inset)]"
+							>
+								<span
+									class="font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--hud-dim)]"
+								>
+									{chip.month}
+								</span>
+								<span
+									class="font-[var(--font-display)] text-lg font-bold leading-none text-[var(--hud-teal)]"
+								>
+									{chip.day}
+								</span>
+							</span>
+							<span class="min-w-0 flex-1">
+								<span class="flex items-center gap-2">
+									<span
+										class="truncate text-sm font-semibold text-[var(--hud-text)] transition group-hover:text-[var(--hud-teal)]"
+									>
+										{event.title}
+									</span>
+									{#if isLive(event.starts_at, event.ends_at)}
+										<span
+											class="shrink-0 rounded-sm bg-[var(--hud-lime)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-lime)]"
+										>
+											Live now
+										</span>
+									{/if}
+								</span>
+								<span
+									class="mt-1 block truncate font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--hud-muted)]"
+								>
+									{timeMeta(event.starts_at, event.location)}
+								</span>
+							</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<a
+				href="/community/events"
+				class="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--hud-teal)] hover:underline"
+			>
+				Full events calendar →
+			</a>
+		{/if}
+	</div>
 
 	{#if groups.length === 0}
 		<div

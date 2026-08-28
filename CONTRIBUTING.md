@@ -86,6 +86,7 @@ If you touched exported game data or assets derived from the official source, up
 - **Site-wide nav and shared copy** — `src/lib/content/site.ts`
 - **Home-page sections** — `src/content/home/*.md` (still markdown-in-repo because they aren't articles)
 - **Articles and guides** — Supabase `articles` table; not in this repo. Edit through `/contribute` instead of editing files.
+- **Community links** — Supabase `community_link_groups` / `community_links`; not in this repo. Edit through `/admin/community-links` (admin only). `src/lib/content/community.ts` is only the no-Supabase fallback and the seed for a fresh database.
 - **Exported game data** — `GameData/` submodule
 - **Supabase schema changes** — `supabase/migrations/` (one new numbered file per change; never edit a previously-committed migration)
 - **Server-only code** — `src/lib/server/` (anything that touches the service-role key, sanitizer, or admin endpoints)

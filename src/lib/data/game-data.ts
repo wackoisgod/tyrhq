@@ -1,11 +1,11 @@
 import runtimeData from '$gamedata/generated/runtime.json';
 
-import {
-	fillGeneratedComponentDescription,
-	type ComponentValueToken
-} from '$lib/game-engine/component-format';
+import { fillTemplatedComponentDescription } from '$lib/game-engine/component-format';
+import { compareStatKeys } from '$lib/game-engine/tank-compare';
+import { calculateRealAccelerationMps2 } from './vehicle-real-acceleration';
 import type {
 	AmmoSummary,
+	CompareTank,
 	ComponentSummary,
 	GameDataBundle,
 	GameSnapshot,
@@ -19,23 +19,6 @@ type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
 	ammo: Array<Omit<GameDataBundle['ammo'][number], 'displayName'> & { displayName?: string }>;
 };
 
-const componentValueTokens = new Map<string, ComponentValueToken>([
-	['agitator', 'LevelValuePercentMultiplyIncrease'],
-	['bulkheads', 'LevelValuePercentMultiplyIncrease'],
-	['camoweb', 'LevelValuePercentMultiplyIncrease'],
-	['coreinjector', 'LevelValuePercentMultiplyDecrease'],
-	['driftsparker', 'LevelValuePercentMultiplyIncrease'],
-	['energyexpander', 'LevelValuePercentMultiplyIncrease'],
-	['extendedgearing', 'LevelValuePercentMultiplyIncrease'],
-	['hotchamber', 'LevelValuePercentMultiplyIncrease'],
-	['powerconverter', 'LevelValuePercentMultiplyDecrease'],
-	['quickslot', 'LevelValuePercentMultiplyDecrease'],
-	['repairmechanism', 'LevelValuePercentMultiplyDecrease'],
-	['sensitivesights', 'LevelValuePercentMultiplyIncrease'],
-	['stablerangefinder', 'LevelValuePercentMultiplyDecrease'],
-	['synchronizer', 'LevelValuePercentMultiplyIncrease']
-]);
-
 function deriveAmmoDisplayName(key: string, fallbackName: string) {
 	const rawName = key.split('.').at(-1) ?? fallbackName;
 	return rawName
@@ -45,10 +28,9 @@ function deriveAmmoDisplayName(key: string, fallbackName: string) {
 }
 
 function normalizeComponentDescription(component: GameDataBundle['components'][number]) {
-	return fillGeneratedComponentDescription(
-		component.description,
-		component.pointValues,
-		componentValueTokens.get(component.id)
+	return fillTemplatedComponentDescription(
+		component.descriptionTemplate || component.description,
+		component.pointValues
 	);
 }
 
@@ -78,10 +60,15 @@ function toTankSummary(): TankSummary[] {
 		classLabel: vehicle.classLabel,
 		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
 		selectable: vehicle.selectable,
+		weightKg: Number(vehicle.weightKg ?? 0),
 		stats: {
 			health: Number(vehicle.stats.MaxHealth ?? 0),
 			maxSpeed: Number(vehicle.stats.MaxSpeed ?? 0),
 			reverseSpeed: Number(vehicle.stats.MaxReverseSpeed ?? 0),
+			realAccelerationMps2: calculateRealAccelerationMps2(
+				Number(vehicle.stats.MaxSpeed ?? 0),
+				Number(vehicle.stats.AccelerationTime ?? 0)
+			),
 			reloadTime: Number(vehicle.stats.ReloadTime ?? 0),
 			damage: Number(vehicle.stats.ShellDamage ?? 0),
 			penetration: Number(vehicle.stats.ShellPenetration ?? 0),
@@ -115,6 +102,8 @@ function toComponentSummary(): ComponentSummary[] {
 		slug: component.slug,
 		name: component.name,
 		description: component.description,
+		descriptionTemplate: component.descriptionTemplate,
+		valueTokens: component.valueTokens,
 		categoryId: component.categoryId,
 		category: component.category,
 		pointValues: component.pointValues
@@ -128,6 +117,8 @@ function toTalentSummary(): TalentSummary[] {
 		slug: talent.slug,
 		name: talent.name,
 		description: talent.description,
+		descriptionTemplate: talent.descriptionTemplate,
+		valueTokens: talent.valueTokens,
 		maxPoints: talent.maxPoints
 	}));
 }
@@ -154,6 +145,33 @@ function toMapSummary(): MapSummary[] {
 
 export function getGameDataBundle() {
 	return bundle;
+}
+
+export function getCompareTanks(): CompareTank[] {
+	return bundle.vehicles.map((vehicle) => ({
+		id: vehicle.id,
+		slug: vehicle.slug,
+		name: vehicle.name,
+		classId: vehicle.classId,
+		classLabel: vehicle.classLabel,
+		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
+		stats: Object.fromEntries(
+			compareStatKeys.map((key) => [
+				key,
+				Number(
+					key === 'weightKg'
+						? vehicle.weightKg
+						: key === 'realAccelerationMps2'
+							? calculateRealAccelerationMps2(
+									Number(vehicle.stats.MaxSpeed ?? 0),
+									Number(vehicle.stats.AccelerationTime ?? 0)
+								)
+							: (vehicle.stats[key] ?? 0)
+				)
+			])
+		),
+		ability: vehicle.ability
+	}));
 }
 
 export function getGameSnapshot(): GameSnapshot {

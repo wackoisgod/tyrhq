@@ -1,6 +1,7 @@
 import type {
 	AmmoRecord,
 	ComponentRecord,
+	EffectBinding,
 	EffectRecord,
 	GameDataBundle,
 	TalentRecord,
@@ -152,6 +153,9 @@ const componentEffectMappings = [
 	{ pattern: /ShellDamageFlat|DuplicatorShellDamage/i, key: 'ShellDamage', mode: 'add' },
 	{ pattern: /ShellVelocity/i, key: 'ShellVelocity', mode: 'add' },
 	{ pattern: /ShellPenetration/i, key: 'ShellPenetration', mode: 'add' },
+	// GE_ActiveReloadTime ships with empty modifiers, so active-reload talents (e.g.
+	// Penetration Reload Reduction) rely on this name mapping. Must precede /ReloadTime/.
+	{ pattern: /ActiveReload/i, key: 'ActiveReloadReductionTime', mode: 'add' },
 	{ pattern: /ReloadTimePercent/i, key: 'ReloadTime', mode: 'mult' },
 	{ pattern: /ReloadTime/i, key: 'ReloadTime', mode: 'add' },
 	{ pattern: /Intra.*Reload/i, key: 'IntraClipReloadTime', mode: 'add' },
@@ -228,6 +232,47 @@ export function descriptionIndicatesStacking(description: string) {
 	return /stack|stacks|stacking/.test(normalizeDescription(description));
 }
 
+/**
+ * Burst amplifications a tooltip states as a word-multiplier on the whole effect
+ * ("Effect briefly quintuples on landing after being airborne"). Resolved as a stack
+ * count so "assume max stacks" can preview the amplified value. The multiplier word
+ * must sit in a clause whose subject is "effect" — DUPLICATOR's "Doubles the number
+ * of shells gained" amplifies shell gain, not its own stat modifier, and must not match.
+ */
+const effectMultiplierWords: Array<[RegExp, number]> = [
+	[/\bdoubles?\b/, 2],
+	[/\btriples?\b/, 3],
+	[/\bquadruples?\b/, 4],
+	[/\bquintuples?\b/, 5]
+];
+
+function getDescriptionEffectMultiplier(description: string): number {
+	const effectClause = normalizeDescription(description).match(/\beffect\b[^.]*/)?.[0];
+	if (!effectClause) return 1;
+	for (const [pattern, multiplier] of effectMultiplierWords) {
+		if (pattern.test(effectClause)) return multiplier;
+	}
+	return 1;
+}
+
+/**
+ * Components that stack in-game although their tooltip never says "stack": RELENTLESS
+ * ADAPTER re-applies its Max Health gain on every module-damage event, up to its GE's
+ * stack limit (15). Kept opt-in per component because many component GEs export
+ * placeholder stack limits with no gameplay meaning (999 on Power Converter, 50 on
+ * Duplicator).
+ */
+const trustedStackLimitComponents = new Set(['relentlessadapter']);
+
+/** Whether the "assume max stacks" option changes anything for this component. */
+export function componentSupportsMaxStacks(component: ComponentRecord): boolean {
+	return (
+		descriptionIndicatesStacking(component.description) ||
+		trustedStackLimitComponents.has(component.id) ||
+		getDescriptionEffectMultiplier(component.description) > 1
+	);
+}
+
 function inferStatTargetsFromDescription(description: string) {
 	const normalized = normalizeDescription(description);
 	const targets = new Set<string>();
@@ -271,6 +316,13 @@ function extractScalableFloatValue(magnitudeText?: string) {
 }
 
 function getModifierValue(modifier: EffectRecord['modifiers'][number]) {
+	if (
+		typeof modifier.scalableFloatValue === 'number' &&
+		Number.isFinite(modifier.scalableFloatValue)
+	) {
+		return modifier.scalableFloatValue;
+	}
+
 	const magnitudeType = modifier.magnitudeType.toLowerCase();
 	if (magnitudeType && magnitudeType !== 'scalablefloat') return null;
 	return extractScalableFloatValue(modifier.magnitude);
@@ -389,6 +441,10 @@ function getComponentEffectEdits(
 	return keys.map((key) => ({ attribute: key, value: effectiveValue, mode, stacks: stackCount }));
 }
 
+const kphStatKeys = new Set(
+	statDefinitions.filter((stat) => stat.unit === 'kph').map((stat) => stat.key)
+);
+
 function getDescriptionBasedComponentEdits(
 	component: ComponentRecord,
 	stackCount = 1
@@ -402,8 +458,19 @@ function getDescriptionBasedComponentEdits(
 
 	const inferredMode = inferModeFromDescriptionText(description);
 	const mode: ContributionMode = inferredMode === 'mult' ? 'mult' : 'add';
+
+	// Flat speed boosts read "by N kph", and N is not always derivable from pointValues —
+	// DRIFT SPARKER's tooltip bakes "…increase your Acceleration and Max Speed by 12 kph"
+	// into the text while its pointValue still holds the retired ×1.12 hull-traverse
+	// multiplier. For kph-unit stats, trust the figure the game itself displays.
+	const statedKphMatch =
+		mode === 'add' ? normalizeDescription(description).match(/\bby (\d+(?:\.\d+)?) kph\b/) : null;
+	let statedKph = statedKphMatch ? Number(statedKphMatch[1]) : null;
+	if (statedKph !== null && !(Number.isFinite(statedKph) && statedKph > 0)) statedKph = null;
+
 	if (mode === 'add' && descriptionIndicatesDecrease(description)) {
 		value = -Math.abs(value);
+		if (statedKph !== null) statedKph = -statedKph;
 	}
 
 	if (mode === 'mult') {
@@ -413,7 +480,12 @@ function getDescriptionBasedComponentEdits(
 		if (decrease && value > 1) value = 1 / value;
 	}
 
-	return targets.map((key) => ({ attribute: key, value, mode, stacks: stackCount }));
+	return targets.map((key) => ({
+		attribute: key,
+		value: statedKph !== null && kphStatKeys.has(key) ? statedKph : value,
+		mode,
+		stacks: stackCount
+	}));
 }
 
 /**
@@ -514,6 +586,24 @@ function getEventStackCount(effect: EffectRecord | undefined, allowMaxStacks: bo
 	return effect?.stackLimit && effect.stackLimit > 1 ? effect.stackLimit : 1;
 }
 
+/**
+ * Stack count for one of a component's data-driven effects. The tooltip's stated burst
+ * multiplier participates because it is not always mirrored in the GE data — FRICTION
+ * CAPACITOR's quintuple lives only in the text (its Max Speed GE has stackLimit 1 and
+ * its airborne tracker is empty).
+ */
+function getComponentEffectStackCount(
+	effect: EffectRecord,
+	component: ComponentRecord,
+	allowMaxStacks: boolean
+) {
+	if (!allowMaxStacks) return 1;
+	return Math.max(
+		getEventStackCount(effect, true),
+		getDescriptionEffectMultiplier(component.description)
+	);
+}
+
 function getDescriptionStackLimit(description: string) {
 	const normalized = normalizeDescription(description);
 	const matches = [
@@ -537,7 +627,10 @@ function getFallbackStackCount(
 ) {
 	if (!allowMaxStacks) return 1;
 
-	let stackCount = getDescriptionStackLimit(description);
+	let stackCount = Math.max(
+		getDescriptionStackLimit(description),
+		getDescriptionEffectMultiplier(description)
+	);
 	for (const effect of effects) {
 		const effectName = getEffectName(effect.path);
 		if (effectName && /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
@@ -557,6 +650,51 @@ function getTalentPointValue(talent: TalentRecord, points: number) {
  * Almost all talents carry `Gameplay.Event.LoadoutApplied`, so we must not treat that alone as conditional.
  */
 const BASELINE_TALENT_EVENT_TAGS = new Set<string>(['Gameplay.Event.LoadoutApplied']);
+
+function isConditionalEventTag(eventTag: string) {
+	return Boolean(eventTag) && !BASELINE_TALENT_EVENT_TAGS.has(eventTag);
+}
+
+type BoundEffect = {
+	effect: EffectRecord;
+	conditional: boolean;
+};
+
+/** Preserve the exported event-to-effect relationship instead of treating both arrays as a cross-product. */
+function getBoundEffects(
+	effectIds: readonly string[],
+	effectBindings: readonly EffectBinding[] | undefined,
+	effectById: Map<string, EffectRecord>,
+	fallbackConditional: boolean
+): BoundEffect[] {
+	if (!effectBindings?.length) {
+		return [...new Set(effectIds)]
+			.map((effectId) => effectById.get(effectId))
+			.filter((effect): effect is EffectRecord => Boolean(effect))
+			.map((effect) => ({ effect, conditional: fallbackConditional }));
+	}
+
+	const eventTagsByEffectId = new Map<string, Set<string>>();
+	for (const binding of effectBindings) {
+		if (!binding.effectId) continue;
+		const tags = eventTagsByEffectId.get(binding.effectId) ?? new Set<string>();
+		tags.add(binding.eventTag ?? '');
+		eventTagsByEffectId.set(binding.effectId, tags);
+	}
+
+	return [...eventTagsByEffectId.entries()]
+		.map(([effectId, eventTags]) => {
+			const effect = effectById.get(effectId);
+			if (!effect) return null;
+			return {
+				effect,
+				// If one GE is bound to both setup and gameplay events, keep it conditional.
+				// This avoids treating event-driven tracker effects as permanent bonuses.
+				conditional: [...eventTags].some(isConditionalEventTag)
+			};
+		})
+		.filter((value): value is BoundEffect => Boolean(value));
+}
 
 function normalizeDescriptionForConditionalHeuristic(raw: string): string {
 	return raw
@@ -591,14 +729,16 @@ function descriptionSuggestsSituationalContext(normalizedDesc: string): boolean 
 /**
  * True when a talent is context-dependent (TyrPilotBuilder-style): non-baseline event tags and/or
  * situational wording in the description. Used for Sources badge and the Conditionals toggle.
+ *
+ * Only the main description is scanned. Supplemental descriptions are stat glossaries
+ * ("Base Aiming Dispersion is how inaccurate your shot is while stationary…") whose wording
+ * would wrongly mark permanent passives as situational.
  */
 export function isConditionalTalent(talent: TalentRecord): boolean {
 	const situationalTags = talent.eventTags.filter((tag) => !BASELINE_TALENT_EVENT_TAGS.has(tag));
 	if (situationalTags.length > 0) return true;
 
-	const desc = normalizeDescriptionForConditionalHeuristic(
-		`${talent.description ?? ''} ${talent.supplementalDescription ?? ''}`
-	);
+	const desc = normalizeDescriptionForConditionalHeuristic(talent.description ?? '');
 	return descriptionSuggestsSituationalContext(desc);
 }
 
@@ -697,6 +837,15 @@ export function computeBuild(
 	const assumeMaxStacks = options.assumeMaxStacks ?? false;
 	const baseStats = { ...vehicle.stats };
 
+	// Talents modify StartingSecondary/TertiaryShellsCount, but the tank data stores the
+	// base counts on AltAmmoCountOne/Two — seed the displayed attributes from those.
+	if (baseStats.StartingSecondaryShellsCount === undefined) {
+		baseStats.StartingSecondaryShellsCount = baseStats.AltAmmoCountOne ?? 0;
+	}
+	if (baseStats.StartingTertiaryShellsCount === undefined) {
+		baseStats.StartingTertiaryShellsCount = baseStats.AltAmmoCountTwo ?? 0;
+	}
+
 	const contributions: Contribution[] = [];
 	const ammoContribs: AmmoContribution[] = [];
 	let order = 0;
@@ -735,11 +884,20 @@ export function computeBuild(
 		if (!componentId) continue;
 		const component = catalog.componentById.get(componentId);
 		if (!component) continue;
-		if (!includeConditionalEffects && isConditionalComponent(component)) continue;
 
 		const description = component.description || '';
-		const allowsStacking = descriptionIndicatesStacking(description);
-		const conditional = isConditionalComponent(component);
+		const allowsStacking = componentSupportsMaxStacks(component);
+		const componentIsConditional = isConditionalComponent(component);
+		const boundEffects = getBoundEffects(
+			component.effectIds,
+			component.effectBindings,
+			catalog.effectById,
+			componentIsConditional
+		);
+		const applicableEffects = includeConditionalEffects
+			? boundEffects
+			: boundEffects.filter((binding) => !binding.conditional);
+		if (applicableEffects.length === 0) continue;
 		const source = `Component: ${component.name}`;
 		let appliedAny = false;
 		// True once we see a concrete, data-driven modifier — even one targeting an attribute we
@@ -747,15 +905,17 @@ export function computeBuild(
 		// component is fully described by its GE data, so we must NOT fall back to fuzzy
 		// description parsing (which would misread trigger wording like "land a penetration").
 		let hasDataDrivenModifier = false;
-		const componentEffects = [...new Set(component.effectIds)]
-			.map((effectId) => catalog.effectById.get(effectId))
-			.filter((effect): effect is EffectRecord => Boolean(effect));
+		const componentEffects = applicableEffects.map((binding) => binding.effect);
 
-		for (const effect of componentEffects) {
+		for (const { effect, conditional } of applicableEffects) {
 			const effectName = getEffectName(effect.path);
 			if (!effectName || /(Remover|Tracker|Trigger|Applier)/i.test(effectName)) continue;
 
-			const stackCount = getEventStackCount(effect, assumeMaxStacks && allowsStacking);
+			const stackCount = getComponentEffectStackCount(
+				effect,
+				component,
+				assumeMaxStacks && allowsStacking
+			);
 			let effectApplied = false;
 
 			for (const modifier of effect.modifiers) {
@@ -790,6 +950,7 @@ export function computeBuild(
 		}
 
 		if (!appliedAny && !hasDataDrivenModifier) {
+			const conditional = applicableEffects.some((binding) => binding.conditional);
 			const fallbackStacks = getFallbackStackCount(
 				componentEffects,
 				description,
@@ -806,18 +967,25 @@ export function computeBuild(
 		if (points <= 0) continue;
 		const talent = catalog.talentById.get(talentId);
 		if (!talent) continue;
-		if (!includeConditionalEffects && isConditionalTalent(talent)) continue;
 
 		const value = getTalentPointValue(talent, points);
 		if (!value || Number.isNaN(value)) continue;
 
-		const conditional = isConditionalTalent(talent);
+		const talentIsConditional = isConditionalTalent(talent);
+		const boundEffects = getBoundEffects(
+			talent.effectIds,
+			talent.effectBindings,
+			catalog.effectById,
+			talentIsConditional
+		);
+		const applicableEffects = includeConditionalEffects
+			? boundEffects
+			: boundEffects.filter((binding) => !binding.conditional);
+		if (applicableEffects.length === 0) continue;
 		const source = `Talent: ${talent.name} (${points})`;
 		const allowMaxStacks = assumeMaxStacks && descriptionIndicatesStacking(talent.description);
 
-		for (const effectId of [...new Set(talent.effectIds)]) {
-			const effect = catalog.effectById.get(effectId);
-			if (!effect) continue;
+		for (const { effect, conditional } of applicableEffects) {
 			const stackCount = getEventStackCount(effect, allowMaxStacks);
 			for (const modifier of effect.modifiers) {
 				const attribute = normalizeAttributeKey(modifier.attribute);
@@ -830,6 +998,19 @@ export function computeBuild(
 					conditional,
 					order++
 				);
+			}
+
+			// Some talent GEs export with no modifiers (e.g. GE_ActiveReloadTime behind
+			// Penetration Reload Reduction). Fall back to the effect-name mapping so the
+			// talent's point value still lands on the right stat.
+			if (effect.modifiers.length === 0) {
+				const effectName = getEffectName(effect.path);
+				if (effectName && !/(Remover|Tracker|Trigger|Applier)/i.test(effectName)) {
+					const edits = getComponentEffectEdits(effectName, value, talent.description, stackCount);
+					for (const edit of edits) {
+						pushContribution(contributions, edit, source, conditional, order++);
+					}
+				}
 			}
 		}
 	}
@@ -879,7 +1060,16 @@ export function computeBuild(
 
 export function formatStatValue(value: number, unit?: string) {
 	if (!Number.isFinite(value)) return '-';
-	const rounded = Math.abs(value - Math.round(value)) < 0.0001 ? String(Math.round(value)) : value.toFixed(2);
+	let rounded: string;
+	if (Math.abs(value - Math.round(value)) < 0.0001) {
+		rounded = String(Math.round(value));
+	} else if (Math.abs(value) < 1) {
+		// Sub-1 stats (dispersion penalties) lose their talent deltas at two decimals:
+		// 0.14 × 0.85 = 0.119 would render as "0.12" and read as −14.3% instead of −15%.
+		rounded = value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+	} else {
+		rounded = value.toFixed(2);
+	}
 	return unit ? `${rounded} ${unit}` : rounded;
 }
 

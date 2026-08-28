@@ -10,7 +10,14 @@ import type {
 	VehicleRecord
 } from '$lib/types/game';
 
-import { computeBuild, createPlannerCatalog, type PlannerSelection } from './build';
+import {
+	componentSupportsMaxStacks,
+	computeBuild,
+	createPlannerCatalog,
+	formatStatValue,
+	isConditionalTalent,
+	type PlannerSelection
+} from './build';
 
 function makeAmmo(id: string, displayName: string, damage = 1, modOverrides: Partial<AmmoRecord['modifiers']> = {}): AmmoRecord {
 	return {
@@ -116,6 +123,7 @@ function makeVehicle(id: string, stats: Record<string, number>, defaultAmmo: str
 		classLabel: 'Medium',
 		isWorkInProgress: false,
 		selectable: true,
+		weightKg: 20_000,
 		stats,
 		ability: {
 			name: 'Commander Ability',
@@ -562,6 +570,218 @@ describe('computeBuild aggregator math', () => {
 		expect(entry?.delta).toBeCloseTo(9.75, 4);
 	});
 
+	it('drift sparker applies the flat 12 kph stated in its tooltip, not the raw 1.12 point value', () => {
+		// DRIFT SPARKER's only GE is an empty Tracker (skipped by name), and its tooltip
+		// bakes the boost into the text — "Powersliding and Hoverdrifting briefly increase
+		// your Acceleration and Max Speed by 12 kph." — while pointValues still carries the
+		// retired ×1.12 hull-traverse multiplier. The description fallback must apply the
+		// stated 12 kph to Top Speed, not "+1.12 kph".
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const trackerEffect: EffectRecord = {
+			id: 'ge-components-driftsparkertracker',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_DriftSparkerTracker.GE_Components_DriftSparkerTracker_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const driftSparker: ComponentRecord = {
+			...makeComponent(
+				'driftsparker',
+				'DRIFT SPARKER',
+				['ge-components-driftsparkertracker'],
+				[1.1200000047683716],
+				'Powersliding and Hoverdrifting briefly increase your Acceleration and Max Speed by 12 kph.'
+			),
+			eventTags: ['Gameplay.Event.WhileEffectiveHandbrake', 'Gameplay.Event.WhileHoverDrifting']
+		};
+		const vehicle = makeVehicle(
+			'stealth',
+			{ MaxSpeed: 65, AccelerationTime: 4.5 },
+			'standard',
+			'tree_stealth'
+		);
+		const tree = makeTree('tree_stealth', 'stealth', []);
+
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [driftSparker],
+			talents: [],
+			effects: [trackerEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'stealth',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['driftsparker', '', '', ''],
+			talentPoints: {}
+		});
+
+		expect(build).not.toBeNull();
+		// 65 + 12 = 77 (the tooltip's stated boost), NOT 65 + 1.12 = 66.12 (the point value)
+		expect(build!.stats.MaxSpeed).toBeCloseTo(77, 4);
+		expect(build!.stats.MaxSpeed).not.toBeCloseTo(66.12, 2);
+
+		const entry = build!.breakdown.MaxSpeed?.find((e) => e.source.includes('DRIFT SPARKER'));
+		expect(entry?.delta).toBeCloseTo(12, 4);
+		// The boost only applies while powersliding/hoverdrifting.
+		expect(entry?.conditional).toBe(true);
+
+		// The acceleration half has no exported magnitude (its Tracker GE is empty), so the
+		// time-based Acceleration stat must not pick up a phantom edit.
+		expect(build!.stats.AccelerationTime).toBeCloseTo(4.5, 4);
+		expect(build!.breakdown.AccelerationTime ?? []).toHaveLength(0);
+	});
+
+	it('relentless adapter honors its GE stack limit under max stacks despite no "stack" wording', () => {
+		// RELENTLESS ADAPTER re-applies its Max Health gain on every module-damage event, up
+		// to its GE's stack limit (15) — but its tooltip never uses the word "stack", so the
+		// wording-based gate alone would keep "assume max stacks" from ever applying.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const adapterEffect = makeEffect('Components_RelentlessAdapterMaxHP', 'MaxHealth', 'AddBase', 0, {
+			stackLimit: 15,
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const adapter: ComponentRecord = {
+			...makeComponent(
+				'relentlessadapter',
+				'RELENTLESS ADAPTER',
+				['Components_RelentlessAdapterMaxHP'],
+				[60],
+				'Increases Max Health by 60 and heals for the same amount when one of your modules is damaged'
+			),
+			eventTags: ['Gameplay.Event.OnModuleHit']
+		};
+		const vehicle = makeVehicle('brawler', { MaxHealth: 2000 }, 'standard', 'tree_brawler');
+		const tree = makeTree('tree_brawler', 'brawler', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [adapter],
+			talents: [],
+			effects: [adapterEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+		const selection: PlannerSelection = {
+			vehicleId: 'brawler',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['relentlessadapter', '', '', ''],
+			talentPoints: {}
+		};
+
+		expect(componentSupportsMaxStacks(adapter)).toBe(true);
+
+		const singleStack = computeBuild(catalog, selection);
+		expect(singleStack!.stats.MaxHealth).toBeCloseTo(2060, 4);
+
+		const maxStacks = computeBuild(catalog, selection, { assumeMaxStacks: true });
+		expect(maxStacks!.stats.MaxHealth).toBeCloseTo(2000 + 60 * 15, 4);
+	});
+
+	it('friction capacitor surfaces its landing quintuple under max stacks', () => {
+		// FRICTION CAPACITOR's quintuple lives only in its tooltip ("Effect briefly
+		// quintuples on landing after being airborne") — its Max Speed GE has stackLimit 1
+		// and its airborne tracker GE is empty — so the stated multiplier must drive the
+		// max-stacks preview: +2 kph passively, +10 kph on landing.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const trackerEffect: EffectRecord = {
+			id: 'ge-components-frictioncapacitorairbornetracker',
+			path: '/Game/Blueprints/Abilities/Effects/Components/GE_Components_FrictionCapacitorAirborneTracker.GE_Components_FrictionCapacitorAirborneTracker_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const maxSpeedEffect = makeEffect('Components_MaxSpeedFlat', 'MaxSpeed', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const frictionCapacitor: ComponentRecord = {
+			...makeComponent(
+				'frictioncapacitor',
+				'FRICTION CAPACITOR',
+				['ge-components-frictioncapacitorairbornetracker', 'Components_MaxSpeedFlat'],
+				[2],
+				'Increases Max Speed by 2 kph. Effect briefly quintuples on landing after being airborne.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne']
+		};
+		const vehicle = makeVehicle('blink', { MaxSpeed: 57 }, 'standard', 'tree_blink');
+		const tree = makeTree('tree_blink', 'blink', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [frictionCapacitor],
+			talents: [],
+			effects: [trackerEffect, maxSpeedEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+		const selection: PlannerSelection = {
+			vehicleId: 'blink',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['frictioncapacitor', '', '', ''],
+			talentPoints: {}
+		};
+
+		expect(componentSupportsMaxStacks(frictionCapacitor)).toBe(true);
+
+		const singleStack = computeBuild(catalog, selection);
+		expect(singleStack!.stats.MaxSpeed).toBeCloseTo(59, 4);
+
+		const maxStacks = computeBuild(catalog, selection, { assumeMaxStacks: true });
+		expect(maxStacks!.stats.MaxSpeed).toBeCloseTo(67, 4);
+		const entry = maxStacks!.breakdown.MaxSpeed?.find((e) => e.source.includes('FRICTION CAPACITOR'));
+		expect(entry?.delta).toBeCloseTo(10, 4);
+	});
+
+	it('duplicator\'s "Doubles the number of shells gained" is not a stat-effect multiplier', () => {
+		// The multiplier word must only count when it amplifies the component's own effect
+		// ("Effect briefly quintuples…"). DUPLICATOR doubles shell GAIN, and its ShellDamage
+		// GE exports a meaningless stackLimit of 50 — max stacks must leave its flat +5 alone.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const duplicatorEffect = makeEffect('Components_DuplicatorShellDamage', 'ShellDamage', 'AddBase', 5, {
+			stackLimit: 50
+		});
+		const duplicator = makeComponent(
+			'duplicator',
+			'DUPLICATOR',
+			['Components_DuplicatorShellDamage'],
+			[2],
+			'Increases base Shell Damage by 5 and Doubles the number of shells gained from all sources'
+		);
+		const vehicle = makeVehicle('deadeye', { ShellDamage: 100 }, 'standard', 'tree_deadeye');
+		const tree = makeTree('tree_deadeye', 'deadeye', []);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [duplicator],
+			talents: [],
+			effects: [duplicatorEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		expect(componentSupportsMaxStacks(duplicator)).toBe(false);
+
+		const build = computeBuild(
+			catalog,
+			{
+				vehicleId: 'deadeye',
+				ammoIds: ['standard'],
+				previewAmmoSlot: 0,
+				componentIds: ['duplicator', '', '', ''],
+				talentPoints: {}
+			},
+			{ assumeMaxStacks: true }
+		);
+		expect(build!.stats.ShellDamage).toBeCloseTo(105, 4);
+	});
+
 	it('ammo equip-effect speed modifiers apply to vehicle Max/Reverse/Strafing speed', () => {
 		// Unstable restricts all three movement speeds to 65% while loaded — these live
 		// on the ammo's equip effect, surfaced via the optional speed modifiers.
@@ -720,6 +940,80 @@ describe('computeBuild aggregator math', () => {
 		expect(entry?.delta).toBeCloseTo(-4, 4);
 	});
 
+	it('talents with empty-modifier GEs fall back to the effect-name mapping (active reload)', () => {
+		// GE_ActiveReloadTime exports with no modifiers, so Penetration Reload Reduction
+		// must land on ActiveReloadReductionTime via the effect-name fallback — and not on
+		// the main ReloadTime stat despite the name overlap.
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const activeReloadEffect: EffectRecord = {
+			id: 'ge-activereloadtime',
+			path: '/Game/Blueprints/Abilities/Effects/Talents/GE_ActiveReloadTime.GE_ActiveReloadTime_C',
+			stackLimit: 1,
+			tags: [],
+			modifiers: []
+		};
+		const reloadTalent = makeTalent(
+			'bush-talent018',
+			'Penetration Reload Reduction',
+			['ge-activereloadtime'],
+			[-0.5, -1]
+		);
+		const vehicle = makeVehicle('bush', { ReloadTime: 8 }, 'standard', 'tree_bush');
+		const tree = makeTree('tree_bush', 'bush', ['bush-talent018']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [reloadTalent],
+			effects: [activeReloadEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'bush',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { 'bush-talent018': 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.stats.ActiveReloadReductionTime).toBeCloseTo(-1, 4);
+		expect(build!.stats.ReloadTime).toBeCloseTo(8, 4);
+	});
+
+	it('seeds starting shell counts from AltAmmoCount base stats', () => {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const shellsEffect = makeEffect('SecondaryShells', 'StartingSecondaryShellsCount', 'AddBase', 0, {
+			magnitudeType: 'CustomCalculationClass'
+		});
+		const shellsTalent = makeTalent('shells', 'Secondary Shells', ['SecondaryShells'], [3, 6]);
+		const vehicle = makeVehicle('bush', { AltAmmoCountOne: 2, AltAmmoCountTwo: 0 }, 'standard', 'tree_bush');
+		const tree = makeTree('tree_bush', 'bush', ['shells']);
+		const bundle = makeBundle({
+			vehicles: [vehicle],
+			ammo: [standard],
+			components: [],
+			talents: [shellsTalent],
+			effects: [shellsEffect],
+			trees: [tree]
+		});
+		const catalog = createPlannerCatalog(bundle);
+
+		const build = computeBuild(catalog, {
+			vehicleId: 'bush',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['', '', '', ''],
+			talentPoints: { shells: 2 }
+		});
+
+		expect(build).not.toBeNull();
+		expect(build!.baseStats.StartingSecondaryShellsCount).toBe(2);
+		expect(build!.stats.StartingSecondaryShellsCount).toBeCloseTo(8, 4);
+	});
+
 	it('catalytic reservoir does not leak its trigger wording ("penetration") into a stat bonus', () => {
 		// CATALYTIC RESERVOIR generates energy (CurrentAbilityResource) when you land a penetration.
 		// Because it has a concrete data-driven modifier — even though it targets an attribute we
@@ -763,5 +1057,102 @@ describe('computeBuild aggregator math', () => {
 		expect(build).not.toBeNull();
 		expect(build!.stats.ShellPenetration).toBeCloseTo(60, 4); // unchanged; no phantom +3
 		expect(build!.breakdown.ShellPenetration).toBeUndefined();
+	});
+});
+
+describe('isConditionalTalent', () => {
+	function talentWith(description: string, supplementalDescription: string) {
+		return {
+			...makeTalent('t', 'Talent', [], [1]),
+			description,
+			supplementalDescription
+		};
+	}
+
+	it('ignores stat-glossary wording in the supplemental description', () => {
+		// "…while stationary and fully aimed" describes the STAT, not a condition on the
+		// talent — it must not mark this permanent passive as situational.
+		const talent = talentWith(
+			'Reduces base Aiming Dispersion by value (-value per point)',
+			'Base Aiming Dispersion is how inaccurate your shot is while stationary and fully aimed.'
+		);
+		expect(isConditionalTalent(talent)).toBe(false);
+	});
+
+	it('still flags situational wording in the main description', () => {
+		const talent = talentWith('Increases Max Speed by value while spotted', '');
+		expect(isConditionalTalent(talent)).toBe(true);
+	});
+});
+
+describe('formatStatValue', () => {
+	it('keeps three decimals for sub-1 stats so dispersion deltas survive', () => {
+		expect(formatStatValue(0.119)).toBe('0.119');
+		expect(formatStatValue(-0.020999996)).toBe('-0.021');
+		expect(formatStatValue(0.4)).toBe('0.4');
+	});
+
+	it('keeps the legacy formats for whole and larger values', () => {
+		expect(formatStatValue(28, 'deg/s')).toBe('28 deg/s');
+		expect(formatStatValue(34.72, 'deg/s')).toBe('34.72 deg/s');
+		expect(formatStatValue(4.5, 's')).toBe('4.50 s');
+	});
+});
+
+describe('exported effect bindings', () => {
+	it('keeps permanent component modifiers when conditional effects are disabled', () => {
+		const standard = makeAmmo('standard', 'Standard');
+		const passiveEffect = makeEffect('passive-health', 'MaxHealth', 'AddBase', 100);
+		passiveEffect.modifiers[0] = {
+			...passiveEffect.modifiers[0],
+			magnitude: 'opaque-exported-magnitude',
+			scalableFloatValue: 100
+		};
+		const conditionalEffect = makeEffect('conditional-health', 'MaxHealth', 'AddBase', 200);
+		const component: ComponentRecord = {
+			...makeComponent(
+				'mixed-component',
+				'MIXED COMPONENT',
+				['passive-health', 'conditional-health'],
+				[1],
+				'Provides a passive bonus and a larger bonus after taking damage.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.OnDamageTaken'],
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'passive-health',
+					effectPath: passiveEffect.path
+				},
+				{
+					eventTag: 'Gameplay.Event.OnDamageTaken',
+					effectId: 'conditional-health',
+					effectPath: conditionalEffect.path
+				}
+			]
+		};
+		const vehicle = makeVehicle('mixed', { MaxHealth: 1000 }, 'standard', 'tree_mixed');
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [standard],
+				components: [component],
+				talents: [],
+				effects: [passiveEffect, conditionalEffect],
+				trees: [makeTree('tree_mixed', 'mixed', [])]
+			})
+		);
+		const selection: PlannerSelection = {
+			vehicleId: 'mixed',
+			ammoIds: ['standard'],
+			previewAmmoSlot: 0,
+			componentIds: ['mixed-component'],
+			talentPoints: {}
+		};
+
+		expect(computeBuild(catalog, selection)?.stats.MaxHealth).toBeCloseTo(1300, 4);
+		expect(
+			computeBuild(catalog, selection, { includeConditionalEffects: false })?.stats.MaxHealth
+		).toBeCloseTo(1100, 4);
 	});
 });

@@ -69,6 +69,16 @@
 							<span class="tyr-review-pill__count">{data.pendingReviewCount}</span>
 						</a>
 					{/if}
+					{#if data.pendingEventCount > 0}
+						<a
+							href="/admin/events"
+							class="tyr-review-pill"
+							aria-label="{data.pendingEventCount} event{data.pendingEventCount === 1 ? '' : 's'} awaiting review"
+						>
+							<span class="tyr-review-pill__label">Events</span>
+							<span class="tyr-review-pill__count">{data.pendingEventCount}</span>
+						</a>
+					{/if}
 					<a
 						href={data.user ? '/settings' : '/auth'}
 						class="tyr-account-chip"
@@ -127,14 +137,6 @@
 
 				<div class="tyr-actions">
 					<div class="tyr-header-actions">
-						<a
-							href={siteCopy.wishlistUrl}
-							target="_blank"
-							rel="noreferrer"
-							class="hud-cta-outline tyr-header-button px-6 py-3"
-						>
-							Wishlist On Steam
-						</a>
 						<a
 							href={siteCopy.playtestUrl}
 							target="_blank"

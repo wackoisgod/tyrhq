@@ -1,26 +1,7 @@
-<script lang="ts">
-	import type { TankSummary } from '$lib/types/game';
-	import type { ArmorHitInfo, ArmorHitResult } from './types';
+<script lang="ts" module>
+	import type { ArmorHitResult } from './types';
 
-	let {
-		tank,
-		shooter,
-		hovered,
-		pinned,
-		visualizerEnabled,
-		onClearPin
-	}: {
-		tank: TankSummary;
-		shooter: TankSummary;
-		hovered: ArmorHitInfo | null;
-		pinned: ArmorHitInfo | null;
-		visualizerEnabled: boolean;
-		onClearPin: () => void;
-	} = $props();
-
-	let display = $derived(pinned ?? hovered);
-
-	const resultLabels: Record<ArmorHitResult, { label: string; color: string }> = {
+	export const resultLabels: Record<ArmorHitResult, { label: string; color: string }> = {
 		penetrate: { label: 'PENETRATION', color: 'text-[#43ffbe]' },
 		overmatch: { label: 'PENETRATION', color: 'text-[#43ffbe]' },
 		ricochet: { label: 'NO PENETRATION', color: 'text-[var(--hud-text)]' },
@@ -31,7 +12,34 @@
 	};
 </script>
 
-<aside class="flex w-80 shrink-0 flex-col border-l border-[var(--hud-ghost)] bg-[var(--hud-panel-deep)]">
+<script lang="ts">
+	import type { TankSummary } from '$lib/types/game';
+	import { getArmorModuleLabel, type ArmorHitInfo } from './types';
+
+	let {
+		tank,
+		shooter,
+		hovered,
+		pinned,
+		visualizerEnabled,
+		canHover = true,
+		onClearPin
+	}: {
+		tank: TankSummary;
+		shooter: TankSummary;
+		hovered: ArmorHitInfo | null;
+		pinned: ArmorHitInfo | null;
+		visualizerEnabled: boolean;
+		canHover?: boolean;
+		onClearPin: () => void;
+	} = $props();
+
+	let display = $derived(pinned ?? hovered);
+</script>
+
+<aside
+	class="flex w-full flex-col border-t border-[var(--hud-ghost)] bg-[var(--hud-panel-deep)] lg:w-80 lg:shrink-0 lg:border-l lg:border-t-0"
+>
 	<div class="border-b border-[var(--hud-ghost)] p-5">
 		<div class="text-xs uppercase tracking-[0.32em] text-[var(--hud-dim)]">Target</div>
 		<div class="mt-1 font-[var(--font-display)] text-2xl font-bold uppercase text-[var(--hud-text)]">
@@ -52,13 +60,16 @@
 
 		{#if display}
 			{@const result = resultLabels[display.result] ?? resultLabels.no_pen}
+			{@const moduleLabel = display.result === 'module'
+				? getArmorModuleLabel(display.module)
+				: undefined}
 			<div class="mt-4 space-y-3">
 				<div
 					class="rounded-sm bg-[var(--hud-inset)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_var(--hud-ghost)]"
 				>
 					<div class="text-xs uppercase tracking-[0.22em] text-[var(--hud-dim)]">Result</div>
 					<div class="mt-1 font-[var(--font-display)] text-lg font-bold uppercase {result.color}">
-						{result.label}
+						{moduleLabel ? `${moduleLabel} MODULE` : result.label}
 					</div>
 				</div>
 
@@ -111,9 +122,13 @@
 			<p class="mt-4 text-sm leading-6 text-[var(--hud-muted)]">
 				Armor visualizer disabled. Turn it back on to inspect armor sections and penetration values.
 			</p>
-		{:else}
+		{:else if canHover}
 			<p class="mt-4 text-sm leading-6 text-[var(--hud-muted)]">
 				Hover over the model to inspect armor values. Click to pin a readout.
+			</p>
+		{:else}
+			<p class="mt-4 text-sm leading-6 text-[var(--hud-muted)]">
+				Tap the model to inspect armor values. Tap empty space to clear the readout.
 			</p>
 		{/if}
 	</div>

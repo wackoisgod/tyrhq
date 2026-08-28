@@ -1,9 +1,63 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
 	import DifficultyMeter from '$lib/components/DifficultyMeter.svelte';
+	import { MAX_TANK_NOTES_LENGTH } from '$lib/builds/constants';
 	import type { TankSummary } from '$lib/types/game';
 
 	let { data } = $props();
+
+	// Personal tank notepad — seeded from the initial load on purpose; the
+	// effect below resyncs when navigation swaps in a different tank.
+	// svelte-ignore state_referenced_locally
+	let noteText = $state(data.tankNote ?? '');
+	// svelte-ignore state_referenced_locally
+	let savedNoteText = $state(data.tankNote ?? '');
+	// svelte-ignore state_referenced_locally
+	let noteVehicleId = $state(data.tank.id);
+	let noteSaving = $state(false);
+	let noteSaved = $state(false);
+	let noteError = $state<string | null>(null);
+	const noteDirty = $derived(noteText.trim() !== savedNoteText);
+
+	// Resync when client-side navigation lands on a different tank page
+	$effect(() => {
+		if (data.tank.id !== noteVehicleId) {
+			noteVehicleId = data.tank.id;
+			noteText = data.tankNote ?? '';
+			savedNoteText = data.tankNote ?? '';
+			noteSaving = false;
+			noteSaved = false;
+			noteError = null;
+		}
+	});
+
+	async function saveTankNote() {
+		if (noteSaving) return;
+		noteSaving = true;
+		noteSaved = false;
+		noteError = null;
+		try {
+			const res = await fetch('/api/tank-notes', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ vehicleId: data.tank.id, notes: noteText.trim() })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ message: 'Save failed' }));
+				noteError = body.message ?? 'Save failed';
+				return;
+			}
+			const saved = await res.json();
+			savedNoteText = saved.notes ?? '';
+			noteText = savedNoteText;
+			noteSaved = true;
+			setTimeout(() => (noteSaved = false), 2000);
+		} catch {
+			noteError = 'Network error — could not save notes.';
+		} finally {
+			noteSaving = false;
+		}
+	}
 
 	const statRows = $derived([
 		{ label: 'Health', value: data.tank.stats.health, unit: '' },
@@ -14,15 +68,32 @@
 		{ label: 'Reload', value: data.tank.stats.reloadTime, unit: 's' },
 		{ label: 'Vision', value: data.tank.stats.vision, unit: 'm' },
 		{ label: 'Detection', value: data.tank.stats.detection, unit: 'm' },
-		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' }
+		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' },
+		{ label: 'Weight', value: data.tank.weightKg, unit: 'kg', groupThousands: true },
+		{
+			label: 'Real Acceleration',
+			value: data.tank.stats.realAccelerationMps2,
+			unit: 'm/s²',
+			precision: 2
+		}
 	]);
 	const hasAbilityDetails = $derived(
 		Boolean(data.tank.ability?.description || data.tank.ability?.icon)
 	);
 
-	function formatValue(value: number | undefined, unit: string) {
+	function formatValue(
+		value: number | undefined,
+		unit: string,
+		groupThousands = false,
+		precision = 1
+	) {
 		if (value == null) return '0';
-		return `${Number.isInteger(value) ? value : value.toFixed(1).replace(/\.0$/, '')}${unit ? ` ${unit}` : ''}`;
+		const formatted = groupThousands
+			? value.toLocaleString('en-US', { maximumFractionDigits: 1 })
+			: Number.isInteger(value)
+				? value
+				: value.toFixed(precision).replace(/\.0+$/, '');
+		return `${formatted}${unit ? ` ${unit}` : ''}`;
 	}
 
 	function getTankTheme(tank: TankSummary) {
@@ -98,21 +169,30 @@
 					<div class={`text-xs uppercase tracking-[0.32em] ${getTankTheme(data.tank).accent}`}>
 						{data.tank.classLabel} vehicle
 					</div>
-					{#if data.armorAvailable}
+					<div class="flex items-center gap-2">
 						<a
-							href={`/tools/tanks/${data.tank.slug}/armor`}
+							href={`/tools/tanks/compare?tanks=${data.tank.slug}`}
 							class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm transition hover:bg-[var(--hud-panel)] hover:text-[var(--hud-lime)]"
+							title="Compare {data.tank.name} against other vehicles"
 						>
-							Inspect Armor
+							Compare
 						</a>
-					{:else}
-						<span
-							class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm"
-							title="Armor viewer assets are not published for this vehicle yet."
-						>
-							Armor Data Pending
-						</span>
-					{/if}
+						{#if data.armorAvailable}
+							<a
+								href={`/tools/tanks/${data.tank.slug}/armor`}
+								class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm transition hover:bg-[var(--hud-panel)] hover:text-[var(--hud-lime)]"
+							>
+								Inspect Armor
+							</a>
+						{:else}
+							<span
+								class="rounded-sm bg-[var(--hud-panel)]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-dim)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.4)] backdrop-blur-sm"
+								title="Armor viewer assets are not published for this vehicle yet."
+							>
+								Armor Data Pending
+							</span>
+						{/if}
+					</div>
 				</div>
 
 				<div class="absolute inset-x-5 bottom-5">
@@ -139,12 +219,12 @@
 					<div class="rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)]">
 						<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">{stat.label}</div>
 						<div class="mt-1 text-xl font-semibold text-[var(--hud-text)]">
-							{formatValue(stat.value, stat.unit)}
+							{formatValue(stat.value, stat.unit, stat.groupThousands, stat.precision)}
 						</div>
 					</div>
 				{/each}
 				<div
-					class="flex items-center justify-between gap-3 rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)] sm:col-span-3"
+					class="flex items-center justify-between gap-3 rounded-sm bg-[var(--hud-panel-mid)] p-3 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)]"
 				>
 					<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">Difficulty</div>
 					<DifficultyMeter value={data.tank.stats.difficulty} size="md" showValue />
@@ -180,6 +260,66 @@
 			{/if}
 		</div>
 	</div>
+
+	<section id="tank-notes" class="mt-4">
+		<div
+			class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+		>
+			<span>Notepad</span>
+			<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
+				PERSONAL · {data.tank.name}
+			</span>
+		</div>
+
+		{#if data.user}
+			<div class="rounded-sm bg-[var(--hud-panel-mid)] p-4 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)] md:p-5">
+				<div class="flex flex-wrap items-center justify-between gap-4">
+					<h2 class="font-[var(--font-display)] text-2xl font-semibold uppercase text-[var(--hud-text)]">
+						My Notes
+					</h2>
+					<span class="text-[11px] text-[var(--hud-dim)]">
+						Only visible to you · shown in the Build Planner when {data.tank.name} is selected
+					</span>
+				</div>
+				<textarea
+					bind:value={noteText}
+					maxlength={MAX_TANK_NOTES_LENGTH}
+					rows="5"
+					placeholder="Playstyle reminders for {data.tank.name} — positioning, engagement ranges, what to do when your ability is down…"
+					class="mt-3 min-h-[8rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+				></textarea>
+				{#if noteError}
+					<div
+						class="mt-2 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						{noteError}
+					</div>
+				{/if}
+				<div class="mt-2 flex flex-wrap items-center justify-between gap-3">
+					<span class="font-mono text-[11px] tabular-nums text-[var(--hud-dim)]">
+						{noteText.length}/{MAX_TANK_NOTES_LENGTH}
+					</span>
+					<div class="flex items-center gap-3">
+						{#if noteSaved}
+							<span class="text-sm text-[var(--hud-teal)]">Saved.</span>
+						{/if}
+						<button
+							class="hud-cta-ghost px-4 py-2 text-sm"
+							disabled={noteSaving || !noteDirty}
+							onclick={saveTankNote}
+						>
+							{noteSaving ? 'Saving…' : 'Save Notes'}
+						</button>
+					</div>
+				</div>
+			</div>
+		{:else}
+			<div class="rounded-sm bg-[var(--hud-panel-mid)] p-4 text-sm text-[var(--hud-muted)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.22)]">
+				<a href="/auth" class="font-semibold text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]">Sign in</a>
+				to keep personal playstyle notes for {data.tank.name}.
+			</div>
+		{/if}
+	</section>
 
 	<section id="build-library" class="mt-4">
 		<div

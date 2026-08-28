@@ -17,9 +17,19 @@ export const load: PageServerLoad = ({ params }) => {
 	}
 
 	const effectsById = new Map(bundle.effects.map((effect) => [effect.id, effect]));
-	const linkedEffects = component.effectIds
-		.map((id) => effectsById.get(id))
-		.filter((effect): effect is NonNullable<typeof effect> => Boolean(effect));
+	const linkedEffects = (component.effectBindings?.length
+		? component.effectBindings.map((binding) => ({
+				eventTag: binding.eventTag,
+				effect: effectsById.get(binding.effectId)
+			}))
+		: component.effectIds.map((effectId) => ({
+				eventTag: '',
+				effect: effectsById.get(effectId)
+			})))
+		.filter(
+			(binding): binding is { eventTag: string; effect: NonNullable<typeof binding.effect> } =>
+				Boolean(binding.effect)
+		);
 
 	const nativeVehicles = bundle.vehicles
 		.flatMap((vehicle) => {

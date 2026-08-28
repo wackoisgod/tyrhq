@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { T, useTask, useThrelte } from '@threlte/core';
 	import { OrbitControls, interactivity, useFBO, useInteractivity } from '@threlte/extras';
-	import type { ArmorHitInfo } from './types';
+	import {
+		getArmorModuleForTriangle,
+		type ArmorData,
+		type ArmorHitInfo
+	} from './types';
 	import {
 		BufferAttribute,
 		BufferGeometry,
@@ -30,16 +34,6 @@
 	} from 'three';
 	import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 	import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-
-	type ArmorData = {
-		vehicleId: string;
-		textureWidth: number;
-		textureHeight: number;
-		triangles: [number, number][];
-		isModule: number[];
-		isAbsorb?: number[];
-		sectionIds?: number[];
-	};
 
 	type DeployedClipName = 'enter' | 'idle' | 'exit';
 	type DeployedAnimationSet = Partial<Record<DeployedClipName, AnimationClip>>;
@@ -925,11 +919,13 @@
 		const isAbsorb = armorData.isAbsorb?.[faceIndex] ?? 0;
 
 		if (isModule) {
+			const module = getArmorModuleForTriangle(armorData, faceIndex);
 			return {
 				thickness: 0,
 				angle: 0,
 				isFiftyFifty: false,
-				result: isAbsorb ? 'absorb' : 'module'
+				result: isAbsorb ? 'absorb' : 'module',
+				module
 			};
 		}
 
@@ -975,7 +971,10 @@
 		onhover(null);
 	}
 
-	function handlePointerDown(event: any) {
+	// Fired only for genuine clicks/taps (pointer moved less than the interactivity
+	// plugin's distance threshold), so orbit drags that start on the hull never pin.
+	// This is also what makes pinning work on touch, where hover never fires.
+	function handleClick(event: any) {
 		if (!armorVisualizerActive) return;
 		if (!isPrimaryIntersection(event)) return;
 		onclick(getHitInfo(event));
@@ -1164,7 +1163,7 @@
 			onpointermove: handlePointerMove,
 			onpointerout: handlePointerLeave,
 			onpointerleave: handlePointerLeave,
-			onpointerdown: handlePointerDown,
+			onclick: handleClick,
 			onpointermissed: () => onclick(null)
 		});
 

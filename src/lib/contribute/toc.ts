@@ -55,18 +55,34 @@ const HEADING_RE = /<h([1-6])\b([^>]*)>([\s\S]*?)<\/h\1>/gi;
 const ID_ATTR_RE = /\bid="([^"]*)"/i;
 const TAG_RE = /<[^>]+>/g;
 
-const ENTITY_MAP: Record<string, string> = {
-	'&amp;': '&',
-	'&lt;': '<',
-	'&gt;': '>',
-	'&quot;': '"',
-	'&#39;': "'",
-	'&apos;': "'",
-	'&nbsp;': ' '
+const NAMED_ENTITY_MAP: Record<string, string> = {
+	amp: '&',
+	lt: '<',
+	gt: '>',
+	quot: '"',
+	apos: "'",
+	nbsp: ' '
 };
 
+/**
+ * Decode the character references the sanitizer's serializer emits. The stored
+ * HTML comes out of rehype-stringify, which escapes special characters as
+ * numeric references (`&` becomes `&#x26;`), so numeric hex/decimal forms must
+ * be decoded alongside the common named entities.
+ */
 function decodeBasicEntities(value: string): string {
-	return value.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (m) => ENTITY_MAP[m.toLowerCase()] ?? m);
+	return value.replace(
+		/&(?:#x([0-9a-f]+)|#([0-9]+)|(amp|lt|gt|quot|apos|nbsp));/gi,
+		(match, hex?: string, dec?: string, named?: string) => {
+			if (named) return NAMED_ENTITY_MAP[named.toLowerCase()] ?? match;
+			const codePoint = hex ? parseInt(hex, 16) : parseInt(dec!, 10);
+			try {
+				return String.fromCodePoint(codePoint);
+			} catch {
+				return match;
+			}
+		}
+	);
 }
 
 /** Strip inline markup (`<em>`, `<code>`, `<a>`, …) to a clean text label. */

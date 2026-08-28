@@ -1,8 +1,12 @@
 <script lang="ts">
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
+	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
+	import Editor from '$lib/contribute/Editor.svelte';
+	import { MAX_BUILD_NOTES_LENGTH } from '$lib/builds/constants';
 	import { getAbsoluteUrl } from '$lib/site-url';
 	import {
 		canIncrementTalentPoint,
+		componentSupportsMaxStacks,
 		computeBuild,
 		createPlannerCatalog,
 		descriptionIndicatesStacking,
@@ -21,6 +25,7 @@
 	} from '$lib/game-engine/build';
 	import {
 		fillComponentDescription,
+		fillTalentDescription,
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
@@ -37,6 +42,9 @@
 	let saveSuccess = $state<string | null>(null);
 	let copyLinkLabel = $state('Copy Share Link');
 	let buildName = $state('');
+	let buildNotes = $state('');
+	/** Whether the collapsible build-notes editor row is expanded */
+	let buildNotesOpen = $state(false);
 	let exporting = $state(false);
 	let exportError = $state<string | null>(null);
 	let exportCode = $state('');
@@ -65,8 +73,26 @@
 				isPublic: data.loadedBuild.is_public
 			};
 			buildName = data.loadedBuild.title;
+			buildNotes = data.loadedBuild.notes ?? '';
+			buildNotesOpen = Boolean(data.loadedBuild.notes);
 		}
 	});
+
+	/**
+	 * Whether the notes editor is shown: new builds and builds you own. Viewing
+	 * someone else's build shows their notes read-only until "Save as New" forks
+	 * it into your own copy (editingBuild then points at the fork).
+	 */
+	const canEditNotes = $derived(
+		Boolean(data.user) &&
+			(!data.loadedBuild ||
+				data.loadedBuild.user_id === data.user?.id ||
+				(editingBuild !== null && editingBuild.id !== data.loadedBuild.id))
+	);
+	const creatorNotes = $derived(data.loadedBuild?.notes?.trim() ?? '');
+	/** Sanitized, stat-resolved HTML for the loaded build's notes (may be empty
+	 * for notes saved before the markdown upgrade — fall back to plain text). */
+	const creatorNotesHtml = $derived(data.loadedBuild?.notes_html ?? '');
 
 	async function toggleStar() {
 		if (!data.user || !data.loadedBuild || starring) return;
@@ -116,7 +142,8 @@
 					title,
 					vehicleId: selection.vehicleId,
 					selection,
-					isPublic
+					isPublic,
+					notes: buildNotes.trim()
 				})
 			});
 			if (!res.ok) {
@@ -133,6 +160,7 @@
 				isPublic: build.is_public
 			};
 			buildName = build.title;
+			buildNotes = build.notes ?? '';
 			clearDraft();
 			saveSuccess = isPublic
 				? `Build shared! Link: /builds/${build.slug}`
@@ -212,6 +240,7 @@
 	function newBuild() {
 		editingBuild = null;
 		buildName = '';
+		buildNotes = '';
 		clearDraft();
 		selection = getDefaultSelection(catalog);
 		saveError = null;
@@ -402,6 +431,9 @@
 	const currentVehicle = $derived(
 		selection ? (catalog.vehicleById.get(selection.vehicleId) ?? catalog.vehicles[0]) : catalog.vehicles[0]
 	);
+	const personalTankNote = $derived(
+		selection && data.user ? ((data.tankNotes ?? {})[selection.vehicleId] ?? '') : ''
+	);
 	const talentNodes = $derived(selection ? getPlannerTalentsForVehicle(catalog, selection.vehicleId) : []);
 	const talentGridDims = $derived.by(() => {
 		if (!talentNodes.length) return { cols: 1, rows: 1 };
@@ -468,7 +500,7 @@
 		for (const id of selection.componentIds) {
 			if (!id) continue;
 			const c = catalog.componentById.get(id);
-			if (c && descriptionIndicatesStacking(c.description)) return true;
+			if (c && componentSupportsMaxStacks(c)) return true;
 		}
 		for (const [talentId, pts] of Object.entries(selection.talentPoints)) {
 			if (pts <= 0) continue;
@@ -559,34 +591,11 @@
 	function formatTalentDescription(
 		description: string,
 		pointValues: number[],
+		valueTokens: import('$lib/game-engine/component-format').TalentValueToken[],
 		currentPoints: number,
 		nodeMaxPoints: number
 	) {
-		const cleaned = plainComponentDescription(description);
-		if (!pointValues.length) return cleaned;
-
-		const perPoint = pointValues[0];
-		// When unallocated, preview the value at the node's cap — pointValues may extend
-		// past the node's maxPoints (e.g. Sonar Max Energy: pointValues=[10,20,30,40,50]
-		// but the node only allows 3 points, so the previewed max should be 30, not 50).
-		const previewIndex = currentPoints > 0
-			? Math.min(currentPoints, pointValues.length)
-			: Math.min(nodeMaxPoints, pointValues.length);
-		const levelValue = pointValues[Math.max(1, previewIndex) - 1];
-
-		function fmt(n: number) {
-			const abs = Math.abs(n);
-			if (abs >= 100) return String(Math.round(n));
-			if (abs >= 1 && abs === Math.round(abs)) return String(n);
-			const s = n.toFixed(2).replace(/\.?0+$/, '');
-			return s === '-0' ? '0' : s;
-		}
-
-		let count = 0;
-		return cleaned.replace(/\bvalue\b/gi, () => {
-			count++;
-			return fmt(count === 1 ? levelValue : perPoint);
-		});
+		return fillTalentDescription(description, pointValues, valueTokens, currentPoints, nodeMaxPoints);
 	}
 
 	function otherSlotsComponentIds(slotIndex: number): Set<string> {
@@ -658,6 +667,72 @@
 
 	function getTalentPoints(talentId: string) {
 		return selection?.talentPoints[talentId] ?? 0;
+	}
+
+	const HOLD_PRESS_MS = 400;
+
+	/**
+	 * Tap fires `onTap`, press-and-hold fires `onHold` instead. Keyboard activation
+	 * (Enter/Space) arrives as a synthetic click with no preceding hold, so it taps.
+	 */
+	function pressAndHold(el: HTMLElement, params: { onTap: () => void; onHold: () => void }) {
+		let current = params;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let holdFired = false;
+
+		const cancelHold = () => {
+			if (timer !== null) {
+				clearTimeout(timer);
+				timer = null;
+			}
+		};
+		const onPointerDown = (event: PointerEvent) => {
+			if (event.button !== 0) return;
+			holdFired = false;
+			cancelHold();
+			timer = setTimeout(() => {
+				timer = null;
+				holdFired = true;
+				navigator.vibrate?.(15);
+				current.onHold();
+			}, HOLD_PRESS_MS);
+		};
+		const onClick = (event: MouseEvent) => {
+			if (holdFired) {
+				// The pointerup ending a hold still emits a click — swallow it.
+				holdFired = false;
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				return;
+			}
+			current.onTap();
+		};
+		const onContextMenu = (event: Event) => {
+			// Holding must not pop the mobile long-press context menu.
+			event.preventDefault();
+		};
+
+		el.addEventListener('pointerdown', onPointerDown);
+		el.addEventListener('pointerup', cancelHold);
+		el.addEventListener('pointerleave', cancelHold);
+		el.addEventListener('pointercancel', cancelHold);
+		el.addEventListener('click', onClick);
+		el.addEventListener('contextmenu', onContextMenu);
+
+		return {
+			update(next: typeof params) {
+				current = next;
+			},
+			destroy() {
+				cancelHold();
+				el.removeEventListener('pointerdown', onPointerDown);
+				el.removeEventListener('pointerup', cancelHold);
+				el.removeEventListener('pointerleave', cancelHold);
+				el.removeEventListener('pointercancel', cancelHold);
+				el.removeEventListener('click', onClick);
+				el.removeEventListener('contextmenu', onContextMenu);
+			}
+		};
 	}
 
 	function getPreviewSlotLabel(index: number) {
@@ -839,6 +914,15 @@
 					</div>
 				</div>
 
+				{#if data.buildLoadFailed}
+					<div
+						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						Couldn't load that build — it may be private (sign in to see your own builds), deleted,
+						or the link is invalid. Showing the planner without it.
+					</div>
+				{/if}
+
 				{#if saveError}
 					<div
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
@@ -913,6 +997,91 @@
 						</div>
 					</label>
 				</div>
+
+				{#if data.user}
+					<div class="mt-4 grid gap-1 border-t border-[var(--hud-variant)] pt-3">
+						{#if canEditNotes}
+							<details class="group" bind:open={buildNotesOpen}>
+								<summary
+									class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+								>
+									<svg
+										class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+										viewBox="0 0 16 16"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="m6 4 4 4-4 4" />
+									</svg>
+									Build Notes
+									<span
+										class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+									>
+										{buildNotes.trim()
+											? `${buildNotes.trim().length} chars`
+											: 'optional — how is this build meant to be played?'}
+									</span>
+								</summary>
+								<div class="pb-1 pl-5 pt-1">
+									<Editor
+										bind:value={buildNotes}
+										compact
+										maxLength={MAX_BUILD_NOTES_LENGTH}
+										placeholder="How is this build meant to be played? Markdown supported — link guides, embed videos, add callouts and live :stat values, just like articles."
+									/>
+									<div
+										class="mt-1 flex items-center justify-between gap-3 text-[11px] text-[var(--hud-dim)]"
+									>
+										<span>Saved with the build — anyone who opens a shared build sees these notes.</span>
+										<span class="font-mono tabular-nums">{buildNotes.length}/{MAX_BUILD_NOTES_LENGTH}</span>
+									</div>
+								</div>
+							</details>
+						{/if}
+
+						<details class="group">
+							<summary
+								class="flex cursor-pointer select-none list-none items-center gap-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)] [&::-webkit-details-marker]:hidden"
+							>
+								<svg
+									class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+									viewBox="0 0 16 16"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m6 4 4 4-4 4" />
+								</svg>
+								My Tank Notes
+								<span
+									class="font-mono text-[10px] font-normal normal-case tracking-normal text-[var(--hud-dim)]"
+								>
+									{personalTankNote ? currentVehicle.name : `none for ${currentVehicle.name} yet`}
+								</span>
+							</summary>
+							<div class="pb-1 pl-5 pt-1">
+								{#if personalTankNote}
+									<p
+										class="whitespace-pre-line rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-muted)] shadow-[inset_2px_0_0_0_var(--hud-lime),inset_0_0_0_1px_rgba(69,73,50,0.25)]"
+									>{personalTankNote}</p>
+								{/if}
+								<a
+									href={`/tools/tanks/${currentVehicle.slug}#tank-notes`}
+									class="mt-1.5 inline-block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--hud-teal)] transition hover:text-[var(--hud-lime)]"
+								>
+									{personalTankNote ? 'Edit' : 'Add'} tank notes on the {currentVehicle.name} page &rarr;
+								</a>
+							</div>
+						</details>
+					</div>
+				{/if}
 			</section>
 
 			<section
@@ -969,6 +1138,8 @@
 					<span class="text-[var(--hud-teal)]">Teal</span> = spent ·
 					<span class="text-[var(--hud-lime)]">Lime</span> = keystone ·
 					<span class="text-rose-400">Red</span> = invalid.
+					Hold <span class="text-[var(--hud-lime)]">+</span> to max a node · hold
+					<span class="text-[var(--hud-teal)]">−</span> to clear it.
 				</p>
 
 				{#if talentNodes.length === 0}
@@ -1024,11 +1195,13 @@
 									</div>
 
 									<p class="mt-1.5 flex-1 text-xs leading-snug text-[var(--hud-muted)] line-clamp-3">
-										{formatTalentDescription(node.talent.description, node.talent.pointValues, points, node.maxPoints)}
+										{formatTalentDescription(node.talent.description, node.talent.pointValues, node.talent.valueTokens ?? [], points, node.maxPoints)}
 									</p>
 									{#if node.talent.supplementalDescription}
+										<!-- Supplemental text never carries value placeholders — render it verbatim so
+										     natural uses of the word "value" aren't replaced with numbers. -->
 										<p class="mt-1 text-[10px] leading-snug text-[var(--hud-dim)] line-clamp-2">
-											{formatTalentDescription(node.talent.supplementalDescription, node.talent.pointValues, points, node.maxPoints)}
+											{plainComponentDescription(node.talent.supplementalDescription)}
 										</p>
 									{/if}
 	
@@ -1037,19 +1210,38 @@
 									>
 										<button
 											type="button"
-											class="flex h-7 w-7 items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-base leading-none text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
+											class="flex h-7 w-7 touch-manipulation select-none items-center justify-center rounded-sm border border-[var(--hud-teal)] bg-transparent text-base leading-none text-[var(--hud-teal)] transition [-webkit-touch-callout:none] hover:bg-[var(--hud-teal)]/15 disabled:border-[#454932] disabled:text-[#454932] disabled:opacity-40"
 											disabled={points <= 0}
-											onclick={() =>
-												setTalentPoints(node.talent.id, points - 1, node.maxPoints)}
+											title="Tap: −1 · Hold: clear"
+											aria-label={`Remove a point from ${node.talent.name}; hold to clear`}
+											use:pressAndHold={{
+												onTap: () =>
+													setTalentPoints(
+														node.talent.id,
+														getTalentPoints(node.talent.id) - 1,
+														node.maxPoints
+													),
+												onHold: () => setTalentPoints(node.talent.id, 0, node.maxPoints)
+											}}
 										>
 											−
 										</button>
 										<button
 											type="button"
-											class="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--hud-lime)] text-base font-medium leading-none text-[var(--hud-on-lime)] transition hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
+											class="flex h-7 w-7 touch-manipulation select-none items-center justify-center rounded-sm bg-[var(--hud-lime)] text-base font-medium leading-none text-[var(--hud-on-lime)] transition [-webkit-touch-callout:none] hover:brightness-110 disabled:bg-[var(--hud-variant)] disabled:text-[var(--hud-dim)] disabled:opacity-50"
 											disabled={!canInc}
-											onclick={() =>
-												setTalentPoints(node.talent.id, points + 1, node.maxPoints)}
+											title="Tap: +1 · Hold: max"
+											aria-label={`Add a point to ${node.talent.name}; hold to max`}
+											use:pressAndHold={{
+												onTap: () =>
+													setTalentPoints(
+														node.talent.id,
+														getTalentPoints(node.talent.id) + 1,
+														node.maxPoints
+													),
+												onHold: () =>
+													setTalentPoints(node.talent.id, node.maxPoints, node.maxPoints)
+											}}
 										>
 											+
 										</button>
@@ -1276,6 +1468,27 @@
 					</div>
 				</div>
 			</section>
+
+			{#if !canEditNotes && creatorNotes}
+				<section
+					class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"
+					style="box-shadow: var(--hud-notch-shadow);"
+				>
+					<div
+						class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--hud-variant)] pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+					>
+						<span>Briefing</span>
+						<span class="font-mono font-normal normal-case tracking-normal text-[var(--hud-muted)]">
+							CREATOR_NOTES{#if data.creatorName}&nbsp;· {data.creatorName}{/if}
+						</span>
+					</div>
+					{#if creatorNotesHtml}
+						<ArticleBody html={creatorNotesHtml} />
+					{:else}
+						<p class="whitespace-pre-line text-sm leading-6 text-[var(--hud-muted)]">{creatorNotes}</p>
+					{/if}
+				</section>
+			{/if}
 
 			<section
 				class="rounded-sm bg-[var(--hud-panel)] p-4 md:p-5"

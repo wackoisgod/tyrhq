@@ -13,6 +13,9 @@ export const statDefinitions: StatDefinition[] = [
 	{ key: 'IntraClipReloadTime', label: 'Intra Reload', group: 'Weapon', unit: 's', lowerBetter: true },
 	{ key: 'ShellSwapTime', label: 'Shell Swap Time', group: 'Weapon', unit: 's', lowerBetter: true },
 	{ key: 'ShellVelocity', label: 'Shell Velocity', group: 'Weapon', unit: 'm/s' },
+	{ key: 'StartingSecondaryShellsCount', label: 'Secondary Shells', group: 'Weapon' },
+	{ key: 'StartingTertiaryShellsCount', label: 'Tertiary Shells', group: 'Weapon' },
+	{ key: 'GunMaxDepression', label: 'Gun Depression', group: 'Weapon', unit: 'deg', lowerBetter: true },
 	{
 		key: 'BaseDispersionPenalty',
 		label: 'Base Dispersion',
@@ -44,6 +47,13 @@ export const statDefinitions: StatDefinition[] = [
 		lowerBetter: true
 	},
 	{ key: 'DispersionReductionSpeed', label: 'Aim Speed', group: 'Dispersion' },
+	{
+		key: 'PreciseDispersionTime',
+		label: 'Precision Aim Time',
+		group: 'Dispersion',
+		unit: 's',
+		lowerBetter: true
+	},
 	{ key: 'MaxHealth', label: 'Health', group: 'Survivability' },
 	{ key: 'MaxSpeed', label: 'Top Speed', group: 'Mobility', unit: 'kph' },
 	{ key: 'MaxReverseSpeed', label: 'Reverse Speed', group: 'Mobility', unit: 'kph' },
@@ -58,13 +68,16 @@ export const statDefinitions: StatDefinition[] = [
 	{ key: 'MaxAbilityResource', label: 'Max Energy', group: 'Ability' },
 	{ key: 'InitialAbilityResource', label: 'Starting Energy', group: 'Ability' },
 	{ key: 'GlobalBonusResourceFlat', label: 'Bonus Energy Gain', group: 'Ability' },
+	{ key: 'CurrentAbilityResource', label: 'Event Energy Gain', group: 'Ability' },
+	{ key: 'TrackModuleDamagedAssistModifier', label: 'Tracking Assist Energy', group: 'Ability' },
 	{ key: 'AbilityCooldown', label: 'Ability Cooldown', group: 'Ability', unit: 's', lowerBetter: true },
 	{ key: 'AbilityCost', label: 'Ability Cost', group: 'Ability', lowerBetter: true },
 	{
 		key: 'ActiveReloadReductionTime',
 		label: 'Active Reload Reduction',
 		group: 'Ability',
-		unit: 's'
+		unit: 's',
+		lowerBetter: true
 	},
 	{ key: 'WallPhaseInTime', label: 'Wall Phase Time', group: 'Ability', unit: 's', lowerBetter: true }
 ];

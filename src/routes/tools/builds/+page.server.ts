@@ -1,4 +1,6 @@
 import { getGameDataBundle } from '$lib/data/game-data';
+import { isMissingBuildNotesColumnError } from '$lib/server/build-requests';
+import { renderGameStatRefs } from '$lib/server/game-data-refs';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -21,17 +23,41 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		is_public: boolean;
 		user_id: string;
 		star_count: number;
+		notes: string;
+		notes_html: string;
 	} | null = null;
 	let creatorName: string | null = null;
 	let userHasStarred = false;
 
 	if (slug && locals.supabase) {
 		// RLS allows access if user owns it OR it's public
-		const { data } = await locals.supabase
+		const buildQuery = await locals.supabase
 			.from('builds')
-			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, profiles(display_name)')
+			.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, notes, notes_html, profiles(display_name)')
 			.eq('slug', slug)
 			.single();
+
+		let data = buildQuery.data;
+		if (!data && isMissingBuildNotesColumnError(buildQuery.error)) {
+			// Database has not run migration 017 yet — retry without notes so
+			// builds still open instead of silently falling back to a blank one
+			const legacyQuery = await locals.supabase
+				.from('builds')
+				.select('id, slug, title, vehicle_id, selection, is_public, user_id, star_count, profiles(display_name)')
+				.eq('slug', slug)
+				.single();
+			data = legacyQuery.data ? { ...legacyQuery.data, notes: '', notes_html: '' } : null;
+		}
+
+		// Fill live :stat references with current game-data values (same as
+		// article rendering) before the notes HTML reaches the page
+		if (data?.notes_html) {
+			data = { ...data, notes_html: renderGameStatRefs(data.notes_html) };
+		}
+
+		if (!data && buildQuery.error) {
+			console.error(`[planner] Failed to load build "${slug}"`, buildQuery.error);
+		}
 
 		if (data) {
 			loadedBuild = data;
@@ -59,12 +85,30 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			? initialVehicleId
 			: null;
 
+	// Personal per-tank notes so the planner can surface the pilot's own
+	// playstyle reminders for whichever vehicle is selected
+	let tankNotes: Record<string, string> = {};
+	if (user && locals.supabase) {
+		const { data: noteRows } = await locals.supabase
+			.from('tank_notes')
+			.select('vehicle_id, notes')
+			.eq('user_id', user.id);
+		tankNotes = Object.fromEntries(
+			(noteRows ?? []).map((row) => [row.vehicle_id, row.notes as string])
+		);
+	}
+
 	return {
 		bundle,
 		initialVehicleId: loadedBuild ? loadedBuild.vehicle_id : initialVehicleId,
 		lockedVehicleId,
 		loadedBuild,
+		// A build was requested but could not be loaded (private, deleted, bad
+		// link, or the database is unreachable) — surface it instead of quietly
+		// showing a blank planner
+		buildLoadFailed: Boolean(slug) && !loadedBuild,
 		creatorName,
-		userHasStarred
+		userHasStarred,
+		tankNotes
 	};
 };

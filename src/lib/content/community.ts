@@ -1,6 +1,13 @@
-// Curated community links surfaced on the /community page. Adding a Discord,
-// fan site, or tool is a data-only change here — no route or component edits
-// needed. Groups render in array order; a group with no links is skipped.
+// Fallback community links for the /community page.
+//
+// The live directory is admin-curated in the database (community_link_groups /
+// community_links, edited at /admin/community-links). These groups are only
+// served when Supabase isn't configured — local dev without a service-role
+// key, or a preview build — so the page never renders empty. They also seed a
+// fresh database via migration 018. Editing this file does NOT change a
+// deployed site; use the admin page for that.
+//
+// Groups render in array order; a group with no links is skipped.
 
 export type CommunityLink = {
 	label: string;
@@ -43,7 +50,7 @@ export const communityGroups: CommunityGroup[] = [
 		links: [
 			{
 				label: 'The Tyr Hotline',
-				href: 'https://discord.gg/7WxrVHq8W',
+				href: 'https://discord.gg/kbJG4xrAM',
 				description: 'Community-run hub for Tyr players.',
 				tag: 'Discord'
 			}

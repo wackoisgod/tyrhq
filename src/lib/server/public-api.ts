@@ -1,6 +1,7 @@
 import type {
 	AmmoRecord,
 	ComponentRecord,
+	EffectRecord,
 	GameDataBundle,
 	MapRecord,
 	TalentRecord,
@@ -18,6 +19,7 @@ export const PUBLIC_API_RESOURCES = [
 	'ammo',
 	'components',
 	'talents',
+	'effects',
 	'talent-trees',
 	'maps'
 ] as const;
@@ -72,6 +74,7 @@ const exampleIds = (() => {
 		ammo: bundle.ammo[0]?.id ?? 'standard',
 		components: bundle.components[0]?.id ?? 'adaptivehardening',
 		talents: bundle.talents[0]?.id ?? 'healer-talent019',
+		effects: bundle.effects[0]?.id ?? 'ge-activereloadtime-ge-activereloadtime',
 		talentTrees: bundle.talentTrees[0]?.id ?? 'blink',
 		maps: bundle.maps[0]?.id ?? 'divide'
 	};
@@ -153,12 +156,16 @@ function serializeComponent(component: ComponentRecord) {
 		slug: component.slug,
 		name: component.name,
 		description: component.description,
+		descriptionTemplate: component.descriptionTemplate ?? component.description,
+		valueTokens: component.valueTokens ?? [],
 		categoryId: component.categoryId,
 		category: component.category,
 		pointValues: component.pointValues,
 		tagIds: component.tagIds,
 		eventTags: component.eventTags,
 		effectIds: component.effectIds,
+		effectPaths: component.effectPaths,
+		effectBindings: component.effectBindings ?? [],
 		nativeVehicles: component.nativeVehicles,
 		assets: {
 			iconUrl: getPublicImageUrl('images/components', component.id)
@@ -173,15 +180,26 @@ function serializeTalent(talent: TalentRecord) {
 		slug: talent.slug,
 		name: talent.name,
 		description: talent.description,
+		descriptionTemplate: talent.descriptionTemplate ?? talent.description,
+		valueTokens: talent.valueTokens ?? [],
 		supplementalDescription: talent.supplementalDescription,
 		type: talent.type,
 		maxPoints: talent.maxPoints,
 		pointValues: talent.pointValues,
 		eventTags: talent.eventTags,
 		effectIds: talent.effectIds,
+		effectPaths: talent.effectPaths,
+		effectBindings: talent.effectBindings ?? [],
 		assets: {
 			iconUrl: getPublicImageUrl('images/talents', talent.id)
 		}
+	};
+}
+
+function serializeEffect(effect: EffectRecord) {
+	return {
+		...effect,
+		modifiers: effect.modifiers.map((modifier) => ({ ...modifier }))
 	};
 }
 
@@ -303,6 +321,13 @@ const RESOURCE_CONFIGS: Record<PublicApiResourceName, PublicApiResourceConfig<an
 			}
 		]
 	},
+	effects: {
+		singularLabel: 'Effect',
+		schemaName: 'Effect',
+		exampleId: exampleIds.effects,
+		collection: (bundle) => bundle.effects,
+		serialize: serializeEffect
+	},
 	'talent-trees': {
 		singularLabel: 'Talent Tree',
 		schemaName: 'TalentTree',
@@ -356,12 +381,16 @@ export function getPublicApiDatasetMeta() {
 		schemaVersion: bundle.metadata.schemaVersion,
 		generatedAt: bundle.metadata.generatedAt,
 		rawSource: bundle.metadata.rawSource,
+		sourceChangelist: bundle.metadata.sourceChangelist ?? null,
+		sourceRevisionPolicy: bundle.metadata.sourceRevisionPolicy ?? null,
+		exporter: bundle.metadata.exporter ?? null,
 		datasetRevision: `schema-${bundle.metadata.schemaVersion}-${bundle.metadata.generatedAt}`,
 		resourceCounts: {
 			vehicles: bundle.vehicles.length,
 			ammo: bundle.ammo.length,
 			components: bundle.components.length,
 			talents: bundle.talents.length,
+			effects: bundle.effects.length,
 			talentTrees: bundle.talentTrees.length,
 			maps: bundle.maps.length
 		}
@@ -509,6 +538,9 @@ function getOpenApiSchemas() {
 				schemaVersion: { type: 'integer' },
 				generatedAt: { type: 'string', format: 'date-time' },
 				rawSource: { type: 'string' },
+				sourceChangelist: { type: ['integer', 'null'] },
+				sourceRevisionPolicy: { type: ['string', 'null'] },
+				exporter: { type: ['object', 'null'], additionalProperties: true },
 				datasetRevision: { type: 'string' },
 				resourceCounts: {
 					type: 'object',
@@ -559,6 +591,15 @@ function getOpenApiSchemas() {
 			},
 			required: ['id', 'key', 'slug', 'name', 'displayName', 'description', 'selectable', 'canLoadSecondary', 'modifiers', 'assets']
 		},
+		EffectBinding: {
+			type: 'object',
+			required: ['eventTag', 'effectId', 'effectPath'],
+			properties: {
+				eventTag: { type: 'string' },
+				effectId: { type: 'string' },
+				effectPath: { type: 'string' }
+			}
+		},
 		Component: {
 			type: 'object',
 			properties: {
@@ -567,16 +608,20 @@ function getOpenApiSchemas() {
 				slug: { type: 'string' },
 				name: { type: 'string' },
 				description: { type: 'string' },
+				descriptionTemplate: { type: 'string' },
+				valueTokens: { type: 'array', items: { type: 'string' } },
 				categoryId: { type: 'string' },
 				category: { type: 'string' },
 				pointValues: { type: 'array', items: { type: 'number' } },
 				tagIds: { type: 'array', items: { type: 'string' } },
 				eventTags: { type: 'array', items: { type: 'string' } },
 				effectIds: { type: 'array', items: { type: 'string' } },
+				effectPaths: { type: 'array', items: { type: 'string' } },
+				effectBindings: { type: 'array', items: { $ref: '#/components/schemas/EffectBinding' } },
 				nativeVehicles: { type: 'array', items: { type: 'object', additionalProperties: true } },
 				assets: { type: 'object', additionalProperties: { type: 'string' } }
 			},
-			required: ['id', 'key', 'slug', 'name', 'description', 'categoryId', 'category', 'pointValues', 'tagIds', 'eventTags', 'effectIds', 'nativeVehicles', 'assets']
+			required: ['id', 'key', 'slug', 'name', 'description', 'descriptionTemplate', 'valueTokens', 'categoryId', 'category', 'pointValues', 'tagIds', 'eventTags', 'effectIds', 'effectPaths', 'effectBindings', 'nativeVehicles', 'assets']
 		},
 		Talent: {
 			type: 'object',
@@ -586,15 +631,36 @@ function getOpenApiSchemas() {
 				slug: { type: 'string' },
 				name: { type: 'string' },
 				description: { type: 'string' },
+				descriptionTemplate: { type: 'string' },
+				valueTokens: { type: 'array', items: { type: 'string' } },
 				supplementalDescription: { type: 'string' },
 				type: { type: 'string' },
 				maxPoints: { type: 'integer' },
 				pointValues: { type: 'array', items: { type: 'number' } },
 				eventTags: { type: 'array', items: { type: 'string' } },
 				effectIds: { type: 'array', items: { type: 'string' } },
+				effectPaths: { type: 'array', items: { type: 'string' } },
+				effectBindings: { type: 'array', items: { $ref: '#/components/schemas/EffectBinding' } },
 				assets: { type: 'object', additionalProperties: { type: 'string' } }
 			},
-			required: ['id', 'key', 'slug', 'name', 'description', 'supplementalDescription', 'type', 'maxPoints', 'pointValues', 'eventTags', 'effectIds', 'assets']
+			required: ['id', 'key', 'slug', 'name', 'description', 'descriptionTemplate', 'valueTokens', 'supplementalDescription', 'type', 'maxPoints', 'pointValues', 'eventTags', 'effectIds', 'effectPaths', 'effectBindings', 'assets']
+		},
+		Effect: {
+			type: 'object',
+			required: ['id', 'path', 'stackLimit', 'tags', 'modifiers'],
+			properties: {
+				id: { type: 'string' },
+				path: { type: 'string' },
+				durationPolicy: { type: 'string' },
+				stackingType: { type: 'string' },
+				stackLimit: { type: 'integer' },
+				tags: { type: 'array', items: { type: 'string' } },
+				ownedTags: { type: 'array', items: { type: 'string' } },
+				modifiers: { type: 'array', items: { type: 'object', additionalProperties: true } },
+				executions: { type: 'array', items: {} },
+				gameplayCues: { type: 'array', items: {} }
+			},
+			additionalProperties: true
 		},
 		TalentTree: {
 			type: 'object',
@@ -629,6 +695,8 @@ function getOpenApiSchemas() {
 		ComponentResponse: buildSingleSchemaRef('Component'),
 		TalentCollectionResponse: buildCollectionSchemaRef('Talent'),
 		TalentResponse: buildSingleSchemaRef('Talent'),
+		EffectCollectionResponse: buildCollectionSchemaRef('Effect'),
+		EffectResponse: buildSingleSchemaRef('Effect'),
 		TalentTreeCollectionResponse: buildCollectionSchemaRef('TalentTree'),
 		TalentTreeResponse: buildSingleSchemaRef('TalentTree'),
 		MapCollectionResponse: buildCollectionSchemaRef('Map'),

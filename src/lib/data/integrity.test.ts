@@ -88,6 +88,7 @@ describe('generated data integrity', () => {
 	it('keeps runtime references internally consistent', () => {
 		const bundle = readJson<GameDataBundle>(runtimePath);
 		const effectIds = new Set(bundle.effects.map((effect) => effect.id));
+		const effectById = new Map(bundle.effects.map((effect) => [effect.id, effect]));
 		const vehicleIds = new Set(bundle.vehicles.map((vehicle) => vehicle.id));
 		const talentIds = new Set(bundle.talents.map((talent) => talent.id));
 
@@ -99,11 +100,27 @@ describe('generated data integrity', () => {
 			for (const effectId of component.effectIds) {
 				expect(effectIds.has(effectId)).toBe(true);
 			}
+			const bindings = component.effectBindings ?? [];
+			expect([...new Set(bindings.map((binding) => binding.effectId))].sort()).toEqual(
+				[...component.effectIds].sort()
+			);
+			for (const binding of bindings) {
+				expect(effectById.get(binding.effectId)?.path).toBe(binding.effectPath);
+				expect(component.effectPaths).toContain(binding.effectPath);
+			}
 		}
 
 		for (const talent of bundle.talents) {
 			for (const effectId of talent.effectIds) {
 				expect(effectIds.has(effectId)).toBe(true);
+			}
+			const bindings = talent.effectBindings ?? [];
+			expect([...new Set(bindings.map((binding) => binding.effectId))].sort()).toEqual(
+				[...talent.effectIds].sort()
+			);
+			for (const binding of bindings) {
+				expect(effectById.get(binding.effectId)?.path).toBe(binding.effectPath);
+				expect(talent.effectPaths).toContain(binding.effectPath);
 			}
 		}
 

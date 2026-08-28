@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { listFlyoutEntries } from '$lib/server/articles';
 import { countPendingReviewSubmissions } from '$lib/server/submissions';
+import { countPendingEvents } from '$lib/server/events';
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	depends('supabase:auth');
@@ -39,8 +40,10 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 
 	const flyoutEntries = await listFlyoutEntries();
 
-	const pendingReviewCount =
-		role === 'contributor' || role === 'admin' ? await countPendingReviewSubmissions() : 0;
+	const isReviewer = role === 'contributor' || role === 'admin';
+	const [pendingReviewCount, pendingEventCount] = isReviewer
+		? await Promise.all([countPendingReviewSubmissions(), countPendingEvents()])
+		: [0, 0];
 
 	return {
 		session,
@@ -49,6 +52,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		role,
 		isTournamentOrganizer: Boolean(profile?.is_tournament_organizer),
 		flyoutEntries,
-		pendingReviewCount
+		pendingReviewCount,
+		pendingEventCount
 	};
 };

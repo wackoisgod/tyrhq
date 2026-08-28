@@ -69,17 +69,6 @@
 				</div>
 			</div>
 
-			<div class="mt-6 flex justify-center">
-				<a
-					href={siteCopy.wishlistUrl}
-					target="_blank"
-					rel="noreferrer"
-					class="hud-cta px-5 py-3"
-				>
-					Wishlist on Steam
-				</a>
-			</div>
-
 			<p class="mt-8 text-sm leading-7 text-[var(--hud-muted)] md:text-base">
 				This is Tyr, a tank shooter where positioning, strategic decision-making, and mastery of
 				unique abilities win.
