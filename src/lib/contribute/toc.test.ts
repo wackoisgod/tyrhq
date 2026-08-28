@@ -56,6 +56,19 @@ describe('extractHeadings', () => {
 		expect(extractHeadings(html)).toEqual([{ id: 't', text: 'Armor vs & Ammo', level: 2 }]);
 	});
 
+	it('decodes numeric character references like the ones rehype-stringify emits', () => {
+		const html = '<h2 id="d">Depression &#x26; Elevation</h2><h3 id="s">Rock &#38; Roll &#39;66</h3>';
+		expect(extractHeadings(html)).toEqual([
+			{ id: 'd', text: 'Depression & Elevation', level: 2 },
+			{ id: 's', text: "Rock & Roll '66", level: 3 }
+		]);
+	});
+
+	it('leaves invalid numeric references untouched', () => {
+		const html = '<h2 id="x">Bad &#x110000; ref</h2>';
+		expect(extractHeadings(html)).toEqual([{ id: 'x', text: 'Bad &#x110000; ref', level: 2 }]);
+	});
+
 	it('skips empty headings', () => {
 		expect(extractHeadings('<h2></h2><h2 id="real">Real</h2>')).toEqual([
 			{ id: 'real', text: 'Real', level: 2 }
