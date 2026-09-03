@@ -55,6 +55,7 @@
 <ArticlePageShell
 	type="patch"
 	article={data.patch}
+	sourceLabel="the official Tyr patch notes"
 	backHref="/patch-notes"
 	backLabel="Back To Patch Notes"
 >
@@ -101,6 +102,7 @@
 			articleType="patch"
 			signedIn={Boolean(data.user)}
 			canModerate={data.role === 'contributor' || data.role === 'admin'}
+			canSuggestEdit={false}
 		/>
 	{/snippet}
 </ArticlePageShell>

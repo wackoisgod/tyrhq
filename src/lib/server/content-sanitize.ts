@@ -5,9 +5,10 @@ import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import remarkRehype from 'remark-rehype';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import rehypeParse from 'rehype-parse';
 import type { Schema } from 'hast-util-sanitize';
 import rehypeStringify from 'rehype-stringify';
-import { visit } from 'unist-util-visit';
+import { SKIP, visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
 import type { Node } from 'unist';
 import { env as publicEnv } from '$env/dynamic/public';
@@ -377,6 +378,154 @@ function getProcessor(imageHostPrefix: string) {
 	return cachedProcessor;
 }
 
+/* ------------------------------------------------------------------ *
+ * Mirrored (scraped) content
+ *
+ * Patch notes are mirrored from the official Tyr site rather than authored
+ * here, so they get their own pipeline. Two things have to differ from the
+ * community one:
+ *
+ *   1. No `remark-directive`. Official copy is not written against our
+ *      directive syntax, and a stray `:Foo` or `::something` in a patch note
+ *      would otherwise fail the whole sync as an "unknown directive".
+ *   2. Images are filtered, not rejected. Official notes embed screenshots on
+ *      the studio's own hosts; an image we can't vouch for is dropped so the
+ *      rest of the note still mirrors, instead of throwing the note away.
+ *
+ * Everything after that — the sanitize schema, heading ids — is shared with
+ * community content, so mirrored bodies are no more trusted than a
+ * contributor's.
+ * ------------------------------------------------------------------ */
+
+const PUBLIC_STORAGE_PATH_PREFIX = '/storage/v1/object/public/';
+
+/**
+ * Is this an image we're willing to hotlink from a mirrored note?
+ *
+ * Allowed: anything on an explicitly configured official origin, plus public
+ * Supabase storage objects (the studio serves its site media from one, and
+ * `https://*.supabase.co` is already in our CSP `img-src`). Everything else —
+ * `http:`, data URIs, random image hosts — is dropped.
+ */
+export function isAllowedMirrorImage(src: string, allowedOrigins: readonly string[]): boolean {
+	let parsed: URL;
+	try {
+		parsed = new URL(src);
+	} catch {
+		return false;
+	}
+	if (parsed.protocol !== 'https:') return false;
+	if (allowedOrigins.includes(parsed.origin)) return true;
+	return (
+		parsed.hostname.endsWith('.supabase.co') &&
+		parsed.pathname.startsWith(PUBLIC_STORAGE_PATH_PREFIX)
+	);
+}
+
+/**
+ * Drop `<img>` elements we won't hotlink, and normalise the ones we keep the
+ * same way `validateImageSources` does (no srcset, lazy + async).
+ */
+function filterMirroredImages(allowedOrigins: readonly string[]) {
+	return (tree: Root) => {
+		visit(tree as unknown as Node, 'element', (node: Node, index, parent) => {
+			const el = node as Node & {
+				tagName?: string;
+				properties?: Record<string, unknown> | null;
+			};
+			if (el.tagName !== 'img') return;
+
+			const props = (el.properties ?? {}) as Record<string, unknown>;
+			const src = typeof props.src === 'string' ? props.src : null;
+
+			if (!src || !isAllowedMirrorImage(src, allowedOrigins)) {
+				const holder = parent as (Node & { children?: Node[] }) | null | undefined;
+				if (holder?.children && typeof index === 'number') {
+					holder.children.splice(index, 1);
+					return [SKIP, index];
+				}
+				return;
+			}
+
+			delete props.srcSet;
+			delete props.srcset;
+			props.loading = 'lazy';
+			props.decoding = 'async';
+			el.properties = props;
+		});
+	};
+}
+
+function buildMirrorMarkdownProcessor(allowedOrigins: readonly string[]) {
+	return unified()
+		.use(remarkParse)
+		.use(remarkGfm)
+		.use(remarkRehype, { allowDangerousHtml: false })
+		.use(filterMirroredImages, allowedOrigins)
+		.use(rehypeSanitize, sanitizeSchema)
+		.use(assignHeadingIds)
+		.use(rehypeStringify);
+}
+
+function buildMirrorHtmlProcessor(allowedOrigins: readonly string[]) {
+	return unified()
+		.use(rehypeParse, { fragment: true })
+		.use(filterMirroredImages, allowedOrigins)
+		.use(rehypeSanitize, sanitizeSchema)
+		.use(assignHeadingIds)
+		.use(rehypeStringify);
+}
+
+/**
+ * The markdown and HTML pipelines differ in their input tree type (mdast vs
+ * hast), so they have no common `Processor` type. All this cache needs is the
+ * one call site's shape.
+ */
+interface MirrorProcessor {
+	process(value: string): Promise<{ toString(): string }>;
+}
+
+const mirrorProcessors = new Map<string, MirrorProcessor>();
+
+function getMirrorProcessor(format: 'markdown' | 'html', allowedOrigins: readonly string[]) {
+	const key = `${format}|${[...allowedOrigins].sort().join(' ')}`;
+	const cached = mirrorProcessors.get(key);
+	if (cached) return cached;
+	const processor =
+		format === 'markdown'
+			? buildMirrorMarkdownProcessor(allowedOrigins)
+			: buildMirrorHtmlProcessor(allowedOrigins);
+	mirrorProcessors.set(key, processor);
+	return processor;
+}
+
+export interface MirroredBodyInput {
+	format: 'markdown' | 'html';
+	content: string;
+}
+
+export interface MirrorSanitizeOptions {
+	/** Origins whose images survive the filter. See `isAllowedMirrorImage`. */
+	allowedImageOrigins?: readonly string[];
+}
+
+/**
+ * Render a mirrored patch note body to safe HTML.
+ *
+ * Unlike `sanitizeArticleBody` this does not throw on content problems — a
+ * mirror has no author to send an error back to, and one bad image must not
+ * cost us the note. It still throws on genuinely broken input (unparseable
+ * markup), which the sync records as a per-note failure.
+ */
+export async function sanitizeMirroredBody(
+	body: MirroredBodyInput,
+	options: MirrorSanitizeOptions = {}
+): Promise<SanitizeResult> {
+	const allowedOrigins = options.allowedImageOrigins ?? [];
+	const file = await getMirrorProcessor(body.format, allowedOrigins).process(body.content);
+	return toSanitizeResult(String(file));
+}
+
 export interface SanitizeResult {
 	html: string;
 	wordCount: number;
@@ -397,14 +546,16 @@ export async function sanitizeArticleBody(
 ): Promise<SanitizeResult> {
 	const imageHostPrefix = options.imageHostPrefix ?? getArticleImageHostPrefix();
 	const file = await getProcessor(imageHostPrefix).process(markdown);
-	const html = String(file);
+	return toSanitizeResult(String(file));
+}
 
-	// Cheap word count for length validation (server-rendered, so we count after
-	// HTML stripping to avoid penalising callouts/YouTube wrappers).
+/**
+ * Cheap word count for length validation. Counted after HTML stripping so
+ * callouts/YouTube wrappers don't inflate it.
+ */
+function toSanitizeResult(html: string): SanitizeResult {
 	const text = html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');
-	const wordCount = text.split(/\s+/).filter(Boolean).length;
-
-	return { html, wordCount };
+	return { html, wordCount: text.split(/\s+/).filter(Boolean).length };
 }
 
 /**

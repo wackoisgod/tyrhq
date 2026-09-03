@@ -13,10 +13,26 @@ The fastest way to publish an article or guide is the in-site editor:
 2. Visit `/contribute/new`. Pick **Guide** or **Article**.
    - **Guide** = strategy / fundamentals / chassis-specific tips. You can attach vehicle slugs so the guide shows up on the matching tank pages.
    - **Article** = news, dispatches, anything published under `/articles`.
+   - **Patch notes are not on this list.** They are mirrored automatically from the [official Tyr patch notes](https://www.playtyr.com/patch-notes) — see [Patch Notes](#patch-notes) below.
 3. Fill in the title, summary, and tags. Use the editor toolbar to write your body — bold, italic, headings, lists, links, plus inserters for **YouTube embeds** (`▶ YouTube`), **callout boxes** (`ⓘ Info` / `⚠ Warning` / `★ Tip`), and **live game-data values** (`＃ Stat`).
 4. Toggle **Show preview** in the toolbar to see exactly how the article will render. The preview uses the same server-side sanitizer the publish path does, so what you see is what readers will see.
 5. **Save Draft** at any time to come back later (find your drafts at `/contribute/mine`).
 6. **Submit For Review** when ready. A reviewer will approve, request changes, or reject the submission from `/admin/submissions`. You'll see status updates and any reviewer notes back at `/contribute/mine`. When a reviewer requests changes they can also propose **inline edits** to your body — those come back to the editor as accept/reject suggestions you resolve hunk-by-hunk before resubmitting.
+
+### Patch Notes
+
+You don't write these. Everything under `/patch-notes` is scraped from the
+[official Tyr patch notes](https://www.playtyr.com/patch-notes) on a schedule,
+rendered through the same sanitizer as community content, and linked back to
+the original. There is no upload form and no **Suggest An Edit** button —
+a synced note would just overwrite your changes on the next run, so
+corrections belong upstream with the studio.
+
+Reviewers and admins get two buttons on `/admin/articles`: **Sync latest**
+(picks up a release early) and **Backfill archive** (walks the whole official
+archive). Withdrawing a mirrored note still works and sticks — syncs never
+republish something a moderator took down. Implementation notes are in the
+[README](./README.md#patch-notes).
 
 ### Editing An Existing Article Or Guide
 

@@ -5,12 +5,19 @@
 		articleId,
 		articleType,
 		signedIn,
-		canModerate
+		canModerate,
+		canSuggestEdit = true
 	}: {
 		articleId: string;
 		articleType: 'guide' | 'article' | 'patch';
 		signedIn: boolean;
 		canModerate: boolean;
+		/**
+		 * False for mirrored content: a patch note synced from the official site
+		 * would have any suggested edit overwritten by the next sync, so the
+		 * server refuses it and we don't offer the button.
+		 */
+		canSuggestEdit?: boolean;
 	} = $props();
 
 	function listingHref(type: 'guide' | 'article' | 'patch'): string {
@@ -91,11 +98,11 @@
 	}
 </script>
 
-{#if signedIn || canModerate}
+{#if (signedIn && canSuggestEdit) || canModerate}
 	<div
 		class="mt-8 flex flex-wrap items-center gap-2 border-t border-[var(--hud-variant)] pt-4"
 	>
-		{#if signedIn}
+		{#if signedIn && canSuggestEdit}
 			<button
 				type="button"
 				onclick={startSuggestEdit}

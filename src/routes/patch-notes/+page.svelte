@@ -20,8 +20,14 @@
 		Patch Notes
 	</h1>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
-		Change logs and balance updates for Tyr, newest first. Versions reflect the build the notes
-		were captured against.
+		Change logs and balance updates for Tyr, newest first, mirrored automatically from
+		<a
+			href={data.officialUrl}
+			target="_blank"
+			rel="noreferrer"
+			class="text-[var(--hud-teal)] underline decoration-dotted underline-offset-2 hover:text-[var(--hud-lime)]"
+			>the official Tyr patch notes</a
+		>. Every note links back to the original.
 	</p>
 
 	{#if data.patches.length === 0}
@@ -48,6 +54,14 @@
 								class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-[var(--hud-teal)]"
 							>
 								{patch.version}
+							</span>
+						{/if}
+						{#if patch.source === 'official'}
+							<span
+								class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-dim)]"
+								title="Mirrored from the official Tyr site"
+							>
+								Official
 							</span>
 						{/if}
 						<span

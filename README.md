@@ -20,6 +20,7 @@ This repository is the website codebase. It is not affiliated with, endorsed by,
 - Armor viewer and model previews
 - **Articles and guides** authored through an in-site WYSIWYG-ish markdown editor with live preview, server-side sanitization, and a reviewer queue (no GitHub required for content)
 - **Suggested edits** on existing published articles, reviewer-side rendered diff, full revision history per article
+- **Patch notes**, mirrored automatically from the [official Tyr patch notes](https://www.playtyr.com/patch-notes) — a scheduled sync scrapes the official site, renders each note through the same sanitizer as community content, and links every note back to the original. Nobody uploads patch notes by hand
 - **Role gradient**: User / Reviewer (`contributor`) / Admin — admins manage roles, reviewers moderate content
 - **Community events**: a public events calendar at `/community/events`, authored from the "My Events" panel on the profile page (`/settings`) — reviewers and admins post events directly, signed-in users submit events into a moderation queue at `/admin/events`; submitters can edit their events, with regular-user edits going back through review
 - **Community links**: the Discord / fan-site / tool directory on `/community`, curated by admins at `/admin/community-links` — grouped, reordered, and https-only; falls back to a built-in list when Supabase isn't configured
@@ -100,6 +101,8 @@ The site can run in a reduced read-only mode without Supabase, but auth, builds,
 | `SUPABASE_SERVICE_ROLE_KEY` | For the contribution system, API key management, and the migration script | Service-role key used by server-only code paths that bypass RLS |
 | `PUBLIC_SITE_URL` | Optional | Canonical public site origin used for auth redirects, share links, and canonical metadata |
 | `PUBLIC_REPO_URL` | Optional | Public source repository URL surfaced in the footer |
+| `CRON_SECRET` | For the scheduled patch note sync | Shared secret for `/api/cron/patch-notes`. Vercel Cron sends it as `Authorization: Bearer …`; unset, the route refuses to run |
+| `PATCH_NOTES_SOURCE_ORIGIN` | Optional | Origin the patch note sync scrapes. Defaults to `https://www.playtyr.com` |
 
 Behavior by configuration:
 
@@ -131,6 +134,7 @@ Current migration set:
 - `016_community_events.sql` — `community_events` table and RLS policies backing the community events calendar and its moderation queue
 - `017_tank_and_build_notes.sql` — `builds.notes` / `builds.notes_html` columns and the private `tank_notes` table
 - `018_community_links.sql` — `community_link_groups` and `community_links` tables (publicly readable, service-role writes) backing the admin-curated link directory on `/community`; seeds the groups that were previously hardcoded
+- `019_patch_note_sync.sql` — provenance columns on `articles` (`source`, `source_key`, `source_url`, `source_hash`, `source_updated_at`, `source_synced_at`) plus a partial unique index, so patch notes mirrored from the official site are idempotent and never collide with hand-authored rows
 
 This repository does not include a local Supabase CLI project config, so apply these migrations using your preferred Supabase workflow.
 
@@ -178,10 +182,58 @@ npm run sync:data
 ## Content
 
 - Articles and guides live in the Supabase `articles` table; author them via the in-site editor at `/contribute/new`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full flow.
+- Patch notes live in the same table (`type = 'patch'`) but are **not** authored here — they are mirrored from the official site. See [Patch Notes](#patch-notes) below.
 - Editor body content uses [`remark-directive`](https://github.com/remarkjs/remark-directive) shortcodes for embeds: `::youtube{id="…"}` for YouTube videos and `:::callout{type="info|warning|tip"} … :::` for styled callout boxes. Anything else outside the safe-HTML allowlist is rejected at submission time by `src/lib/server/content-sanitize.ts`.
 - Home-page sections still use markdown-in-repo (`src/content/home/*.md`) and the mdsvex pipeline.
 - Shared navigation and site copy live in `src/lib/content/site.ts`.
 - Core shell styling lives in `src/app.css`; the design system is documented in [DESIGN.md](./DESIGN.md).
+
+## Patch Notes
+
+Patch notes are mirrored from <https://www.playtyr.com/patch-notes> rather than
+uploaded. The pieces:
+
+| File | Role |
+| --- | --- |
+| `src/lib/server/patch-notes-source.ts` | Reads the official site. Prefers the SvelteKit loader payload at `<route>/__data.json` (which hands us each note's markdown and real timestamps) and falls back to parsing the rendered HTML |
+| `src/lib/server/patch-notes-sync.ts` | Turns a scrape into `articles` rows: hash-gated so unchanged notes cost no writes, never overwrites a hand-authored row, and appends an `article_revisions` entry whenever upstream changes |
+| `src/lib/server/patch-notes-runner.ts` | Shared entry point; keeps concurrent runs to one |
+| `src/lib/server/patch-notes-cron.ts` | Shared body of the two scheduled routes, authorised by `CRON_SECRET` |
+| `src/routes/api/cron/patch-notes/+server.ts` | Hourly run — newest index page only |
+| `src/routes/api/cron/patch-notes/full/+server.ts` | Daily run — walks the whole archive, so upstream corrections to older notes are picked up |
+| `src/routes/api/admin/patch-notes/sync/+server.ts` | Manual run behind the buttons on `/admin/articles` |
+
+Behaviour worth knowing:
+
+- Two schedules, both in `vercel.json`: hourly over the newest index page
+  (which always covers a new release plus a same-day hotfix), and daily over
+  the whole archive so an upstream correction to an older note isn't missed.
+  **Backfill archive** on `/admin/articles` does the full walk on demand — run
+  it once after deploying.
+- Mirrored notes render through a dedicated pipeline in
+  `content-sanitize.ts` (`sanitizeMirroredBody`): no custom directives, because
+  official copy isn't written against our shortcode syntax, and images are
+  filtered against an allow-list of official origins rather than rejected, so
+  one odd image can't cost us the note.
+- **Withdrawing a mirrored note keeps it withdrawn.** Syncs never reset
+  `status`; only the first insert publishes.
+- Suggested edits are refused on patch notes — the next sync would overwrite
+  them. Corrections belong upstream.
+- A note whose slug collides with a hand-authored patch note is skipped and
+  reported, unless the slug matches exactly, in which case the mirror adopts
+  the existing row (keeping its URL and stars). The sync report on
+  `/admin/articles` lists every skip with its reason.
+
+To trigger a sync by hand:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<host>/api/cron/patch-notes?full=1"
+```
+
+`PATCH_NOTES_LIVE_TEST=1 npm test` additionally runs one opt-in check against
+the live official site — the quickest way to find out that upstream changed
+shape.
 
 ## Roles
 

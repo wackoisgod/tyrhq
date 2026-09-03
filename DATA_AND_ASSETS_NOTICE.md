@@ -15,6 +15,7 @@ The MIT license does not apply to Tyr-related data, branding, images, models, fo
 - checked into this repository directly
 - pulled in through an official Stoke Games submodule
 - generated from Stoke-owned source data
+- fetched at runtime from an official Stoke Games site
 
 Examples include:
 
@@ -24,6 +25,15 @@ Examples include:
 - `static/models/**`
 
 It also does not grant any trademark rights in the Tyr name, logos, or Stoke Games branding.
+
+## Mirrored Patch Notes
+
+Patch notes shown under `/patch-notes` are not written here. They are fetched
+at runtime from the official Tyr site (<https://www.playtyr.com/patch-notes>)
+and stored so the site can render them, with attribution and a link back to the
+original on every note. Their text and any embedded screenshots remain the
+property of Stoke Games; the MIT license covers only the code that fetches and
+renders them (`src/lib/server/patch-notes-*.ts`).
 
 ## Rights Status
 

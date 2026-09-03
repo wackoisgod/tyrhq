@@ -14,7 +14,8 @@
 		backLabel,
 		headerActions,
 		footer,
-		banner
+		banner,
+		sourceLabel = 'the original'
 	}: {
 		type: 'guide' | 'article' | 'patch';
 		article: {
@@ -28,7 +29,14 @@
 			isNew?: boolean;
 			isPinned?: boolean;
 			version?: string | null;
+			/**
+			 * Set for content we mirror rather than author (patch notes). Renders
+			 * an attribution link back to the original.
+			 */
+			sourceUrl?: string | null;
 		};
+		/** Link text for the `sourceUrl` attribution line. */
+		sourceLabel?: string;
 		vehicles?: Vehicle[];
 		backHref: string;
 		backLabel: string;
@@ -126,6 +134,18 @@
 				</h1>
 				{#if article.authorDisplay}
 					<p class="mt-2 text-sm text-[var(--hud-dim)]">By {article.authorDisplay}</p>
+				{/if}
+				{#if article.sourceUrl}
+					<p class="mt-1 text-xs text-[var(--hud-muted)]">
+						Mirrored from
+						<a
+							href={article.sourceUrl}
+							target="_blank"
+							rel="noreferrer"
+							class="text-[var(--hud-teal)] underline decoration-dotted underline-offset-2 hover:text-[var(--hud-lime)]"
+							>{sourceLabel}</a
+						>
+					</p>
 				{/if}
 			</div>
 			{#if headerActions}

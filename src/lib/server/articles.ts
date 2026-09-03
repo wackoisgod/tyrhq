@@ -4,6 +4,7 @@ import { isRecentlyPublished } from '$lib/utils/article-recency';
 import { renderGameStatRefs } from './game-data-refs';
 
 export type ArticleType = 'guide' | 'article' | 'patch';
+export type ArticleSource = 'local' | 'official';
 
 export interface ArticleSummary {
 	id: string;
@@ -24,6 +25,14 @@ export interface ArticleSummary {
 	heroImageUrl: string | null;
 	version: string | null;
 	isPinned: boolean;
+	/**
+	 * 'local' for anything authored here through the contribution pipeline,
+	 * 'official' for a patch note mirrored from playtyr.com. See
+	 * patch-notes-sync.ts.
+	 */
+	source: ArticleSource;
+	/** Canonical upstream page, for attribution. Null for local articles. */
+	sourceUrl: string | null;
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -61,22 +70,33 @@ interface ArticleRow {
 	hero_image_url: string | null;
 	version: string | null;
 	is_pinned?: boolean | null;
+	source?: string | null;
+	source_url?: string | null;
 }
 
 const SUMMARY_COLUMNS_BASE =
 	'id, type, slug, title, summary, author_display, author_user_id, author_profile:profiles(display_name), tags, vehicle_slugs, star_count, published_at, updated_at, flyout_section, flyout_order, hero_image_url, version';
-const SUMMARY_COLUMNS = `${SUMMARY_COLUMNS_BASE}, is_pinned`;
+const SUMMARY_COLUMNS = `${SUMMARY_COLUMNS_BASE}, is_pinned, source, source_url`;
 const DETAIL_COLUMNS_BASE = `${SUMMARY_COLUMNS_BASE}, body_markdown, body_html, current_revision_id`;
 const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, body_markdown, body_html, current_revision_id`;
 
-function isMissingPinnedColumn(error: { code?: string; message?: string } | null): boolean {
-	return Boolean(error && error.code === '42703' && error.message?.includes('is_pinned'));
+// Columns added by later migrations (014 pinned guides, 019 patch note sync).
+// Reads retry against SUMMARY_COLUMNS_BASE when the database predates them, so
+// a deploy that lands before its migration degrades to the old shape instead of
+// serving an error page.
+const OPTIONAL_COLUMNS = ['is_pinned', 'source', 'source_url'];
+
+function isMissingOptionalColumn(error: { code?: string; message?: string } | null): boolean {
+	if (!error || error.code !== '42703') return false;
+	return OPTIONAL_COLUMNS.some((column) => error.message?.includes(column));
 }
 
-function withPinnedDefault(row: ArticleRow): ArticleRow {
+function withOptionalDefaults(row: ArticleRow): ArticleRow {
 	return {
 		...row,
-		is_pinned: row.is_pinned ?? false
+		is_pinned: row.is_pinned ?? false,
+		source: row.source ?? 'local',
+		source_url: row.source_url ?? null
 	};
 }
 
@@ -106,7 +126,9 @@ function summaryFromRow(row: ArticleRow): ArticleSummary {
 		flyoutOrder: row.flyout_order,
 		heroImageUrl: row.hero_image_url,
 		version: row.version,
-		isPinned: row.is_pinned ?? false
+		isPinned: row.is_pinned ?? false,
+		source: row.source === 'official' ? 'official' : 'local',
+		sourceUrl: row.source_url ?? null
 	};
 }
 
@@ -147,7 +169,7 @@ export async function listPublishedArticles(type: ArticleType): Promise<ArticleS
 	data = result.data as ArticleRow[] | null;
 	error = result.error;
 
-	if (isMissingPinnedColumn(error)) {
+	if (isMissingOptionalColumn(error)) {
 		const legacy = await admin
 			.from('articles')
 			.select(SUMMARY_COLUMNS_BASE)
@@ -163,7 +185,7 @@ export async function listPublishedArticles(type: ArticleType): Promise<ArticleS
 		return [];
 	}
 
-	return (data ?? []).map(withPinnedDefault).map(summaryFromRow);
+	return (data ?? []).map(withOptionalDefaults).map(summaryFromRow);
 }
 
 export async function getPublishedArticle(
@@ -186,7 +208,7 @@ export async function getPublishedArticle(
 	data = result.data;
 	error = result.error;
 
-	if (isMissingPinnedColumn(error)) {
+	if (isMissingOptionalColumn(error)) {
 		const legacy = await admin
 			.from('articles')
 			.select(DETAIL_COLUMNS_BASE)
@@ -203,7 +225,7 @@ export async function getPublishedArticle(
 		return null;
 	}
 
-	return data ? detailFromRow(withPinnedDefault(data)) : null;
+	return data ? detailFromRow(withOptionalDefaults(data)) : null;
 }
 
 export interface WithdrawnArticleStub {
@@ -218,7 +240,7 @@ export interface WithdrawnArticleStub {
  * Gone notice, a missing slug stays a 404. Withdrawal is reversible (see
  * restoreArticle) so the row still exists — it just isn't served by
  * getPublishedArticle. Only the fields needed for the notice are selected, so
- * there's no is_pinned legacy-column fallback to worry about.
+ * there's no optional-column fallback to worry about.
  */
 export async function getWithdrawnArticle(
 	type: ArticleType,
@@ -255,7 +277,7 @@ export async function getArticleByIdForReview(id: string): Promise<ArticleDetail
 	data = result.data;
 	error = result.error;
 
-	if (isMissingPinnedColumn(error)) {
+	if (isMissingOptionalColumn(error)) {
 		const legacy = await admin
 			.from('articles')
 			.select(DETAIL_COLUMNS_BASE)
@@ -268,7 +290,7 @@ export async function getArticleByIdForReview(id: string): Promise<ArticleDetail
 		console.error('[articles] getArticleByIdForReview failed', error);
 		return null;
 	}
-	return data ? detailFromRow(withPinnedDefault(data)) : null;
+	return data ? detailFromRow(withOptionalDefaults(data)) : null;
 }
 
 export interface ArticleAdminRow extends ArticleSummary {
@@ -292,7 +314,7 @@ export async function listAllArticlesForAdmin(): Promise<ArticleAdminRow[]> {
 	data = result.data as ArticleAdminRawRow[] | null;
 	error = result.error;
 
-	if (isMissingPinnedColumn(error)) {
+	if (isMissingOptionalColumn(error)) {
 		const legacy = await admin
 			.from('articles')
 			.select(`${SUMMARY_COLUMNS_BASE}, status`)
@@ -305,7 +327,7 @@ export async function listAllArticlesForAdmin(): Promise<ArticleAdminRow[]> {
 		return [];
 	}
 	return (data ?? []).map((row) => ({
-		...summaryFromRow(withPinnedDefault(row)),
+		...summaryFromRow(withOptionalDefaults(row)),
 		status: row.status
 	}));
 }

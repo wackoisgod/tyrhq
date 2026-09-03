@@ -7,7 +7,9 @@ import {
 	computeContentHash,
 	assertBodyLength,
 	assertHeroImageUrl,
-	BODY_MIN_CHARS
+	BODY_MIN_CHARS,
+	isAllowedMirrorImage,
+	sanitizeMirroredBody
 } from './content-sanitize';
 
 // Tests that exercise image rules pass an explicit prefix so they don't
@@ -356,5 +358,98 @@ describe('computeContentHash with hero image', () => {
 		const a = computeContentHash(fm, '<p>x</p>', null);
 		const b = computeContentHash(fm, '<p>x</p>', `${TEST_IMAGE_PREFIX}h.png`);
 		expect(a).not.toBe(b);
+	});
+});
+
+/* ------------------------------------------------------------------ *
+ * Mirrored (scraped) patch note bodies
+ * ------------------------------------------------------------------ */
+
+const OFFICIAL_ORIGIN = 'https://www.playtyr.com';
+const OFFICIAL_MEDIA =
+	'https://wlzdlmjammxwiyodonbj.supabase.co/storage/v1/object/public/site-media/uploads/shot.png';
+
+describe('isAllowedMirrorImage', () => {
+	it('allows the configured official origin and public Supabase storage', () => {
+		expect(isAllowedMirrorImage(`${OFFICIAL_ORIGIN}/media/shot.png`, [OFFICIAL_ORIGIN])).toBe(
+			true
+		);
+		// The studio serves its site media from a Supabase bucket, which our CSP
+		// img-src already covers via the *.supabase.co wildcard.
+		expect(isAllowedMirrorImage(OFFICIAL_MEDIA, [])).toBe(true);
+	});
+
+	it('rejects hotlinks we would not vouch for', () => {
+		expect(isAllowedMirrorImage('https://i.imgur.com/x.png', [OFFICIAL_ORIGIN])).toBe(false);
+		expect(isAllowedMirrorImage('http://www.playtyr.com/x.png', [OFFICIAL_ORIGIN])).toBe(false);
+		expect(isAllowedMirrorImage('data:image/png;base64,AAAA', [OFFICIAL_ORIGIN])).toBe(false);
+		expect(isAllowedMirrorImage('/relative.png', [OFFICIAL_ORIGIN])).toBe(false);
+		// Right host family, wrong path — not a public storage object.
+		expect(
+			isAllowedMirrorImage('https://evil.supabase.co/rest/v1/steal', [OFFICIAL_ORIGIN])
+		).toBe(false);
+	});
+});
+
+describe('sanitizeMirroredBody', () => {
+	const options = { allowedImageOrigins: [OFFICIAL_ORIGIN] };
+
+	it('renders official markdown with heading ids for the table of contents', async () => {
+		const { html } = await sanitizeMirroredBody(
+			{ format: 'markdown', content: '## Bug Fixes\n\n- Fixed a **thing**\n' },
+			options
+		);
+		expect(html).toContain('<h2 id="bug-fixes">Bug Fixes</h2>');
+		expect(html).toContain('<strong>thing</strong>');
+	});
+
+	it('passes directive-looking official copy through as plain text', async () => {
+		// The community pipeline would reject these as unknown directives. Official
+		// copy is not written against our syntax, so a stray colon must not cost us
+		// the whole note.
+		const { html } = await sanitizeMirroredBody(
+			{ format: 'markdown', content: 'Ammo type :AP now reloads faster.\n\n::: notes\n' },
+			options
+		);
+		expect(html).toContain(':AP');
+		expect(html).toContain('::: notes');
+	});
+
+	it('keeps official images and drops hotlinks to anywhere else', async () => {
+		const { html } = await sanitizeMirroredBody(
+			{
+				format: 'markdown',
+				content: `![shot](${OFFICIAL_MEDIA})\n\n![bad](https://i.imgur.com/x.png)\n`
+			},
+			options
+		);
+		expect(html).toContain(`src="${OFFICIAL_MEDIA}"`);
+		expect(html).toContain('loading="lazy"');
+		expect(html).not.toContain('imgur');
+	});
+
+	it('strips scripts and event handlers from an upstream HTML body', async () => {
+		const { html } = await sanitizeMirroredBody(
+			{
+				format: 'html',
+				content:
+					'<h2>Fixes</h2><p onclick="steal()">safe</p><script>evil()</script><iframe src="https://evil.test"></iframe>'
+			},
+			options
+		);
+		expect(html).toContain('<h2 id="fixes">Fixes</h2>');
+		expect(html).toContain('safe');
+		expect(html).not.toContain('onclick');
+		expect(html).not.toContain('<script');
+		expect(html).not.toContain('<iframe');
+	});
+
+	it('renders GitHub-flavoured tables the official notes may use', async () => {
+		const { html } = await sanitizeMirroredBody(
+			{ format: 'markdown', content: '| Tank | HP |\n| --- | --- |\n| Atlas | 100 |\n' },
+			options
+		);
+		expect(html).toContain('<table>');
+		expect(html).toContain('<td>Atlas</td>');
 	});
 });

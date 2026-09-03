@@ -37,6 +37,11 @@
 	let id = $state(submission?.id ?? '');
 	/* svelte-ignore state_referenced_locally */
 	let type = $state<'guide' | 'article' | 'patch'>(submission?.type ?? defaultType);
+
+	// True only when editing a draft that was already a patch note. Patch notes
+	// are mirrored from the official site (see patch-notes-sync.ts), so the
+	// option is otherwise hidden.
+	const isExistingPatchDraft = $derived(submission?.type === 'patch');
 	/* svelte-ignore state_referenced_locally */
 	let title = $state(submission?.title ?? '');
 	/* svelte-ignore state_referenced_locally */
@@ -333,11 +338,29 @@
 				<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
 					<input type="radio" bind:group={type} name="type" value="article" /> Article
 				</label>
-				<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
-					<input type="radio" bind:group={type} name="type" value="patch" /> Patch Notes
-				</label>
+				{#if isExistingPatchDraft}
+					<!-- Patch notes are mirrored from the official site now, so this
+					     option only exists to keep a draft that predates the switch
+					     editable. New patch notes cannot be started here. -->
+					<label class="flex items-center gap-2 text-sm text-[var(--hud-text)]">
+						<input type="radio" bind:group={type} name="type" value="patch" /> Patch Notes
+					</label>
+				{/if}
 			</div>
 		</fieldset>
+
+		{#if isExistingPatchDraft}
+			<p class="text-xs leading-5 text-[var(--hud-muted)]">
+				Patch notes are now synced automatically from the
+				<a
+					href="https://www.playtyr.com/patch-notes"
+					target="_blank"
+					rel="noreferrer"
+					class="text-[var(--hud-teal)] underline">official Tyr patch notes</a
+				>. This draft was started before that change; new patch notes can no longer be
+				uploaded.
+			</p>
+		{/if}
 
 		{#if type === 'patch'}
 			<div class="grid gap-3 md:grid-cols-[150px_1fr]">

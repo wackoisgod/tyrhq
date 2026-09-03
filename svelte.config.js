@@ -65,7 +65,28 @@ function supabaseCspSources() {
 	return sources;
 }
 
+/**
+ * Mirrored patch notes keep the studio's own screenshots hotlinked back to the
+ * official site (see src/lib/server/patch-notes-sync.ts), so that origin has to
+ * be in img-src or the images silently fail to load. Derived from
+ * PATCH_NOTES_SOURCE_ORIGIN at build time so a staging mirror works too; the
+ * Supabase bucket they serve most media from is already covered by the
+ * *.supabase.co wildcard.
+ */
+function patchNotesImageSources() {
+	const configured = process.env.PATCH_NOTES_SOURCE_ORIGIN?.trim() || 'https://www.playtyr.com';
+	try {
+		return [new URL(configured).origin];
+	} catch {
+		console.warn(
+			`svelte.config.js: PATCH_NOTES_SOURCE_ORIGIN is not a valid URL: ${configured}`
+		);
+		return [];
+	}
+}
+
 const supabaseSources = supabaseCspSources();
+const patchNoteSources = patchNotesImageSources();
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -93,7 +114,14 @@ const config = {
 				'form-action': ['self'],
 				'frame-ancestors': ['none'],
 				'frame-src': ['self', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
-				'img-src': ['self', 'blob:', 'data:', 'https://*.ytimg.com', ...supabaseSources],
+				'img-src': [
+					'self',
+					'blob:',
+					'data:',
+					'https://*.ytimg.com',
+					...supabaseSources,
+					...patchNoteSources
+				],
 				'manifest-src': ['self'],
 				'object-src': ['none'],
 				'script-src': ['self', 'wasm-unsafe-eval'],

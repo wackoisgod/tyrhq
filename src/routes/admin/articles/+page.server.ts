@@ -1,6 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { listAllArticlesForAdmin } from '$lib/server/articles';
+import { PATCH_NOTES_PATH, resolvePatchNotesOrigin } from '$lib/server/patch-notes-source';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const { session, user, role } = await locals.safeGetSession();
@@ -12,5 +13,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	const articles = await listAllArticlesForAdmin();
-	return { articles };
+	return {
+		articles,
+		officialPatchNotesUrl: `${resolvePatchNotesOrigin()}${PATCH_NOTES_PATH}`
+	};
 };

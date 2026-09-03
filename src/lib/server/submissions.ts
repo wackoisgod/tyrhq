@@ -283,6 +283,17 @@ export async function createDraftSubmission(
 	input: SubmissionDraftInput
 ): Promise<SubmissionRecord> {
 	const admin = requireAdmin();
+
+	// Patch notes are mirrored from the official site (see patch-notes-sync.ts),
+	// not uploaded. Existing patch drafts stay editable so nothing in flight is
+	// stranded, but there is no route to start a new one.
+	if (input.type === 'patch') {
+		throw new SubmissionStateError(
+			'Patch notes are synced from the official Tyr site and can no longer be uploaded here.',
+			409
+		);
+	}
+
 	const sanitized = await sanitizeSubmissionInput(input, { enforceLength: false });
 
 	const { data, error } = await admin
@@ -925,6 +936,14 @@ export async function createSuggestedEditFromArticle(
 			409
 		);
 	}
+	// Patch notes now mirror the official site, so any suggested edit would be
+	// overwritten by the next sync. Corrections belong upstream.
+	if (article.type === 'patch') {
+		throw new SubmissionStateError(
+			'Patch notes are synced from the official Tyr site, so they cannot be edited here.',
+			409
+		);
+	}
 
 	// If the user already has an open suggested-edit draft for this article,
 	// hand them back the same row instead of duplicating.
@@ -974,7 +993,9 @@ export async function createSuggestedEditFromArticle(
 			status: 'draft',
 			flyout_section: article.flyout_section,
 			hero_image_url: sanitized.heroImageUrl,
-			version: article.type === 'patch' ? sanitized.frontmatter.version : null
+			// Only guides and articles reach here — patch notes are mirrored and
+			// rejected above — and neither carries a version label.
+			version: null
 		})
 		.select(SUBMISSION_COLUMNS)
 		.single<SubmissionRecord>();

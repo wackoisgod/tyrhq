@@ -12,6 +12,65 @@
 
 	let busyId = $state<string | null>(null);
 	let actionError = $state('');
+
+	// Patch note sync. The scheduled run (see /api/cron/patch-notes) covers the
+	// normal case; these buttons exist to backfill the archive and to re-pull
+	// after upstream corrects a note.
+	let syncing = $state(false);
+	let syncSummary = $state('');
+	let syncProblems = $state<Array<{ note: string; outcome: string; reason?: string }>>([]);
+
+	async function syncPatchNotes(mode: 'latest' | 'full') {
+		if (syncing) return;
+		syncing = true;
+		actionError = '';
+		syncSummary = '';
+		syncProblems = [];
+		try {
+			const res = await fetch('/api/admin/patch-notes/sync', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ full: mode === 'full' })
+			});
+			if (!res.ok) {
+				actionError = await readErrorMessage(res);
+				return;
+			}
+			const { report } = await res.json();
+			syncSummary =
+				`Checked ${report.checked} · created ${report.created} · updated ${report.updated} · ` +
+				`adopted ${report.adopted} · unchanged ${report.unchanged} · skipped ${report.skipped} · ` +
+				`failed ${report.failed}`;
+			syncProblems = (report.entries ?? [])
+				.filter(
+					(entry: { outcome: string }) =>
+						entry.outcome === 'failed' || entry.outcome === 'skipped'
+				)
+				.map((entry: { sourceKey: string; outcome: string; reason?: string }) => ({
+					note: entry.sourceKey,
+					outcome: entry.outcome,
+					reason: entry.reason
+				}));
+			await invalidateAll();
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Patch note sync failed.';
+		} finally {
+			syncing = false;
+		}
+	}
+
+	// SvelteKit's error() serialises to {"message": "..."} — unwrap it so the
+	// admin sees the message, not raw JSON.
+	async function readErrorMessage(res: Response): Promise<string> {
+		const text = await res.text();
+		try {
+			const parsed = JSON.parse(text);
+			if (parsed && typeof parsed.message === 'string') return parsed.message;
+		} catch {
+			// plain-text error body
+		}
+		return text || `Request failed (${res.status})`;
+	}
 	// Per-row pending edits; keyed by article id. Only synced to the server
 	// when the admin clicks Save.
 	let sectionEdits = $state<Record<string, FlyoutSection | ''>>({});
@@ -170,9 +229,62 @@
 		All articles
 	</h1>
 	<p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
-		Every guide and article in any status. Use Withdraw to take a row offline (it 404s for
-		readers but stays in the database); Restore brings it back to Published.
+		Every guide, article and patch note in any status. Use Withdraw to take a row offline (it
+		404s for readers but stays in the database); Restore brings it back to Published. A
+		withdrawn patch note stays withdrawn across syncs.
 	</p>
+
+	<div
+		class="mt-6 rounded-sm bg-[var(--hud-panel)] p-5"
+		style="box-shadow: var(--hud-surface-ghost);"
+	>
+		<h2
+			class="font-[var(--font-display)] text-sm font-semibold uppercase tracking-[0.18em] text-[var(--hud-text)]"
+		>
+			Patch note sync
+		</h2>
+		<p class="mt-2 max-w-2xl text-sm leading-6 text-[var(--hud-muted)]">
+			Patch notes are mirrored from the
+			<a
+				href={data.officialPatchNotesUrl}
+				target="_blank"
+				rel="noreferrer"
+				class="text-[var(--hud-teal)] underline decoration-dotted underline-offset-2"
+				>official Tyr patch notes</a
+			> on a schedule. Run it by hand to pick up a release early, or backfill the whole archive.
+		</p>
+		<div class="mt-4 flex flex-wrap items-center gap-2">
+			<button
+				type="button"
+				onclick={() => syncPatchNotes('latest')}
+				disabled={syncing}
+				class="hud-cta-ghost px-4 py-2 text-xs disabled:opacity-50"
+			>
+				{syncing ? 'Syncing…' : 'Sync latest'}
+			</button>
+			<button
+				type="button"
+				onclick={() => syncPatchNotes('full')}
+				disabled={syncing}
+				class="hud-cta-ghost px-4 py-2 text-xs disabled:opacity-50"
+			>
+				Backfill archive
+			</button>
+		</div>
+		{#if syncSummary}
+			<p class="mt-3 font-mono text-xs text-[var(--hud-muted)]">{syncSummary}</p>
+		{/if}
+		{#if syncProblems.length}
+			<ul class="mt-2 flex flex-col gap-1">
+				{#each syncProblems as problem}
+					<li class="text-xs text-[var(--hud-lime)]">
+						<span class="font-mono">{problem.note}</span>
+						— {problem.outcome}{problem.reason ? `: ${problem.reason}` : ''}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</div>
 
 	{#if actionError}
 		<p
@@ -207,6 +319,14 @@
 						>
 							{article.type}
 						</span>
+						{#if article.source === 'official'}
+							<span
+								class="rounded-sm bg-[var(--hud-inset)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--hud-dim)]"
+								title="Mirrored from the official Tyr site — edits here are overwritten by the next sync"
+							>
+								Official mirror
+							</span>
+						{/if}
 						<span class="text-xs text-[var(--hud-dim)]">
 							Updated {new Date(article.updatedAt).toLocaleDateString()}
 						</span>

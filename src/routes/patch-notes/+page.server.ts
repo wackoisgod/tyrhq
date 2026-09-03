@@ -1,4 +1,5 @@
 import { listPublishedArticles } from '$lib/server/articles';
+import { PATCH_NOTES_PATH, resolvePatchNotesOrigin } from '$lib/server/patch-notes-source';
 import { compareVersionsDesc } from '$lib/utils/version';
 
 export async function load({ setHeaders }) {
@@ -15,5 +16,10 @@ export async function load({ setHeaders }) {
 		if (cmp !== 0) return cmp;
 		return b.publishedAt.localeCompare(a.publishedAt);
 	});
-	return { patches };
+
+	// Where these notes come from. Read from the same resolver the sync uses so
+	// the attribution link always points at whatever we actually mirrored.
+	const officialUrl = `${resolvePatchNotesOrigin()}${PATCH_NOTES_PATH}`;
+
+	return { patches, officialUrl };
 }
