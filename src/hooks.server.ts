@@ -5,18 +5,58 @@ import { env } from '$env/dynamic/public';
 import { getConfiguredSiteOrigin } from '$lib/site-url';
 import { applySecurityHeaders, isAuthCallbackPath } from '$lib/server/security';
 
+/**
+ * TEMPORARY diagnostic: Vercel's runtime-log export omits client IP,
+ * user-agent and referer, which is exactly what we need to tell real
+ * client-router traffic from a scraper hitting `__data.json` directly.
+ * Emit one structured line per data request so the logs can be filtered
+ * on `[data-request]`. `x-sveltekit-invalidated` is only set by the real
+ * SvelteKit client router; its absence is a cheap bot tell.
+ * Remove once the traffic investigation is done.
+ */
+function logDataRequest(event: Parameters<Handle>[0]['event'], status: number, startedAt: number) {
+	if (!event.url.pathname.endsWith('/__data.json')) return;
+
+	let ip = 'unknown';
+	try {
+		ip = event.getClientAddress();
+	} catch {
+		// Not available in every runtime (e.g. prerender); keep going.
+	}
+
+	const headers = event.request.headers;
+	console.log(
+		'[data-request]',
+		JSON.stringify({
+			ip,
+			forwardedFor: headers.get('x-forwarded-for'),
+			path: event.url.pathname,
+			query: event.url.search || undefined,
+			status,
+			durationMs: Date.now() - startedAt,
+			userAgent: headers.get('user-agent'),
+			referer: headers.get('referer'),
+			invalidated: headers.get('x-sveltekit-invalidated'),
+			hasAuthCookie: event.cookies.getAll().some((c) => c.name.startsWith('sb-'))
+		})
+	);
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	const startedAt = Date.now();
 	const supabaseUrl = env.PUBLIC_SUPABASE_URL;
 	const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 	const configuredSiteOrigin = getConfiguredSiteOrigin();
 	let hasAuthenticatedSession = false;
 	const authCookieHeaders: Record<string, string> = {};
 
-	const finalizeResponse = (response: Response) =>
-		applySecurityHeaders(response, event.url, {
+	const finalizeResponse = (response: Response) => {
+		logDataRequest(event, response.status, startedAt);
+		return applySecurityHeaders(response, event.url, {
 			privateCache: hasAuthenticatedSession || Object.keys(authCookieHeaders).length > 0,
 			extraHeaders: authCookieHeaders
 		});
+	};
 
 	if (configuredSiteOrigin) {
 		const configuredSiteUrl = new URL(configuredSiteOrigin);
