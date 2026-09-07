@@ -25,7 +25,10 @@ function logDataRequest(event: Parameters<Handle>[0]['event'], status: number, s
 	}
 
 	const headers = event.request.headers;
-	console.log(
+	// stderr on purpose: Vercel's dashboard did not surface stdout lines from
+	// the preview deployment, while its own runtime writes error-level lines
+	// that do show up.
+	console.error(
 		'[data-request]',
 		JSON.stringify({
 			ip,
