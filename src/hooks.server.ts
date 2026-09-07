@@ -11,10 +11,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const configuredSiteOrigin = getConfiguredSiteOrigin();
 	let hasAuthenticatedSession = false;
 	const authCookieHeaders: Record<string, string> = {};
+	// Any request carrying a Supabase auth cookie is treated as private even
+	// if no load on this request consulted the session (e.g. a page-only
+	// `__data.json` for a route whose load is fully public). Signed-in
+	// visitors therefore never read from or write to the CDN cache.
+	const hasAuthCookie = event.cookies.getAll().some((cookie) => cookie.name.startsWith('sb-'));
 
 	const finalizeResponse = (response: Response) =>
 		applySecurityHeaders(response, event.url, {
-			privateCache: hasAuthenticatedSession || Object.keys(authCookieHeaders).length > 0,
+			privateCache:
+				hasAuthCookie || hasAuthenticatedSession || Object.keys(authCookieHeaders).length > 0,
 			extraHeaders: authCookieHeaders
 		});
 
