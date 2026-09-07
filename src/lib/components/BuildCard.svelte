@@ -5,7 +5,7 @@
 	let { build }: { build: BuildCardData } = $props();
 </script>
 
-<a href="/builds/{build.slug}" class="tyr-build-card group">
+<a href="/tools/builds?slug={build.slug}" class="tyr-build-card group">
 	<FallbackImage
 		src="/images/vehicles/{build.vehicleId}.png"
 		alt=""

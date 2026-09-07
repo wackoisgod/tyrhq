@@ -53,6 +53,11 @@ export function applyPrivateCacheHeaders(response: Response) {
 	return response;
 }
 
+function isCdnCacheable(response: Response) {
+	const cacheControl = response.headers.get('Cache-Control') ?? '';
+	return /\bs-maxage=/i.test(cacheControl) && !/\b(private|no-store)\b/i.test(cacheControl);
+}
+
 type SecurityHeaderOptions = {
 	privateCache?: boolean;
 	extraHeaders?: Record<string, string>;
@@ -74,6 +79,16 @@ export function applySecurityHeaders(
 
 	if (options.privateCache || response.headers.has('Set-Cookie')) {
 		applyPrivateCacheHeaders(response);
+	} else if (isCdnCacheable(response)) {
+		// A CDN-cached anonymous response must never be handed to a request
+		// carrying an auth cookie: the HTML embeds root-layout data (user,
+		// profile) and would render that visitor as signed out. Vercel keys
+		// its cache on Vary headers, so vary on Cookie. Data responses also
+		// differ by which loads the client asked to re-run.
+		appendVaryHeader(response, 'Cookie');
+		if (url.pathname.endsWith('/__data.json')) {
+			appendVaryHeader(response, 'x-sveltekit-invalidated');
+		}
 	}
 
 	if (url.protocol === 'https:' && !LOCALHOST_HOSTNAMES.has(url.hostname)) {
