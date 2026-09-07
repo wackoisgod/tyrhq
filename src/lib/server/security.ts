@@ -83,12 +83,10 @@ export function applySecurityHeaders(
 		// A CDN-cached anonymous response must never be handed to a request
 		// carrying an auth cookie: the HTML embeds root-layout data (user,
 		// profile) and would render that visitor as signed out. Vercel keys
-		// its cache on Vary headers, so vary on Cookie. Data responses also
-		// differ by which loads the client asked to re-run.
+		// its cache on Vary headers, so vary on Cookie. (SvelteKit sends the
+		// set of invalidated loads for `__data.json` as a query parameter,
+		// which is already part of the cache key, so nothing else is needed.)
 		appendVaryHeader(response, 'Cookie');
-		if (url.pathname.endsWith('/__data.json')) {
-			appendVaryHeader(response, 'x-sveltekit-invalidated');
-		}
 	}
 
 	if (url.protocol === 'https:' && !LOCALHOST_HOSTNAMES.has(url.hostname)) {

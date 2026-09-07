@@ -44,16 +44,6 @@ describe('applySecurityHeaders', () => {
 		expect(response.headers.get('vary')).toBe('Cookie');
 	});
 
-	it('also varies cacheable data responses on the SvelteKit invalidation header', () => {
-		const response = new Response('', {
-			headers: { 'cache-control': 'public, max-age=0, s-maxage=60' }
-		});
-
-		applySecurityHeaders(response, new URL('https://tyr.test/tools/tanks/atlas/__data.json'));
-
-		expect(response.headers.get('vary')).toBe('Cookie, x-sveltekit-invalidated');
-	});
-
 	it('does not add Vary to responses that are not CDN-cacheable', () => {
 		const response = new Response('');
 
