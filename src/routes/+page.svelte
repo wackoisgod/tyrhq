@@ -56,8 +56,8 @@
 <section class="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-10 pt-8 md:px-6 md:pb-12">
 	<div class="tyr-section-heading">
 		<div class="tyr-shell-accent">
-			<div class="tyr-shell-kicker">Early Access // September 2</div>
-			<h1 class="tyr-section-title">Launch Incoming</h1>
+			<div class="tyr-shell-kicker">Early Access // Live Now</div>
+			<h1 class="tyr-section-title">Tyr Is Live</h1>
 		</div>
 	</div>
 
@@ -76,7 +76,7 @@
 			class="tyr-signal-card__vehicle tyr-signal-card__media"
 		/>
 		<div class="tyr-signal-meta">
-			<span>Final Playtest</span>
+			<span>Early Access</span>
 			<span>//</span>
 			<span>Live Now</span>
 		</div>

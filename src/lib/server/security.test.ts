@@ -34,6 +34,24 @@ describe('applySecurityHeaders', () => {
 		expect(response.headers.get('x-frame-options')).toBe('DENY');
 	});
 
+	it('varies CDN-cacheable anonymous responses on Cookie', () => {
+		const response = new Response('', {
+			headers: { 'cache-control': 'public, max-age=0, s-maxage=60' }
+		});
+
+		applySecurityHeaders(response, url);
+
+		expect(response.headers.get('vary')).toBe('Cookie');
+	});
+
+	it('does not add Vary to responses that are not CDN-cacheable', () => {
+		const response = new Response('');
+
+		applySecurityHeaders(response, url);
+
+		expect(response.headers.get('vary')).toBeNull();
+	});
+
 	it('prevents CDN caching for authenticated responses', () => {
 		const response = new Response('', {
 			headers: {

@@ -89,7 +89,9 @@ const config = {
 			runtime: 'nodejs22.x'
 		}),
 		csp: {
-			mode: 'auto',
+			// Hashes rather than nonces: server-rendered pages are CDN-cached,
+			// and a cached page would otherwise replay one nonce to everyone.
+			mode: 'hash',
 			directives: {
 				'base-uri': ['self'],
 				'connect-src': ['self', 'blob:', ...supabaseSources, 'ws:', 'wss:'],

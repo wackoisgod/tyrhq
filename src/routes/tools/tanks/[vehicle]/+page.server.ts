@@ -4,7 +4,18 @@ import { getGameDataBundle, getGameSnapshot } from '$lib/data/game-data';
 import { hasVehicleArmorAssets } from '$lib/server/game-assets';
 import { listPublishedArticles } from '$lib/server/articles';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+/**
+ * Everything this load returns is the same for every visitor, so the
+ * response is CDN-cacheable. The per-user notepad is fetched client-side
+ * from /api/tank-notes instead. Authenticated responses are still forced
+ * to `private, no-store` by the server hook, so only anonymous traffic is
+ * served from the cache.
+ */
+export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
+	setHeaders({
+		'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+	});
+
 	const snapshot = getGameSnapshot();
 	const bundle = getGameDataBundle();
 	const slugOrId = params.vehicle;
@@ -31,8 +42,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		};
 	});
 
-	// Fetch builds for this vehicle
-	let userBuildCount = 0;
+	// Public builds for this vehicle (same for every visitor)
 	let publicBuilds: Array<{
 		id: string;
 		slug: string;
@@ -43,30 +53,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		profiles: { display_name: string } | { display_name: string }[] | null;
 	}> = [];
 
-	let tankNote = '';
-
 	if (locals.supabase) {
-		const { user } = await locals.safeGetSession();
-
-		// Count user's builds for this vehicle (for summary card)
-		if (user) {
-			const { count } = await locals.supabase
-				.from('builds')
-				.select('id', { count: 'exact', head: true })
-				.eq('user_id', user.id)
-				.eq('vehicle_id', vehicle.id);
-			userBuildCount = count ?? 0;
-
-			const { data: noteRow } = await locals.supabase
-				.from('tank_notes')
-				.select('notes')
-				.eq('user_id', user.id)
-				.eq('vehicle_id', vehicle.id)
-				.maybeSingle();
-			tankNote = noteRow?.notes ?? '';
-		}
-
-		// Fetch all public builds for this vehicle
 		const { data: pubData } = await locals.supabase
 			.from('builds')
 			.select('id, slug, title, updated_at, star_count, selection, profiles(display_name)')
@@ -103,8 +90,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		tank,
 		nativeComponents,
 		armorAvailable: hasVehicleArmorAssets(vehicle.id),
-		userBuildCount,
-		tankNote,
 		publicBuilds,
 		componentNames,
 		ammoNames,

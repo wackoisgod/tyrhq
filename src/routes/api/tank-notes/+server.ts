@@ -8,14 +8,24 @@ function failTankNotesRequest(message: string, cause: unknown) {
 	return error(500, 'Tank notes are unavailable right now');
 }
 
-export const GET: RequestHandler = async ({ locals }) => {
+export const GET: RequestHandler = async ({ locals, url }) => {
 	const { session, user } = await locals.safeGetSession();
 	if (!session || !user) return error(401, 'Authentication required');
 
-	const { data, error: dbError } = await locals.supabase
+	let query = locals.supabase
 		.from('tank_notes')
 		.select('vehicle_id, notes, updated_at')
 		.eq('user_id', user.id);
+
+	// Optional `?vehicle=<id>` narrows the list to one tank (used by the
+	// tank page notepad, which loads its note client-side so the page
+	// itself stays CDN-cacheable)
+	const vehicleId = url.searchParams.get('vehicle');
+	if (vehicleId) {
+		query = query.eq('vehicle_id', vehicleId);
+	}
+
+	const { data, error: dbError } = await query;
 
 	if (dbError) return failTankNotesRequest('Failed to list tank notes', dbError);
 	return json(data);

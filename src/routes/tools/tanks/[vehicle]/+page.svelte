@@ -6,29 +6,57 @@
 
 	let { data } = $props();
 
-	// Personal tank notepad — seeded from the initial load on purpose; the
-	// effect below resyncs when navigation swaps in a different tank.
-	// svelte-ignore state_referenced_locally
-	let noteText = $state(data.tankNote ?? '');
-	// svelte-ignore state_referenced_locally
-	let savedNoteText = $state(data.tankNote ?? '');
-	// svelte-ignore state_referenced_locally
-	let noteVehicleId = $state(data.tank.id);
+	// Personal tank notepad. The note is fetched client-side rather than in
+	// the server load so the page response contains no per-user data and
+	// can be served from the CDN cache for anonymous visitors.
+	let noteText = $state('');
+	let savedNoteText = $state('');
+	let noteLoading = $state(false);
 	let noteSaving = $state(false);
 	let noteSaved = $state(false);
 	let noteError = $state<string | null>(null);
 	const noteDirty = $derived(noteText.trim() !== savedNoteText);
 
-	// Resync when client-side navigation lands on a different tank page
+	// (Re)load the note whenever the signed-in user or the tank changes.
+	// The token guards against a slow response for a previous tank landing
+	// after client-side navigation has already moved on.
+	let noteRequestToken = 0;
 	$effect(() => {
-		if (data.tank.id !== noteVehicleId) {
-			noteVehicleId = data.tank.id;
-			noteText = data.tankNote ?? '';
-			savedNoteText = data.tankNote ?? '';
-			noteSaving = false;
-			noteSaved = false;
-			noteError = null;
+		const vehicleId = data.tank.id;
+		const signedIn = !!data.user;
+		const token = ++noteRequestToken;
+
+		noteText = '';
+		savedNoteText = '';
+		noteSaving = false;
+		noteSaved = false;
+		noteError = null;
+
+		if (!signedIn) {
+			noteLoading = false;
+			return;
 		}
+
+		noteLoading = true;
+		fetch(`/api/tank-notes?vehicle=${encodeURIComponent(vehicleId)}`)
+			.then(async (res) => {
+				if (token !== noteRequestToken) return;
+				if (!res.ok) {
+					noteError = 'Could not load your notes.';
+					return;
+				}
+				const rows: Array<{ vehicle_id: string; notes: string }> = await res.json();
+				if (token !== noteRequestToken) return;
+				const note = rows.find((row) => row.vehicle_id === vehicleId)?.notes ?? '';
+				noteText = note;
+				savedNoteText = note;
+			})
+			.catch(() => {
+				if (token === noteRequestToken) noteError = 'Could not load your notes.';
+			})
+			.finally(() => {
+				if (token === noteRequestToken) noteLoading = false;
+			});
 	});
 
 	async function saveTankNote() {
@@ -285,6 +313,7 @@
 					bind:value={noteText}
 					maxlength={MAX_TANK_NOTES_LENGTH}
 					rows="5"
+					disabled={noteLoading}
 					placeholder="Playstyle reminders for {data.tank.name} — positioning, engagement ranges, what to do when your ability is down…"
 					class="mt-3 min-h-[8rem] w-full resize-y rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 text-sm leading-6 text-[var(--hud-text)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)] outline-none placeholder:text-[var(--hud-dim)] focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
 				></textarea>
@@ -305,10 +334,10 @@
 						{/if}
 						<button
 							class="hud-cta-ghost px-4 py-2 text-sm"
-							disabled={noteSaving || !noteDirty}
+							disabled={noteLoading || noteSaving || !noteDirty}
 							onclick={saveTankNote}
 						>
-							{noteSaving ? 'Saving…' : 'Save Notes'}
+							{noteLoading ? 'Loading…' : noteSaving ? 'Saving…' : 'Save Notes'}
 						</button>
 					</div>
 				</div>

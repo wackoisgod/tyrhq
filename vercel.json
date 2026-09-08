@@ -1,0 +1,10 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"redirects": [
+		{
+			"source": "/builds/:slug([a-z0-9]{8})",
+			"destination": "/tools/builds?slug=:slug",
+			"permanent": false
+		}
+	]
+}
