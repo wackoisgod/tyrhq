@@ -15,6 +15,8 @@
 --
 -- Synthetic auth rows exist only to satisfy profile foreign keys and are not
 -- login accounts. Sign in as aspiering@gmail.com to test organizer actions.
+-- To repair previously imported users without resetting tournament data, run
+-- repair_tournament_fixture_auth.sql instead of rerunning this fixture.
 
 begin;
 
@@ -59,6 +61,8 @@ begin
     -- Create 68 deterministic placeholder users. They intentionally have no
     -- password or auth identity, so Supabase will not treat them as sign-in
     -- accounts. The existing new-user trigger creates their profile rows.
+    -- GoTrue reads the token/change fields as strings, so explicitly use empty
+    -- strings: NULL values can break both individual user reads and listUsers.
     with fixture_users as (
         select
             n,
@@ -73,6 +77,14 @@ begin
         role,
         email,
         email_confirmed_at,
+        confirmation_token,
+        recovery_token,
+        email_change_token_current,
+        email_change_token_new,
+        email_change,
+        phone_change_token,
+        phone_change,
+        reauthentication_token,
         raw_app_meta_data,
         raw_user_meta_data,
         created_at,
@@ -85,6 +97,14 @@ begin
         'authenticated',
         email,
         now(),
+        '', -- confirmation_token
+        '', -- recovery_token
+        '', -- email_change_token_current
+        '', -- email_change_token_new
+        '', -- email_change
+        '', -- phone_change_token
+        '', -- phone_change
+        '', -- reauthentication_token
         '{"provider":"email","providers":["email"]}'::jsonb,
         jsonb_build_object('name', 'Tournament Test Player ' || lpad(n::text, 2, '0')),
         now(),

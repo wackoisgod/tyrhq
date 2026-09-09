@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { env } from '$env/dynamic/public';
-	import { getAbsoluteUrl } from '$lib/site-url';
+	import { getAuthCallbackUrl } from '$lib/site-url';
 	import { createBrowserClient } from '@supabase/ssr';
 	import { onMount } from 'svelte';
 
@@ -27,7 +27,7 @@
 		supabase.auth.signInWithOAuth({
 			provider,
 			options: {
-				redirectTo: getAbsoluteUrl('/auth/callback', window.location.origin)
+				redirectTo: getAuthCallbackUrl(window.location.origin)
 			}
 		});
 	}

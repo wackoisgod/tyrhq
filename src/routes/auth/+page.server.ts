@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { getAbsoluteUrl } from '$lib/site-url';
+import { getAuthCallbackUrl } from '$lib/site-url';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -27,7 +27,7 @@ export const actions: Actions = {
 		redirect(303, '/');
 	},
 
-	signup: async ({ request, locals }) => {
+	signup: async ({ request, locals, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;
@@ -40,7 +40,11 @@ export const actions: Actions = {
 			return fail(400, { error: 'Password must be at least 6 characters', email });
 		}
 
-		const { error } = await locals.supabase.auth.signUp({ email, password });
+		const { error } = await locals.supabase.auth.signUp({
+			email,
+			password,
+			options: { emailRedirectTo: getAuthCallbackUrl(url.origin) }
+		});
 		if (error) {
 			console.error('[auth] Signup failed', error);
 			return fail(400, { error: 'Unable to create an account right now', email });
@@ -49,7 +53,7 @@ export const actions: Actions = {
 		return { success: 'Check your email for a confirmation link.' };
 	},
 
-	forgot: async ({ request, locals }) => {
+	forgot: async ({ request, locals, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 
@@ -58,7 +62,7 @@ export const actions: Actions = {
 		}
 
 		const { error } = await locals.supabase.auth.resetPasswordForEmail(email, {
-			redirectTo: getAbsoluteUrl('/auth/callback?next=/auth', new URL(request.url).origin)
+			redirectTo: getAuthCallbackUrl(url.origin, '/auth')
 		});
 		if (error) {
 			console.error('[auth] Password reset failed', error);
