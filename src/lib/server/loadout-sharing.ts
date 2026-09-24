@@ -3,6 +3,7 @@ import { deflateSync, inflateSync } from 'node:zlib';
 import { getGameDataBundle } from '$lib/data/game-data';
 import {
 	createPlannerCatalog,
+	getDefaultSelection,
 	getPlannerTalentsForVehicle,
 	type PlannerSelection
 } from '$lib/game-engine/build';
@@ -11,6 +12,9 @@ const SHARE_CODE_PREFIX = 'TYR';
 const SHARE_CODE_VERSION = 1;
 
 const catalog = createPlannerCatalog(getGameDataBundle());
+const vehicleByKey = new Map(catalog.vehicles.map((vehicle) => [vehicle.key, vehicle]));
+const componentByKey = new Map(catalog.components.map((component) => [component.key, component]));
+const ammoByKey = new Map([...catalog.ammoById.values()].map((ammo) => [ammo.key, ammo]));
 
 type SharedTechTreeAllocation = {
 	talentTag: string;
@@ -81,7 +85,8 @@ class BufferReader {
 
 		const value = this.buffer.subarray(this.offset, this.offset + byteLength).toString('utf8');
 		this.offset += byteLength;
-		return value;
+		// Codes minted in-game serialize UE FStrings with their NUL terminator included.
+		return value.replace(/\0+$/, '');
 	}
 }
 
@@ -178,7 +183,9 @@ function decompressLoadoutData(compressed: Buffer) {
 		throw new Error(`Invalid uncompressed size in share payload: ${expectedSize}`);
 	}
 
-	const uncompressed = inflateSync(compressed.subarray(4));
+	// Cap inflation at the declared size so a crafted payload can't balloon in memory
+	// (share codes arrive from anonymous visitors via the import endpoint).
+	const uncompressed = inflateSync(compressed.subarray(4), { maxOutputLength: expectedSize });
 	if (uncompressed.length !== expectedSize) {
 		throw new Error(
 			`Unexpected uncompressed size in share payload: expected ${expectedSize}, got ${uncompressed.length}`
@@ -276,4 +283,81 @@ export function decodeLoadoutShareCode(shareCode: string): SharedVehicleLoadout 
 	const compressed = fromBase64Url(encoded);
 	const uncompressed = decompressLoadoutData(compressed);
 	return readLoadoutBinary(uncompressed);
+}
+
+export type ImportedShareCode = {
+	selection: PlannerSelection;
+	name: string;
+	/** Parts of the code that were dropped: unknown to the current game data, or not allowed in their slot. */
+	warnings: string[];
+};
+
+/**
+ * Turn an in-game share code back into a planner selection. Lenient on purpose: codes
+ * outlive balance patches, so a component, shell, or talent the current data no longer
+ * knows is dropped (and reported) rather than failing the whole import.
+ */
+export function importShareCodeToPlannerSelection(shareCode: string): ImportedShareCode {
+	let loadout: SharedVehicleLoadout;
+	try {
+		loadout = decodeLoadoutShareCode(shareCode.trim());
+	} catch {
+		throw new Error('That doesn\'t look like a valid Tyr share code');
+	}
+
+	const vehicle = vehicleByKey.get(loadout.vehicleTag);
+	if (!vehicle) {
+		throw new Error(`Share code is for an unknown vehicle (${loadout.vehicleTag || 'none'})`);
+	}
+
+	const selection = getDefaultSelection(catalog, vehicle.id);
+	const warnings: string[] = [];
+
+	const seenComponents = new Set<string>();
+	selection.componentIds = selection.componentIds.map((_, slotIndex) => {
+		const tag = loadout.components[slotIndex] ?? '';
+		if (!tag) return '';
+		const component = componentByKey.get(tag);
+		if (!component) {
+			warnings.push(`Unknown component ${tag}`);
+			return '';
+		}
+		if (seenComponents.has(component.id)) return '';
+		seenComponents.add(component.id);
+		return component.id;
+	});
+
+	selection.ammoIds = selection.ammoIds.map((fallbackAmmoId, slotIndex) => {
+		const tag = loadout.ammoSlots[slotIndex] ?? '';
+		if (!tag) return fallbackAmmoId;
+		const ammo = ammoByKey.get(tag);
+		if (!ammo) {
+			warnings.push(`Unknown shell ${tag}`);
+			return fallbackAmmoId;
+		}
+		if (slotIndex === 1 && ammo.id !== 'standard' && !ammo.canLoadSecondary) {
+			warnings.push(`${ammo.displayName} can't be loaded in the secondary slot`);
+			return fallbackAmmoId;
+		}
+		return ammo.id;
+	});
+
+	const nodeByTalentKey = new Map(
+		getPlannerTalentsForVehicle(catalog, vehicle.id).map((node) => [node.talent.key, node])
+	);
+	for (const allocation of loadout.techTree.allocations) {
+		if (allocation.pointsAllocated <= 0) continue;
+		const node = nodeByTalentKey.get(allocation.talentTag);
+		if (!node) {
+			warnings.push(`Unknown talent ${allocation.talentTag}`);
+			continue;
+		}
+		selection.talentPoints[node.talent.id] = Math.min(allocation.pointsAllocated, node.maxPoints);
+	}
+
+	return {
+		selection,
+		name: loadout.name.trim() || loadout.techTree.name.trim() || `${vehicle.name} Build`,
+		warnings
+	};
 }
