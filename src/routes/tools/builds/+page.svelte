@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
 	import Editor from '$lib/contribute/Editor.svelte';
@@ -34,6 +35,13 @@
 
 	const DRAFT_KEY = 'tyr-planner-draft';
 
+	/** Ammo chip labels where a multiplier below 1 is the buff (faster reload, tighter spread, quieter). */
+	const LOWER_IS_BETTER_AMMO_CHIPS = new Set(['RLD', 'DSP', 'DET']);
+
+	function ammoChipIsBuff(label: string, multiplier: number) {
+		return LOWER_IS_BETTER_AMMO_CHIPS.has(label) ? multiplier < 1 : multiplier > 1;
+	}
+
 	let { data } = $props();
 
 	const catalog = $derived.by(() => createPlannerCatalog(data.bundle));
@@ -50,6 +58,12 @@
 	let exportCode = $state('');
 	let exportModalOpen = $state(false);
 	let copyExportCodeLabel = $state('Copy Export Code');
+	let importModalOpen = $state(false);
+	let importCode = $state('');
+	let importing = $state(false);
+	let importError = $state<string | null>(null);
+	/** Shown after an import that had to drop parts of the code (unknown or not allowed in that slot). */
+	let importNotice = $state<string | null>(null);
 
 	// Star state — overrides track optimistic updates, reset when underlying data changes
 	let starredOverride = $state<boolean | null>(null);
@@ -237,6 +251,72 @@
 		}
 	}
 
+	function openImportModal() {
+		importCode = '';
+		importError = null;
+		importModalOpen = true;
+	}
+
+	function closeImportModal() {
+		importModalOpen = false;
+		importError = null;
+	}
+
+	/** Decode an in-game share code into the planner. Works signed out — nothing is saved. */
+	async function importBuild() {
+		const shareCode = importCode.trim();
+		if (!shareCode || importing) return;
+
+		importing = true;
+		importError = null;
+
+		try {
+			const res = await fetch('/api/builds/import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ shareCode })
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ message: 'Import failed' }));
+				importError = body.message ?? 'Import failed';
+				return;
+			}
+
+			const body = (await res.json()) as {
+				selection: ReturnType<typeof getDefaultSelection>;
+				name: string;
+				warnings: string[];
+			};
+
+			// A loaded build or tank page locks the vehicle; the imported code may be for
+			// another one, so drop back to the plain planner first. The page component is
+			// reused, so the state set below survives the navigation.
+			if (data.loadedBuild || data.lockedVehicleId) {
+				await goto('/tools/builds', { noScroll: true });
+			}
+
+			editingBuild = null;
+			componentModalSlot = null;
+			ammoModalSlot = null;
+			selection = body.selection;
+			buildName = body.name;
+			buildNotes = '';
+			buildNotesOpen = false;
+			saveError = null;
+			saveSuccess = null;
+			exportError = null;
+			importNotice = body.warnings.length
+				? `Imported, but some parts were skipped: ${body.warnings.join('; ')}.`
+				: null;
+			importModalOpen = false;
+		} catch {
+			importError = 'Network error — could not import build.';
+		} finally {
+			importing = false;
+		}
+	}
+
 	function newBuild() {
 		editingBuild = null;
 		buildName = '';
@@ -248,6 +328,7 @@
 		exportError = null;
 		exportCode = '';
 		exportModalOpen = false;
+		importNotice = null;
 	}
 
 	// --- localStorage draft persistence ---
@@ -365,7 +446,7 @@
 
 	$effect(() => {
 		if (typeof document === 'undefined') return;
-		if (exportModalOpen) {
+		if (exportModalOpen || importModalOpen) {
 			const previousOverflow = document.body.style.overflow;
 			document.body.style.overflow = 'hidden';
 			return () => {
@@ -782,6 +863,7 @@
 		if (event.key === 'Escape' && componentModalSlot !== null) closeComponentModal();
 		if (event.key === 'Escape' && ammoModalSlot !== null) closeAmmoModal();
 		if (event.key === 'Escape' && exportModalOpen) closeExportModal();
+		if (event.key === 'Escape' && importModalOpen) closeImportModal();
 	}}
 />
 
@@ -905,6 +987,10 @@
 							{exporting ? 'Exporting…' : 'Export'}
 						</button>
 
+						<button class="hud-cta-outline px-4 py-2 text-sm" onclick={openImportModal}>
+							Import
+						</button>
+
 						<button
 							class="px-3 py-2 text-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
 							onclick={newBuild}
@@ -942,6 +1028,13 @@
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
 					>
 						{exportError}
+					</div>
+				{/if}
+				{#if importNotice}
+					<div
+						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						{importNotice}
 					</div>
 				{/if}
 
@@ -1445,7 +1538,7 @@
 														{#if m.v !== 1}
 															<span
 																class={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-																	m.v > 1
+																	ammoChipIsBuff(m.label, m.v)
 																		? 'bg-emerald-400/12 text-emerald-300'
 																		: 'bg-rose-400/12 text-rose-300'
 																}`}
@@ -1919,7 +2012,7 @@
 												{#if mod.value !== 1}
 													<span
 														class={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-															mod.value > 1
+															ammoChipIsBuff(mod.label, mod.value)
 																? 'bg-emerald-400/12 text-emerald-300'
 																: 'bg-rose-400/12 text-rose-300'
 														}`}
@@ -2009,6 +2102,95 @@
 							</button>
 						</div>
 					</div>
+				</div>
+			</div>
+		{/if}
+
+		{#if importModalOpen}
+			<div
+				class="fixed inset-0 z-[210] flex items-end justify-center sm:items-center sm:p-6"
+				role="presentation"
+			>
+				<button
+					type="button"
+					class="absolute inset-0 bg-[#0a0e17]/85 backdrop-blur-[3px]"
+					aria-label="Close import dialog"
+					onclick={closeImportModal}
+				></button>
+
+				<div
+					class="relative z-10 flex w-full max-w-3xl flex-col overflow-hidden rounded-t-sm border border-[rgba(69,73,50,0.4)] bg-[var(--hud-panel)] shadow-[0_24px_80px_rgba(0,0,0,0.55),inset_0_0_0_1px_var(--hud-ghost)] sm:rounded-sm"
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="import-modal-title"
+				>
+					<header
+						class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-[var(--hud-variant)] bg-[var(--hud-panel-high)] px-4 py-4 shadow-[inset_0_2px_0_0_var(--hud-lime)] sm:px-6"
+					>
+						<div>
+							<p
+								class="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--hud-teal)]"
+							>
+								Loadout sharing
+							</p>
+							<h2
+								id="import-modal-title"
+								class="mt-1 font-[var(--font-display)] text-2xl font-bold uppercase tracking-[0.04em] text-[var(--hud-text)]"
+							>
+								Import Build
+							</h2>
+							<p class="mt-2 text-xs leading-5 text-[var(--hud-muted)]">
+								Paste a share code from Tyr's in-game export to view it in the planner. No sign-in
+								needed.
+							</p>
+						</div>
+						<button
+							type="button"
+							class="rounded-sm border-2 border-[var(--hud-teal)] bg-transparent px-4 py-2 text-sm font-semibold uppercase tracking-wide text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/10"
+							onclick={closeImportModal}
+						>
+							Close
+						</button>
+					</header>
+
+					<form
+						class="bg-[var(--hud-surface)] px-4 py-4 sm:px-6 sm:py-5"
+						onsubmit={(event) => {
+							event.preventDefault();
+							importBuild();
+						}}
+					>
+						<!-- svelte-ignore a11y_autofocus -->
+						<textarea
+							bind:value={importCode}
+							autofocus
+							spellcheck="false"
+							placeholder="TYR01_…"
+							aria-label="Share code"
+							class="min-h-[9rem] w-full resize-none rounded-sm border border-[var(--hud-variant)] bg-[var(--hud-inset)] px-3 py-3 font-mono text-xs leading-6 text-[var(--hud-text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+						></textarea>
+
+						{#if importError}
+							<div
+								class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+							>
+								{importError}
+							</div>
+						{/if}
+
+						<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+							<p class="text-xs leading-5 text-[var(--hud-muted)]">
+								Replaces the planner's current loadout. Sign in if you want to save it.
+							</p>
+							<button
+								type="submit"
+								class="hud-cta-outline px-4 py-2 text-xs"
+								disabled={importing || !importCode.trim()}
+							>
+								{importing ? 'Importing…' : 'Import Build'}
+							</button>
+						</div>
+					</form>
 				</div>
 			</div>
 		{/if}

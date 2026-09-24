@@ -232,6 +232,13 @@ export const exportBuildBodySchema = buildBodyBaseSchema
 	.omit({ isPublic: true, notes: true })
 	.superRefine(refineBuildBody);
 
+export const importBuildBodySchema = z
+	.object({
+		// Real codes are a few hundred characters; the cap keeps anonymous input small.
+		shareCode: z.string().trim().min(1, 'shareCode is required').max(4096, 'shareCode is too long')
+	})
+	.strict();
+
 export const deleteBuildBodySchema = z
 	.object({
 		id: z.string().uuid('id must be a valid UUID')
