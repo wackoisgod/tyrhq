@@ -85,7 +85,11 @@
 		Object.entries(data.shell.modifiers) as [keyof typeof data.shell.modifiers, number][]
 	);
 
-	const activeModifiers = $derived(modifierEntries.filter(([, value]) => value !== 1));
+	const fixedStats: Partial<Record<string, number>> = $derived(data.fixedStats);
+
+	const activeModifiers = $derived(
+		modifierEntries.filter(([key, value]) => value !== 1 || fixedStats[key] !== undefined)
+	);
 
 	let selectedVehicleId = $state<string>('');
 	let hydrated = $state(false);
@@ -305,8 +309,14 @@
 			{#each modifierEntries as [key, value]}
 				{@const statKey = STAT_KEY[key]}
 				{@const baseValue = statKey && selectedVehicle ? selectedVehicle.base[statKey] : null}
-				{@const finalValue = baseValue !== null ? baseValue * value : null}
-				{@const tone = modifierTone(key, value)}
+				{@const fixedValue = fixedStats[key]}
+				{@const finalValue = fixedValue ?? (baseValue !== null ? baseValue * value : null)}
+				{@const tone =
+					fixedValue !== undefined && baseValue !== null
+						? modifierTone(key, baseValue > 0 ? fixedValue / baseValue : 1)
+						: fixedValue !== undefined
+							? 'text-[var(--hud-text)]'
+							: modifierTone(key, value)}
 				<div
 					class="rounded-sm bg-[var(--hud-inset)] px-3 py-3 shadow-[inset_2px_0_0_0_rgba(160,170,217,0.18)]"
 				>
@@ -319,7 +329,9 @@
 						{finalValue !== null ? formatStat(key, finalValue) : formatDelta(value)}
 					</div>
 					<div class="mt-2 font-mono text-[10px] tabular-nums leading-none">
-						{#if finalValue !== null && value !== 1}
+						{#if fixedValue !== undefined && baseValue === null}
+							<span class="text-[var(--hud-dim)]">Fixed value</span>
+						{:else if finalValue !== null && (value !== 1 || fixedValue !== undefined)}
 							{@const delta = finalValue - (baseValue ?? 0)}
 							<span class={tone}
 								>{delta > 0 ? '+' : ''}{formatStat(key, delta)}</span

@@ -16,6 +16,7 @@ import {
 	statKeySet,
 	type StatDefinition
 } from '$lib/game-engine/stat-definitions';
+import { getAmmoFixedStats } from '$lib/game-engine/ammo-fixed-stats';
 
 /** Global cap on talent points spendable across the whole tree (game rule). */
 export const MAX_TOTAL_TALENT_POINTS = 31;
@@ -368,6 +369,8 @@ type AmmoContribution = {
 	attribute: string;
 	/** Multiplier form, e.g. 1.20 for HE +20% shell damage. */
 	multiplier: number;
+	/** Fixed per-shot value that replaces the resolved stat (HE's 45mm pen, Momentum's 500 m/s). */
+	fixedValue?: number;
 	order: number;
 };
 
@@ -494,12 +497,13 @@ function getDescriptionBasedComponentEdits(
  * Math matches the in-engine GAS aggregator:
  *   resolved = ((base + Σadds) × (1 + Σmult_fractions)) ÷ Πdivides
  *   final    = resolved × ammoMultiplier   (ammo is a per-shot multiplier, not aggregator-resident)
+ *            = ammoFixedValue              (when the shell fixes the stat outright, e.g. HE pen)
  *
  * Per-source breakdown contributions:
  *   add source:       its flat value
  *   mult source:      fraction × (base + Σadds)
  *   divide source:    marginal (sequential, since divides are rare)
- *   ammo:             resolved × (ammoMultiplier − 1)
+ *   ammo:             resolved × (ammoMultiplier − 1), or ammoFixedValue − resolved
  *
  * These sum to (final − base), so the breakdown is always self-consistent with the displayed total.
  */
@@ -541,7 +545,10 @@ function resolveStat(
 		const winner = overrides[overrides.length - 1];
 		let value = winner.value;
 		accumulate(winner.source, winner.conditional, winner.order, winner.value - base);
-		if (ammo) {
+		if (ammo?.fixedValue !== undefined) {
+			value = ammo.fixedValue;
+			accumulate(ammo.source, false, ammo.order, ammo.fixedValue - winner.value);
+		} else if (ammo) {
 			value *= ammo.multiplier;
 			accumulate(ammo.source, false, ammo.order, winner.value * (ammo.multiplier - 1));
 		}
@@ -573,7 +580,10 @@ function resolveStat(
 	}
 
 	let final = aggregator;
-	if (ammo) {
+	if (ammo?.fixedValue !== undefined) {
+		final = ammo.fixedValue;
+		accumulate(ammo.source, false, ammo.order, ammo.fixedValue - aggregator);
+	} else if (ammo) {
 		final = aggregator * ammo.multiplier;
 		accumulate(ammo.source, false, ammo.order, aggregator * (ammo.multiplier - 1));
 	}
@@ -877,6 +887,12 @@ export function computeBuild(
 		for (const [attribute, multiplier] of ammoTargets) {
 			if (!Number.isFinite(multiplier) || multiplier === 1) continue;
 			ammoContribs.push({ source: ammoSource, attribute, multiplier, order: order++ });
+		}
+		// Fixed-value shells: the stat is set outright, so any multiplier above is moot.
+		for (const [attribute, fixedValue] of Object.entries(getAmmoFixedStats(previewAmmo))) {
+			const existing = ammoContribs.findIndex((contrib) => contrib.attribute === attribute);
+			if (existing >= 0) ammoContribs.splice(existing, 1);
+			ammoContribs.push({ source: ammoSource, attribute, multiplier: 1, fixedValue, order: order++ });
 		}
 	}
 

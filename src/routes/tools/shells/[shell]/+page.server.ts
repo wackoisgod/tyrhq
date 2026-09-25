@@ -2,11 +2,20 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 import { getGameDataBundle, getGameSnapshot } from '$lib/data/game-data';
+import { getAmmoFixedStats } from '$lib/game-engine/ammo-fixed-stats';
 
 export type ShellGroup = 'Standard' | 'Specialty';
 
 function classifyShell(ammo: { id: string }): ShellGroup {
 	return ammo.id === 'standard' ? 'Standard' : 'Specialty';
+}
+
+/** Fixed shell stats keyed like the shell's modifiers (`penetration`, `velocity`). */
+function toModifierFixedStats(fixed: ReturnType<typeof getAmmoFixedStats>) {
+	const result: Partial<Record<'penetration' | 'velocity', number>> = {};
+	if (fixed.ShellPenetration !== undefined) result.penetration = fixed.ShellPenetration;
+	if (fixed.ShellVelocity !== undefined) result.velocity = fixed.ShellVelocity;
+	return result;
 }
 
 export const load: PageServerLoad = ({ params }) => {
@@ -68,6 +77,7 @@ export const load: PageServerLoad = ({ params }) => {
 			canLoadSecondary: shell.canLoadSecondary,
 			modifiers: shell.modifiers
 		},
+		fixedStats: toModifierFixedStats(getAmmoFixedStats(shell)),
 		group,
 		vehicles,
 		relatedShells

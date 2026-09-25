@@ -1156,3 +1156,63 @@ describe('exported effect bindings', () => {
 		).toBeCloseTo(1100, 4);
 	});
 });
+
+describe('computeBuild fixed-value shells', () => {
+	function buildWith(ammo: AmmoRecord, components: ComponentRecord[] = [], effects: EffectRecord[] = []) {
+		const standard = makeAmmo('standard', 'Standard', 1.0);
+		const vehicle = makeVehicle(
+			'test_tank',
+			{ ShellDamage: 100, ShellPenetration: 110, ShellVelocity: 780 },
+			'standard',
+			'tree_test'
+		);
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [standard, ammo],
+				components,
+				talents: [],
+				effects,
+				trees: [makeTree('tree_test', 'test_tank', [])]
+			})
+		);
+		return computeBuild(catalog, {
+			vehicleId: 'test_tank',
+			ammoIds: [ammo.id],
+			previewAmmoSlot: 0,
+			componentIds: components.map((component) => component.id),
+			talentPoints: {}
+		})!;
+	}
+
+	it('HE sets penetration to its fixed 45mm, overriding other penetration buffs', () => {
+		const he = {
+			...makeAmmo('high_explosive', 'High Explosive', 1.2),
+			description: 'Deals 20% more damage but has fixed 45mm penetration.'
+		};
+		const penEffect = makeEffect('PenBoost', 'ShellPenetration', 'AddBase', 10);
+		const penComponent = makeComponent('pen_boost', 'PEN BOOST', ['PenBoost']);
+		const build = buildWith(he, [penComponent], [penEffect]);
+
+		expect(build.stats.ShellPenetration).toBe(45);
+		expect(build.stats.ShellVelocity).toBe(780);
+		expect(build.stats.ShellDamage).toBeCloseTo(120, 4);
+		const breakdown = build.breakdown.ShellPenetration ?? [];
+		const total = breakdown.reduce((sum, entry) => sum + entry.delta, 0);
+		expect(total).toBeCloseTo(45 - 110, 4);
+		expect(breakdown.find((entry) => entry.source.startsWith('Ammo:'))?.delta).toBeCloseTo(45 - 120, 4);
+	});
+
+	it('Momentum sets shell velocity to its fixed 500 m/s', () => {
+		const momentum = {
+			...makeAmmo('momentum', 'Momentum', 1.3),
+			description:
+				'A slow moving shell that deals 30% increased damage after traveling 200 meters (half max vision range). Travels at a fixed 500 m/s.'
+		};
+		const build = buildWith(momentum);
+
+		expect(build.stats.ShellVelocity).toBe(500);
+		expect(build.stats.ShellPenetration).toBe(110);
+		expect(build.breakdown.ShellVelocity?.[0]?.delta).toBeCloseTo(500 - 780, 4);
+	});
+});
