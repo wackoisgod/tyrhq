@@ -260,7 +260,7 @@
 			</div>
 			{#if hasAbilityDetails}
 				<section class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] p-4 shadow-[inset_2px_0_0_0_var(--hud-teal),inset_0_0_0_1px_rgba(69,73,50,0.22)]">
-					<div class="flex items-start gap-4">
+					<div class="flex flex-wrap items-start gap-4">
 						<div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-[var(--hud-inset)] shadow-[inset_0_0_0_1px_rgba(153,247,255,0.18)]">
 							<FallbackImage
 								src="/images/abilities/{data.tank.id}.png"
@@ -270,7 +270,7 @@
 								class="h-11 w-11 object-contain"
 							/>
 						</div>
-						<div class="min-w-0">
+						<div class="min-w-0 flex-1 basis-48">
 							<div class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]">
 								Ability
 							</div>
@@ -283,6 +283,17 @@
 								</p>
 							{/if}
 						</div>
+						{#if data.tank.stats.abilityCost > 0}
+							<div
+								class="ml-auto shrink-0 rounded-sm bg-[var(--hud-inset)] px-3 py-2 text-right shadow-[inset_0_0_0_1px_rgba(153,247,255,0.18)]"
+								title="Base energy cost to activate {data.tank.ability.name || 'the ability'}, before components and talents"
+							>
+								<div class="text-[10px] uppercase tracking-[0.18em] text-[var(--hud-dim)]">Base Cost</div>
+								<div class="mt-1 text-xl font-semibold text-[var(--hud-text)]">
+									{formatValue(data.tank.stats.abilityCost, 'energy')}
+								</div>
+							</div>
+						{/if}
 					</div>
 				</section>
 			{/if}
