@@ -17,6 +17,10 @@ export type Firepower = {
 	/** Seconds from the first shot of a clip to the first shot of the next. */
 	cycleTime: number;
 	clipSize: number;
+	shellDamage: number;
+	reloadTime: number;
+	/** Gap between shots inside a clip; always 0 for single-shot guns. */
+	intraClipReloadTime: number;
 };
 
 export type FirepowerKey = 'dpm' | 'burstDamage' | 'cycleTime';
@@ -58,7 +62,9 @@ export function calculateFirepower(stats: Record<string, number | undefined>): F
 
 	if (![damage, reload, intra].every(Number.isFinite) || damage < 0) return null;
 
-	const cycleTime = Math.max(0, reload) + (clipSize - 1) * Math.max(0, intra);
+	const reloadTime = Math.max(0, reload);
+	const intraClipReloadTime = Math.max(0, intra);
+	const cycleTime = reloadTime + (clipSize - 1) * intraClipReloadTime;
 	if (cycleTime <= 0) return null;
 
 	const burstDamage = damage * clipSize;
@@ -66,6 +72,9 @@ export function calculateFirepower(stats: Record<string, number | undefined>): F
 		dpm: (burstDamage * 60) / cycleTime,
 		burstDamage,
 		cycleTime,
-		clipSize
+		clipSize,
+		shellDamage: damage,
+		reloadTime,
+		intraClipReloadTime
 	};
 }

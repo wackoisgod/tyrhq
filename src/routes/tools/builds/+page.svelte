@@ -10,6 +10,7 @@
 		componentSupportsMaxStacks,
 		computeBuild,
 		computeBuildFirepower,
+		computeFirepowerSourceImpacts,
 		createPlannerCatalog,
 		descriptionIndicatesStacking,
 		formatStatValue,
@@ -31,7 +32,12 @@
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
-	import { firepowerDefinitions, type FirepowerDefinition } from '$lib/game-engine/firepower';
+	import {
+		firepowerDefinitions,
+		type Firepower,
+		type FirepowerDefinition,
+		type FirepowerKey
+	} from '$lib/game-engine/firepower';
 
 	import { onMount } from 'svelte';
 
@@ -578,6 +584,61 @@
 		const rounded = definition.unit ? delta : Math.round(delta);
 		return `${rounded > 0 ? '+' : ''}${formatFirepowerValue(definition, rounded)}`;
 	}
+
+	/** Damage can pick up fractions from ammo multipliers (110 × 1.2 = 132, 133.5 × 1.2 = 160.2). */
+	function formatDamage(value: number) {
+		return Number(value.toFixed(1)).toLocaleString('en-US');
+	}
+
+	function formatSignedDpm(value: number) {
+		const rounded = Math.round(value);
+		return `${rounded > 0 ? '+' : ''}${rounded.toLocaleString('en-US')}`;
+	}
+
+	/** One-line working shown under each firepower tile. */
+	function firepowerWorking(key: FirepowerKey, firepower: Firepower) {
+		const shots = `${firepower.clipSize} ${firepower.clipSize === 1 ? 'shot' : 'shots'}`;
+		if (key === 'burstDamage') return `${formatDamage(firepower.shellDamage)} dmg × ${shots}`;
+		if (key === 'cycleTime') {
+			const reload = `${formatStatValue(firepower.reloadTime, 's')} reload`;
+			if (firepower.clipSize === 1) return `${reload}, single shot`;
+			const gaps = firepower.clipSize - 1;
+			return `${reload} + ${gaps} × ${formatStatValue(firepower.intraClipReloadTime, 's')} ${gaps === 1 ? 'gap' : 'gaps'}`;
+		}
+		return `${formatDamage(firepower.burstDamage)} dmg per ${formatStatValue(firepower.cycleTime, 's')} cycle`;
+	}
+
+	let firepowerBreakdownOpen = $state(false);
+	// Leave-one-out costs two builds per pick, so only run it while the breakdown is open.
+	const firepowerSources = $derived(
+		firepowerBreakdownOpen && selection
+			? computeFirepowerSourceImpacts(catalog, selection, { assumeMaxStacks })
+			: []
+	);
+
+	type FirepowerInputRow = {
+		label: string;
+		pick: (firepower: Firepower) => number;
+		format: (value: number) => string;
+		lowerBetter?: boolean;
+	};
+
+	const firepowerInputRows: FirepowerInputRow[] = [
+		{ label: 'Shell Damage', pick: (f) => f.shellDamage, format: formatDamage },
+		{ label: 'Clip Size', pick: (f) => f.clipSize, format: (v) => String(v) },
+		{
+			label: 'Reload Time',
+			pick: (f) => f.reloadTime,
+			format: (v) => formatStatValue(v, 's'),
+			lowerBetter: true
+		},
+		{
+			label: 'Intra-clip Gap',
+			pick: (f) => f.intraClipReloadTime,
+			format: (v) => formatStatValue(v, 's'),
+			lowerBetter: true
+		}
+	];
 
 	const buildHasConditionals = $derived.by(() => {
 		if (!selection) return false;
@@ -1631,8 +1692,23 @@
 				</div>
 
 				{#if computedBuild}
+					{#snippet situationalBolt()}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							class="h-3.5 w-3.5 shrink-0"
+							aria-hidden="true"
+						>
+							<path
+								d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.62 12 4c1.58 3.62 3.52 6.94 4.81 8.22.02.04.26.22.07.12-.19-.34-.2-.66.38-.66H13l1 7h-1v1h-2v-1z"
+							/>
+						</svg>
+					{/snippet}
 					{#if buildFirepower?.guaranteed}
 						{@const guaranteed = buildFirepower.guaranteed}
+						{@const stock = buildFirepower.base}
+						{@const best = buildFirepower.withConditional}
 						<div class="mt-4" aria-label="Firepower">
 							<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 								{#each firepowerDefinitions as definition}
@@ -1674,22 +1750,15 @@
 												{formatFirepowerDelta(definition, delta)}
 											</span>
 										</div>
+										<div class="mt-1 font-mono text-[11px] text-[var(--hud-muted)]">
+											{firepowerWorking(definition.key, guaranteed)}
+										</div>
 										{#if conditionalValue != null && Math.abs(conditionalValue - value) >= 0.005}
 											<div
 												class="mt-1.5 flex items-center gap-1.5 border-t border-[var(--hud-variant)]/60 pt-1.5 text-xs text-[var(--hud-teal)]"
 												title="Best case: also counts situational talents and components (on-hit, while unspotted, …){assumeMaxStacks ? ' at max stacks' : ''}."
 											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													viewBox="0 0 24 24"
-													fill="currentColor"
-													class="h-3.5 w-3.5 shrink-0"
-													aria-hidden="true"
-												>
-													<path
-														d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.62 12 4c1.58 3.62 3.52 6.94 4.81 8.22.02.04.26.22.07.12-.19-.34-.2-.66.38-.66H13l1 7h-1v1h-2v-1z"
-													/>
-												</svg>
+												{@render situationalBolt()}
 												<span>With conditional effects</span>
 												<span class="ml-auto font-semibold tabular-nums">
 													{formatFirepowerValue(definition, conditionalValue)}
@@ -1699,10 +1768,152 @@
 									</div>
 								{/each}
 							</div>
-							<p class="mt-2 text-[11px] leading-4 text-[var(--hud-dim)]">
-								Theoretical output with the previewed ammo: every shot hits and penetrates, full clip
-								then full reload. Event-triggered reload speed-ups (active reload) aren't counted.
-							</p>
+							<div class="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+								<p class="max-w-3xl text-[11px] leading-4 text-[var(--hud-dim)]">
+									Theoretical output with the previewed ammo: every shot hits and penetrates, full
+									clip then full reload. Event-triggered reload speed-ups (active reload) aren't
+									counted.
+								</p>
+								<button
+									type="button"
+									class="shrink-0 cursor-pointer border-none bg-transparent p-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-teal)] hover:text-[var(--hud-lime)]"
+									aria-expanded={firepowerBreakdownOpen}
+									aria-controls="firepower-breakdown"
+									onclick={() => (firepowerBreakdownOpen = !firepowerBreakdownOpen)}
+								>
+									{firepowerBreakdownOpen ? 'Hide' : 'Show'} firepower breakdown
+								</button>
+							</div>
+							{#if firepowerBreakdownOpen}
+								{@const showIntra = Math.max(stock?.clipSize ?? 1, guaranteed.clipSize, best?.clipSize ?? 1) > 1}
+								<div
+									id="firepower-breakdown"
+									class="mt-3 grid gap-3 lg:grid-cols-2"
+								>
+									<div
+										class="overflow-x-auto rounded-sm bg-[var(--hud-surface)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.15)]"
+									>
+										<table class="w-full min-w-[19rem] table-fixed text-left text-sm">
+											<colgroup>
+												<col style="width: 34%" />
+												<col style="width: 22%" />
+												<col style="width: 22%" />
+												<col style="width: 22%" />
+											</colgroup>
+											<thead class="bg-[var(--hud-inset)]">
+												<tr class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+													<th class="px-3 py-2 font-medium">Input</th>
+													<th class="px-2 py-2 text-right font-medium">Base</th>
+													<th class="px-2 py-2 text-right font-medium leading-tight">Guaran&shy;teed</th>
+													<th class="px-3 py-2 text-right font-medium leading-tight">Condi&shy;tional</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each firepowerInputRows as input}
+													{#if input.label !== 'Intra-clip Gap' || showIntra}
+														{@const baseValue = stock ? input.pick(stock) : null}
+														{@const nowValue = input.pick(guaranteed)}
+														{@const bestValue = best ? input.pick(best) : null}
+														{@const tone = baseValue === null ? 'neutral' : getDeltaTone(input, nowValue - baseValue)}
+														<tr class="border-t border-[var(--hud-variant)]/60">
+															<td class="px-3 py-2 font-medium text-[var(--hud-text)]">{input.label}</td>
+															<td class="px-2 py-2 text-right tabular-nums text-[var(--hud-dim)]">
+																{baseValue === null ? '-' : input.format(baseValue)}
+															</td>
+															<td
+																class={`px-2 py-2 text-right tabular-nums ${
+																	tone === 'positive'
+																		? 'text-emerald-300'
+																		: tone === 'negative'
+																			? 'text-rose-300'
+																			: 'text-[var(--hud-text)]'
+																}`}
+															>
+																{input.format(nowValue)}
+															</td>
+															<td
+																class={`px-3 py-2 text-right tabular-nums ${
+																	bestValue !== null && Math.abs(bestValue - nowValue) >= 0.005
+																		? 'text-[var(--hud-teal)]'
+																		: 'text-[var(--hud-dim)]'
+																}`}
+															>
+																{bestValue === null ? '-' : input.format(bestValue)}
+															</td>
+														</tr>
+													{/if}
+												{/each}
+											</tbody>
+										</table>
+									</div>
+
+									<div
+										class="overflow-x-auto rounded-sm bg-[var(--hud-surface)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.15)]"
+									>
+										<table class="w-full min-w-[19rem] table-fixed text-left text-sm">
+											<colgroup>
+												<col style="width: 54%" />
+												<col style="width: 23%" />
+												<col style="width: 23%" />
+											</colgroup>
+											<thead class="bg-[var(--hud-inset)]">
+												<tr class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+													<th class="px-3 py-2 font-medium">DPM by source</th>
+													<th class="px-2 py-2 text-right font-medium leading-tight">Guaran&shy;teed</th>
+													<th class="px-3 py-2 text-right font-medium leading-tight">Condi&shy;tional</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each firepowerSources as impact}
+													<tr class="border-t border-[var(--hud-variant)]/60">
+														<td class="px-3 py-2 text-xs text-[var(--hud-muted)]">
+															<span class="flex min-w-0 items-center gap-1.5">
+																{#if impact.conditional}
+																	<span
+																		class="text-[var(--hud-teal)]"
+																		title="Situational pick: applies only under specific in-game conditions."
+																		role="img"
+																		aria-label="Situational effect"
+																	>
+																		{@render situationalBolt()}
+																	</span>
+																{/if}
+																<span class="min-w-0 break-words">{impact.source}</span>
+															</span>
+														</td>
+														{#each [impact.guaranteed, impact.withConditional] as dpmImpact, column}
+															<td
+																class={`${column === 0 ? 'px-2' : 'px-3'} py-2 text-right tabular-nums font-semibold ${
+																	Math.round(dpmImpact) > 0
+																		? 'text-emerald-300'
+																		: Math.round(dpmImpact) < 0
+																			? 'text-rose-300'
+																			: 'text-[var(--hud-dim)]'
+																}`}
+															>
+																{formatSignedDpm(dpmImpact)}
+															</td>
+														{/each}
+													</tr>
+												{:else}
+													<tr class="border-t border-[var(--hud-variant)]/60">
+														<td colspan="3" class="px-3 py-3 text-xs text-[var(--hud-dim)]">
+															Nothing in this build changes DPM yet. Damage, reload and clip talents,
+															components and alternate ammo show up here.
+														</td>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+										{#if firepowerSources.length}
+											<p class="border-t border-[var(--hud-variant)]/60 px-3 py-2 text-[11px] leading-4 text-[var(--hud-dim)]">
+												DPM lost if that pick were removed. Bonuses compound, so the rows needn't
+												add up exactly to the total change.
+											</p>
+										{/if}
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/if}
 					<div

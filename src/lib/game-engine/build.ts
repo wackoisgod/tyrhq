@@ -1095,6 +1095,89 @@ export function computeBuildFirepower(
 	};
 }
 
+export type FirepowerSourceImpact = {
+	source: string;
+	/** The pick is a situational talent/component (same rule as the stat breakdown bolt). */
+	conditional: boolean;
+	/** DPM this pick accounts for: build DPM minus DPM with the pick removed. */
+	guaranteed: number;
+	withConditional: number;
+};
+
+/**
+ * Leave-one-out DPM attribution for the previewed ammo and each component and talent.
+ * Effects interact (percent bonuses pool, ammo multiplies on top, damage and reload
+ * compound), so the impacts need not sum exactly to the build's total DPM change.
+ */
+export function computeFirepowerSourceImpacts(
+	catalog: PlannerCatalog,
+	selection: PlannerSelection,
+	options: { assumeMaxStacks?: boolean } = {}
+): FirepowerSourceImpact[] {
+	const dpmOf = (variant: PlannerSelection, includeConditionalEffects: boolean) => {
+		const build = computeBuild(catalog, variant, {
+			includeConditionalEffects,
+			assumeMaxStacks: includeConditionalEffects && (options.assumeMaxStacks ?? false)
+		});
+		return build ? (calculateFirepower(build.stats)?.dpm ?? null) : null;
+	};
+
+	const fullGuaranteed = dpmOf(selection, false);
+	const fullConditional = dpmOf(selection, true);
+	if (fullGuaranteed === null || fullConditional === null) return [];
+
+	const variants: Array<{ source: string; conditional: boolean; selection: PlannerSelection }> = [];
+
+	const previewAmmo = catalog.ammoById.get(selection.ammoIds[selection.previewAmmoSlot] ?? '');
+	if (previewAmmo) {
+		// An unknown ammo id previews no ammo, which drops every ammo multiplier.
+		variants.push({
+			source: `Ammo: ${previewAmmo.displayName}`,
+			conditional: false,
+			selection: {
+				...selection,
+				ammoIds: selection.ammoIds.map((id, index) => (index === selection.previewAmmoSlot ? '' : id))
+			}
+		});
+	}
+
+	selection.componentIds.forEach((componentId, index) => {
+		const component = componentId ? catalog.componentById.get(componentId) : undefined;
+		if (!component) return;
+		variants.push({
+			source: `Component: ${component.name}`,
+			conditional: isConditionalComponent(component),
+			selection: {
+				...selection,
+				componentIds: selection.componentIds.map((id, slot) => (slot === index ? '' : id))
+			}
+		});
+	});
+
+	for (const [talentId, points] of Object.entries(selection.talentPoints)) {
+		if (points <= 0) continue;
+		const talent = catalog.talentById.get(talentId);
+		if (!talent) continue;
+		const talentPoints = { ...selection.talentPoints };
+		delete talentPoints[talentId];
+		variants.push({
+			source: `Talent: ${talent.name} (${points})`,
+			conditional: isConditionalTalent(talent),
+			selection: { ...selection, talentPoints }
+		});
+	}
+
+	return variants
+		.map(({ source, conditional, selection: variant }) => ({
+			source,
+			conditional,
+			guaranteed: fullGuaranteed - (dpmOf(variant, false) ?? fullGuaranteed),
+			withConditional: fullConditional - (dpmOf(variant, true) ?? fullConditional)
+		}))
+		.filter((impact) => Math.abs(impact.guaranteed) >= 0.5 || Math.abs(impact.withConditional) >= 0.5)
+		.sort((a, b) => Math.abs(b.withConditional) - Math.abs(a.withConditional));
+}
+
 export function formatStatValue(value: number, unit?: string) {
 	if (!Number.isFinite(value)) return '-';
 	let rounded: string;

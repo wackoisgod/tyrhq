@@ -566,7 +566,15 @@ function getOpenApiSchemas() {
 					type: ['object', 'null'],
 					description:
 						'Theoretical sustained output with Standard ammo, derived from ShellDamage, ReloadTime, ClipSize and IntraClipReloadTime. Assumes every shot hits and penetrates.',
-					required: ['dpm', 'burstDamage', 'cycleTime', 'clipSize'],
+					required: [
+						'dpm',
+						'burstDamage',
+						'cycleTime',
+						'clipSize',
+						'shellDamage',
+						'reloadTime',
+						'intraClipReloadTime'
+					],
 					properties: {
 						dpm: { type: 'number', description: 'Damage per minute over repeated full clip + reload cycles.' },
 						burstDamage: { type: 'number', description: 'Damage from emptying one full clip.' },
@@ -574,7 +582,13 @@ function getOpenApiSchemas() {
 							type: 'number',
 							description: 'Seconds per cycle: ReloadTime plus (ClipSize - 1) intra-clip gaps.'
 						},
-						clipSize: { type: 'integer' }
+						clipSize: { type: 'integer' },
+						shellDamage: { type: 'number' },
+						reloadTime: { type: 'number', description: 'Full reload after the clip is emptied.' },
+						intraClipReloadTime: {
+							type: 'number',
+							description: 'Gap between shots inside a clip; 0 for single-shot guns.'
+						}
 					}
 				},
 				ability: {
