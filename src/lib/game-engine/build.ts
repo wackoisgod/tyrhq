@@ -8,6 +8,7 @@ import type {
 	TalentTreeRecord,
 	VehicleRecord
 } from '$lib/types/game';
+import { calculateFirepower, type Firepower } from '$lib/game-engine/firepower';
 import {
 	lowerBetterStats,
 	multiplierDefaultStats,
@@ -1058,6 +1059,125 @@ export function computeBuild(
 	};
 }
 
+export type BuildFirepower = {
+	/** Stock vehicle: no talents, components, or ammo modifiers. */
+	base: Firepower | null;
+	/** Previewed ammo plus permanent loadout bonuses only. */
+	guaranteed: Firepower | null;
+	/** Also counts situational effects (on-hit, while unspotted, …), honouring max stacks. */
+	withConditional: Firepower | null;
+};
+
+/**
+ * Firepower is reported twice so a build's DPM never silently assumes every
+ * situational bonus is active: `guaranteed` drops conditional effects and stacks,
+ * `withConditional` is the best case the planner can model.
+ */
+export function computeBuildFirepower(
+	catalog: PlannerCatalog,
+	selection: PlannerSelection,
+	options: { assumeMaxStacks?: boolean } = {}
+): BuildFirepower | null {
+	const guaranteedBuild = computeBuild(catalog, selection, {
+		includeConditionalEffects: false,
+		assumeMaxStacks: false
+	});
+	if (!guaranteedBuild) return null;
+	const conditionalBuild = computeBuild(catalog, selection, {
+		includeConditionalEffects: true,
+		assumeMaxStacks: options.assumeMaxStacks ?? false
+	});
+
+	return {
+		base: calculateFirepower(guaranteedBuild.baseStats),
+		guaranteed: calculateFirepower(guaranteedBuild.stats),
+		withConditional: conditionalBuild ? calculateFirepower(conditionalBuild.stats) : null
+	};
+}
+
+export type FirepowerSourceImpact = {
+	source: string;
+	/** The pick is a situational talent/component (same rule as the stat breakdown bolt). */
+	conditional: boolean;
+	/** DPM this pick accounts for: build DPM minus DPM with the pick removed. */
+	guaranteed: number;
+	withConditional: number;
+};
+
+/**
+ * Leave-one-out DPM attribution for the previewed ammo and each component and talent.
+ * Effects interact (percent bonuses pool, ammo multiplies on top, damage and reload
+ * compound), so the impacts need not sum exactly to the build's total DPM change.
+ */
+export function computeFirepowerSourceImpacts(
+	catalog: PlannerCatalog,
+	selection: PlannerSelection,
+	options: { assumeMaxStacks?: boolean } = {}
+): FirepowerSourceImpact[] {
+	const dpmOf = (variant: PlannerSelection, includeConditionalEffects: boolean) => {
+		const build = computeBuild(catalog, variant, {
+			includeConditionalEffects,
+			assumeMaxStacks: includeConditionalEffects && (options.assumeMaxStacks ?? false)
+		});
+		return build ? (calculateFirepower(build.stats)?.dpm ?? null) : null;
+	};
+
+	const fullGuaranteed = dpmOf(selection, false);
+	const fullConditional = dpmOf(selection, true);
+	if (fullGuaranteed === null || fullConditional === null) return [];
+
+	const variants: Array<{ source: string; conditional: boolean; selection: PlannerSelection }> = [];
+
+	const previewAmmo = catalog.ammoById.get(selection.ammoIds[selection.previewAmmoSlot] ?? '');
+	if (previewAmmo) {
+		// An unknown ammo id previews no ammo, which drops every ammo multiplier.
+		variants.push({
+			source: `Ammo: ${previewAmmo.displayName}`,
+			conditional: false,
+			selection: {
+				...selection,
+				ammoIds: selection.ammoIds.map((id, index) => (index === selection.previewAmmoSlot ? '' : id))
+			}
+		});
+	}
+
+	selection.componentIds.forEach((componentId, index) => {
+		const component = componentId ? catalog.componentById.get(componentId) : undefined;
+		if (!component) return;
+		variants.push({
+			source: `Component: ${component.name}`,
+			conditional: isConditionalComponent(component),
+			selection: {
+				...selection,
+				componentIds: selection.componentIds.map((id, slot) => (slot === index ? '' : id))
+			}
+		});
+	});
+
+	for (const [talentId, points] of Object.entries(selection.talentPoints)) {
+		if (points <= 0) continue;
+		const talent = catalog.talentById.get(talentId);
+		if (!talent) continue;
+		const talentPoints = { ...selection.talentPoints };
+		delete talentPoints[talentId];
+		variants.push({
+			source: `Talent: ${talent.name} (${points})`,
+			conditional: isConditionalTalent(talent),
+			selection: { ...selection, talentPoints }
+		});
+	}
+
+	return variants
+		.map(({ source, conditional, selection: variant }) => ({
+			source,
+			conditional,
+			guaranteed: fullGuaranteed - (dpmOf(variant, false) ?? fullGuaranteed),
+			withConditional: fullConditional - (dpmOf(variant, true) ?? fullConditional)
+		}))
+		.filter((impact) => Math.abs(impact.guaranteed) >= 0.5 || Math.abs(impact.withConditional) >= 0.5)
+		.sort((a, b) => Math.abs(b.withConditional) - Math.abs(a.withConditional));
+}
+
 export function formatStatValue(value: number, unit?: string) {
 	if (!Number.isFinite(value)) return '-';
 	let rounded: string;
@@ -1073,7 +1193,7 @@ export function formatStatValue(value: number, unit?: string) {
 	return unit ? `${rounded} ${unit}` : rounded;
 }
 
-export function getDeltaTone(definition: StatDefinition, delta: number) {
+export function getDeltaTone(definition: Pick<StatDefinition, 'lowerBetter'>, delta: number) {
 	if (Math.abs(delta) < 0.0001) return 'neutral';
 	if (definition.lowerBetter) return delta < 0 ? 'positive' : 'negative';
 	return delta > 0 ? 'positive' : 'negative';

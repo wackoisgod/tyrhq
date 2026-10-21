@@ -133,4 +133,15 @@ describe('row visibility and formatting', () => {
 			better: 'higher'
 		});
 	});
+
+	it('derives DPM and burst damage from the vehicle weapon stats', () => {
+		const tanksById = new Map(getCompareTanks().map((tank) => [tank.id, tank]));
+		// Alecto: single shot, 110 dmg every 2.5 s (its 1.5 s intra-clip value is unused).
+		expect(tanksById.get('blink')?.stats).toMatchObject({ dpm: 2640, burstDamage: 110 });
+		// Tempest: 5 × 125 dmg per 20 s reload + 4 × 1 s gaps = 625 per 24 s.
+		expect(tanksById.get('recall')?.stats).toMatchObject({ dpm: 1563, burstDamage: 625 });
+
+		const dpm = compareSections.flatMap((section) => section.rows).find((entry) => entry.key === 'dpm');
+		expect(dpm).toMatchObject({ label: 'DPM', better: 'higher' });
+	});
 });

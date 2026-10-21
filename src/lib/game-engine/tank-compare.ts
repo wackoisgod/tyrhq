@@ -57,6 +57,18 @@ export const compareSections: CompareSectionDef[] = [
 			row('ShellPenetration', { unit: 'mm' }),
 			row('ReloadTime'),
 			row('ClipSize', { label: 'Clip Size' }),
+			// Derived from damage, reload and clip stats (see game-engine/firepower).
+			row('dpm', {
+				label: 'DPM',
+				better: 'higher',
+				groupThousands: true,
+				hint: 'Theoretical damage per minute with Standard ammo: every shot hits and penetrates, full clip then full reload.'
+			}),
+			row('burstDamage', {
+				label: 'Burst Damage',
+				better: 'higher',
+				hint: 'Damage from emptying one full clip.'
+			}),
 			row('ShellVelocity'),
 			row('GunMaxDepression', {
 				label: 'Gun Depression',

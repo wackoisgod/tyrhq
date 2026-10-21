@@ -10,6 +10,7 @@ import type {
 } from '$lib/types/game';
 
 import { getGameDataBundle } from '$lib/data/game-data';
+import { calculateFirepower } from '$lib/game-engine/firepower';
 
 export const PUBLIC_API_VERSION = 'v1';
 export const PUBLIC_API_DEFAULT_LIMIT = 50;
@@ -119,6 +120,7 @@ function serializeVehicle(vehicle: VehicleRecord) {
 		selectable: vehicle.selectable,
 		isWorkInProgress: vehicle.isWorkInProgress,
 		stats: vehicle.stats,
+		firepower: calculateFirepower(vehicle.stats),
 		ability: vehicle.ability,
 		loadout: vehicle.loadout,
 		nativeComponents: vehicle.nativeComponents,
@@ -560,6 +562,35 @@ function getOpenApiSchemas() {
 				selectable: { type: 'boolean' },
 				isWorkInProgress: { type: 'boolean' },
 				stats: { type: 'object', additionalProperties: { type: 'number' } },
+				firepower: {
+					type: ['object', 'null'],
+					description:
+						'Theoretical sustained output with Standard ammo, derived from ShellDamage, ReloadTime, ClipSize and IntraClipReloadTime. Assumes every shot hits and penetrates.',
+					required: [
+						'dpm',
+						'burstDamage',
+						'cycleTime',
+						'clipSize',
+						'shellDamage',
+						'reloadTime',
+						'intraClipReloadTime'
+					],
+					properties: {
+						dpm: { type: 'number', description: 'Damage per minute over repeated full clip + reload cycles.' },
+						burstDamage: { type: 'number', description: 'Damage from emptying one full clip.' },
+						cycleTime: {
+							type: 'number',
+							description: 'Seconds per cycle: ReloadTime plus (ClipSize - 1) intra-clip gaps.'
+						},
+						clipSize: { type: 'integer' },
+						shellDamage: { type: 'number' },
+						reloadTime: { type: 'number', description: 'Full reload after the clip is emptied.' },
+						intraClipReloadTime: {
+							type: 'number',
+							description: 'Gap between shots inside a clip; 0 for single-shot guns.'
+						}
+					}
+				},
 				ability: {
 					type: 'object',
 					required: ['name', 'description', 'icon'],
@@ -573,7 +604,7 @@ function getOpenApiSchemas() {
 				nativeComponents: { type: 'array', items: { type: 'object', additionalProperties: true } },
 				assets: { type: 'object', additionalProperties: { type: 'string' } }
 			},
-			required: ['id', 'key', 'slug', 'name', 'classId', 'classLabel', 'selectable', 'isWorkInProgress', 'stats', 'ability', 'loadout', 'nativeComponents', 'assets']
+			required: ['id', 'key', 'slug', 'name', 'classId', 'classLabel', 'selectable', 'isWorkInProgress', 'stats', 'firepower', 'ability', 'loadout', 'nativeComponents', 'assets']
 		},
 		Ammo: {
 			type: 'object',

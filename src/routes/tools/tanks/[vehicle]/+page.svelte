@@ -94,6 +94,10 @@
 		{ label: 'Damage', value: data.tank.stats.damage, unit: '' },
 		{ label: 'Penetration', value: data.tank.stats.penetration, unit: '' },
 		{ label: 'Reload', value: data.tank.stats.reloadTime, unit: 's' },
+		{ label: 'DPM', value: data.tank.stats.dpm, unit: '', groupThousands: true },
+		...(data.tank.stats.burstDamage !== data.tank.stats.damage
+			? [{ label: 'Burst Damage', value: data.tank.stats.burstDamage, unit: '' }]
+			: []),
 		{ label: 'Vision', value: data.tank.stats.vision, unit: 'm' },
 		{ label: 'Detection', value: data.tank.stats.detection, unit: 'm' },
 		{ label: 'Camo', value: data.tank.stats.camo, unit: '%' },
