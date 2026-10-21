@@ -47,11 +47,16 @@ class BufferWriter {
 	}
 
 	writeString(value: string) {
-		const chunk = Buffer.from(value, 'utf8');
-		this.writeInt32(chunk.length);
-		if (chunk.length > 0) {
-			this.chunks.push(chunk);
+		if (!value) {
+			this.writeInt32(0);
+			return;
 		}
+
+		// UE FString lengths include NUL; negative lengths count UTF-16 code units.
+		const unicode = /[^\x00-\x7f]/.test(value);
+		const chunk = Buffer.from(`${value}\0`, unicode ? 'utf16le' : 'ascii');
+		this.writeInt32(unicode ? -chunk.length / 2 : chunk.length);
+		this.chunks.push(chunk);
 	}
 
 	toBuffer() {
@@ -75,15 +80,16 @@ class BufferReader {
 	}
 
 	readString() {
-		const byteLength = this.readInt32();
-		if (byteLength < 0) {
-			throw new Error('Negative string length in loadout share payload');
-		}
+		const length = this.readInt32();
+		const unicode = length < 0;
+		const byteLength = Math.abs(length) * (unicode ? 2 : 1);
 		if (this.offset + byteLength > this.buffer.length) {
 			throw new Error('Unexpected end of buffer while reading string');
 		}
 
-		const value = this.buffer.subarray(this.offset, this.offset + byteLength).toString('utf8');
+		const value = this.buffer
+			.subarray(this.offset, this.offset + byteLength)
+			.toString(unicode ? 'utf16le' : 'utf8');
 		this.offset += byteLength;
 		// Codes minted in-game serialize UE FStrings with their NUL terminator included.
 		return value.replace(/\0+$/, '');
@@ -243,7 +249,8 @@ export function createSharedVehicleLoadout(selection: PlannerSelection, title?: 
 			}
 			return component.key;
 		}),
-		ammoSlots: selection.ammoIds.map((ammoId) => {
+		// The game's primary shell is implicit; loadouts store Secondary and Tertiary only.
+		ammoSlots: selection.ammoIds.slice(1).map((ammoId) => {
 			const ammo = catalog.ammoById.get(ammoId);
 			if (!ammo) {
 				throw new Error(`Unknown ammo "${ammoId}"`);
@@ -327,8 +334,14 @@ export function importShareCodeToPlannerSelection(shareCode: string): ImportedSh
 		return component.id;
 	});
 
+	// Older website codes included Primary; game codes contain only the configurable slots.
+	const configurableAmmoSlots =
+		loadout.ammoSlots.length === selection.ammoIds.length
+			? loadout.ammoSlots.slice(1)
+			: loadout.ammoSlots;
 	selection.ammoIds = selection.ammoIds.map((fallbackAmmoId, slotIndex) => {
-		const tag = loadout.ammoSlots[slotIndex] ?? '';
+		if (slotIndex === 0) return fallbackAmmoId;
+		const tag = configurableAmmoSlots[slotIndex - 1] ?? '';
 		if (!tag) return fallbackAmmoId;
 		const ammo = ammoByKey.get(tag);
 		if (!ammo) {
