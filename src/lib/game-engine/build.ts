@@ -265,12 +265,36 @@ function getDescriptionEffectMultiplier(description: string): number {
  */
 const trustedStackLimitComponents = new Set(['relentlessadapter']);
 
+/**
+ * The tooltip burst multiplier, but only when the burst is missing from the GE data.
+ * REDIRECTOR GEAR ("Effect doubles while you are reloading") exports its doubling as a
+ * second, WhileReloading-bound GE carrying the same modifier, which the conditional-effects
+ * toggle already applies — scaling both GEs by the text multiplier would quadruple it.
+ * FRICTION CAPACITOR's situational GE is an empty tracker, so its quintuple stays text-only.
+ */
+function getTextOnlyEffectMultiplier(
+	component: ComponentRecord,
+	effectById?: Map<string, EffectRecord>
+): number {
+	const multiplier = getDescriptionEffectMultiplier(component.description);
+	if (multiplier <= 1 || !effectById) return multiplier;
+	const burstIsDataDriven = (component.effectBindings ?? []).some(
+		(binding) =>
+			isConditionalEventTag(binding.eventTag ?? '') &&
+			(effectById.get(binding.effectId)?.modifiers.length ?? 0) > 0
+	);
+	return burstIsDataDriven ? 1 : multiplier;
+}
+
 /** Whether the "assume max stacks" option changes anything for this component. */
-export function componentSupportsMaxStacks(component: ComponentRecord): boolean {
+export function componentSupportsMaxStacks(
+	component: ComponentRecord,
+	effectById?: Map<string, EffectRecord>
+): boolean {
 	return (
 		descriptionIndicatesStacking(component.description) ||
 		trustedStackLimitComponents.has(component.id) ||
-		getDescriptionEffectMultiplier(component.description) > 1
+		getTextOnlyEffectMultiplier(component, effectById) > 1
 	);
 }
 
@@ -589,19 +613,20 @@ function getEventStackCount(effect: EffectRecord | undefined, allowMaxStacks: bo
 
 /**
  * Stack count for one of a component's data-driven effects. The tooltip's stated burst
- * multiplier participates because it is not always mirrored in the GE data — FRICTION
- * CAPACITOR's quintuple lives only in the text (its Max Speed GE has stackLimit 1 and
- * its airborne tracker is empty).
+ * multiplier participates when it is not mirrored in the GE data — FRICTION CAPACITOR's
+ * quintuple lives only in the text (its Max Speed GE has stackLimit 1 and its airborne
+ * tracker is empty). See getTextOnlyEffectMultiplier.
  */
 function getComponentEffectStackCount(
 	effect: EffectRecord,
 	component: ComponentRecord,
-	allowMaxStacks: boolean
+	allowMaxStacks: boolean,
+	effectById: Map<string, EffectRecord>
 ) {
 	if (!allowMaxStacks) return 1;
 	return Math.max(
 		getEventStackCount(effect, true),
-		getDescriptionEffectMultiplier(component.description)
+		getTextOnlyEffectMultiplier(component, effectById)
 	);
 }
 
@@ -887,7 +912,7 @@ export function computeBuild(
 		if (!component) continue;
 
 		const description = component.description || '';
-		const allowsStacking = componentSupportsMaxStacks(component);
+		const allowsStacking = componentSupportsMaxStacks(component, catalog.effectById);
 		const componentIsConditional = isConditionalComponent(component);
 		const boundEffects = getBoundEffects(
 			component.effectIds,
@@ -915,7 +940,8 @@ export function computeBuild(
 			const stackCount = getComponentEffectStackCount(
 				effect,
 				component,
-				assumeMaxStacks && allowsStacking
+				assumeMaxStacks && allowsStacking,
+				catalog.effectById
 			);
 			let effectApplied = false;
 
