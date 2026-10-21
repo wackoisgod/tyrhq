@@ -23,6 +23,10 @@ export type TankSummary = {
 		realAccelerationMps2: number;
 		reloadTime: number;
 		damage: number;
+		/** Theoretical damage per minute with Standard ammo (see game-engine/firepower). */
+		dpm: number;
+		/** Damage from one full clip; equals `damage` for single-shot guns. */
+		burstDamage: number;
 		penetration: number;
 		vision: number;
 		detection: number;

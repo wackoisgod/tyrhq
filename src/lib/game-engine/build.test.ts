@@ -13,6 +13,7 @@ import type {
 import {
 	componentSupportsMaxStacks,
 	computeBuild,
+	computeBuildFirepower,
 	createPlannerCatalog,
 	formatStatValue,
 	isConditionalTalent,
@@ -1154,5 +1155,83 @@ describe('exported effect bindings', () => {
 		expect(
 			computeBuild(catalog, selection, { includeConditionalEffects: false })?.stats.MaxHealth
 		).toBeCloseTo(1100, 4);
+	});
+});
+
+describe('computeBuildFirepower', () => {
+	it('separates guaranteed DPM from DPM with conditional effects', () => {
+		const highExplosive = makeAmmo('he', 'High Explosive', 1.2);
+		const passiveReload = makeEffect('passive-reload', 'ReloadTime', 'AddBase', -1);
+		const onHitDamage = makeEffect('onhit-damage', 'ShellDamage', 'AddBase', 50);
+		const component: ComponentRecord = {
+			...makeComponent(
+				'mixed-firepower',
+				'MIXED FIREPOWER',
+				['passive-reload', 'onhit-damage'],
+				[1],
+				'Reduces reload time, and increases shell damage after penetrating an enemy.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.OnPenetration'],
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'passive-reload',
+					effectPath: passiveReload.path
+				},
+				{
+					eventTag: 'Gameplay.Event.OnPenetration',
+					effectId: 'onhit-damage',
+					effectPath: onHitDamage.path
+				}
+			]
+		};
+		const vehicle = makeVehicle(
+			'gun',
+			{ ShellDamage: 100, ReloadTime: 10, ClipSize: 1, IntraClipReloadTime: 2.5 },
+			'he',
+			'tree_gun'
+		);
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [highExplosive],
+				components: [component],
+				talents: [],
+				effects: [passiveReload, onHitDamage],
+				trees: [makeTree('tree_gun', 'gun', [])]
+			})
+		);
+
+		const firepower = computeBuildFirepower(catalog, {
+			vehicleId: 'gun',
+			ammoIds: ['he'],
+			previewAmmoSlot: 0,
+			componentIds: ['mixed-firepower'],
+			talentPoints: {}
+		});
+
+		expect(firepower).not.toBeNull();
+		// Stock: 100 dmg / 10 s, no ammo multiplier.
+		expect(firepower!.base?.dpm).toBeCloseTo(600, 4);
+		// Guaranteed: HE ×1.2 damage, passive −1 s reload → 120 / 9 s.
+		expect(firepower!.guaranteed?.dpm).toBeCloseTo(800, 4);
+		// With conditional: (100 + 50) × 1.2 = 180 / 9 s.
+		expect(firepower!.withConditional?.dpm).toBeCloseTo(1200, 4);
+		expect(firepower!.withConditional?.burstDamage).toBeCloseTo(180, 4);
+	});
+
+	it('returns null for an unknown vehicle', () => {
+		const catalog = createPlannerCatalog(
+			makeBundle({ vehicles: [], ammo: [], components: [], talents: [], effects: [], trees: [] })
+		);
+		expect(
+			computeBuildFirepower(catalog, {
+				vehicleId: 'missing',
+				ammoIds: [],
+				previewAmmoSlot: 0,
+				componentIds: [],
+				talentPoints: {}
+			})
+		).toBeNull();
 	});
 });

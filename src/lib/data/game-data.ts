@@ -1,6 +1,7 @@
 import runtimeData from '$gamedata/generated/runtime.json';
 
 import { fillTemplatedComponentDescription } from '$lib/game-engine/component-format';
+import { calculateFirepower } from '$lib/game-engine/firepower';
 import { compareStatKeys } from '$lib/game-engine/tank-compare';
 import { calculateRealAccelerationMps2 } from './vehicle-real-acceleration';
 import type {
@@ -12,7 +13,8 @@ import type {
 	MapSummary,
 	TalentSummary,
 	TalentTreeSummary,
-	TankSummary
+	TankSummary,
+	VehicleRecord
 } from '$lib/types/game';
 
 type RawGameDataBundle = Omit<GameDataBundle, 'ammo'> & {
@@ -51,35 +53,40 @@ function normalizeBundle(rawBundle: GameDataBundle): GameDataBundle {
 const bundle = normalizeBundle(runtimeData as RawGameDataBundle as GameDataBundle);
 
 function toTankSummary(): TankSummary[] {
-	return bundle.vehicles.map((vehicle) => ({
-		id: vehicle.id,
-		key: vehicle.key,
-		slug: vehicle.slug,
-		name: vehicle.name,
-		classId: vehicle.classId,
-		classLabel: vehicle.classLabel,
-		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
-		selectable: vehicle.selectable,
-		weightKg: Number(vehicle.weightKg ?? 0),
-		stats: {
-			health: Number(vehicle.stats.MaxHealth ?? 0),
-			maxSpeed: Number(vehicle.stats.MaxSpeed ?? 0),
-			reverseSpeed: Number(vehicle.stats.MaxReverseSpeed ?? 0),
-			realAccelerationMps2: calculateRealAccelerationMps2(
-				Number(vehicle.stats.MaxSpeed ?? 0),
-				Number(vehicle.stats.AccelerationTime ?? 0)
-			),
-			reloadTime: Number(vehicle.stats.ReloadTime ?? 0),
-			damage: Number(vehicle.stats.ShellDamage ?? 0),
-			penetration: Number(vehicle.stats.ShellPenetration ?? 0),
-			vision: Number(vehicle.stats.VisionRadius ?? 0),
-			detection: Number(vehicle.stats.DetectionRadius ?? 0),
-			camo: Number(vehicle.stats.CamoPercentage ?? 0),
-			difficulty: Number(vehicle.stats.DifficultyRating ?? 0),
-			abilityCost: Number(vehicle.stats.AbilityCost ?? 0)
-		},
-		ability: vehicle.ability
-	}));
+	return bundle.vehicles.map((vehicle) => {
+		const firepower = calculateFirepower(vehicle.stats);
+		return {
+			id: vehicle.id,
+			key: vehicle.key,
+			slug: vehicle.slug,
+			name: vehicle.name,
+			classId: vehicle.classId,
+			classLabel: vehicle.classLabel,
+			isWorkInProgress: Boolean(vehicle.isWorkInProgress),
+			selectable: vehicle.selectable,
+			weightKg: Number(vehicle.weightKg ?? 0),
+			stats: {
+				health: Number(vehicle.stats.MaxHealth ?? 0),
+				maxSpeed: Number(vehicle.stats.MaxSpeed ?? 0),
+				reverseSpeed: Number(vehicle.stats.MaxReverseSpeed ?? 0),
+				realAccelerationMps2: calculateRealAccelerationMps2(
+					Number(vehicle.stats.MaxSpeed ?? 0),
+					Number(vehicle.stats.AccelerationTime ?? 0)
+				),
+				reloadTime: Number(vehicle.stats.ReloadTime ?? 0),
+				damage: Number(vehicle.stats.ShellDamage ?? 0),
+				dpm: Math.round(firepower?.dpm ?? 0),
+				burstDamage: firepower?.burstDamage ?? 0,
+				penetration: Number(vehicle.stats.ShellPenetration ?? 0),
+				vision: Number(vehicle.stats.VisionRadius ?? 0),
+				detection: Number(vehicle.stats.DetectionRadius ?? 0),
+				camo: Number(vehicle.stats.CamoPercentage ?? 0),
+				difficulty: Number(vehicle.stats.DifficultyRating ?? 0),
+				abilityCost: Number(vehicle.stats.AbilityCost ?? 0)
+			},
+			ability: vehicle.ability
+		};
+	});
 }
 
 function toAmmoSummary(): AmmoSummary[] {
@@ -148,6 +155,23 @@ export function getGameDataBundle() {
 	return bundle;
 }
 
+/** Compare keys that aren't raw exported stats. */
+const derivedCompareStats: Record<string, (vehicle: VehicleRecord) => number> = {
+	weightKg: (vehicle) => Number(vehicle.weightKg ?? 0),
+	realAccelerationMps2: (vehicle) =>
+		calculateRealAccelerationMps2(
+			Number(vehicle.stats.MaxSpeed ?? 0),
+			Number(vehicle.stats.AccelerationTime ?? 0)
+		),
+	dpm: (vehicle) => Math.round(calculateFirepower(vehicle.stats)?.dpm ?? 0),
+	burstDamage: (vehicle) => calculateFirepower(vehicle.stats)?.burstDamage ?? 0
+};
+
+function getCompareStatValue(vehicle: VehicleRecord, key: string) {
+	const derive = derivedCompareStats[key];
+	return Number(derive ? derive(vehicle) : (vehicle.stats[key] ?? 0));
+}
+
 export function getCompareTanks(): CompareTank[] {
 	return bundle.vehicles.map((vehicle) => ({
 		id: vehicle.id,
@@ -157,19 +181,7 @@ export function getCompareTanks(): CompareTank[] {
 		classLabel: vehicle.classLabel,
 		isWorkInProgress: Boolean(vehicle.isWorkInProgress),
 		stats: Object.fromEntries(
-			compareStatKeys.map((key) => [
-				key,
-				Number(
-					key === 'weightKg'
-						? vehicle.weightKg
-						: key === 'realAccelerationMps2'
-							? calculateRealAccelerationMps2(
-									Number(vehicle.stats.MaxSpeed ?? 0),
-									Number(vehicle.stats.AccelerationTime ?? 0)
-								)
-							: (vehicle.stats[key] ?? 0)
-				)
-			])
+			compareStatKeys.map((key) => [key, getCompareStatValue(vehicle, key)])
 		),
 		ability: vehicle.ability
 	}));

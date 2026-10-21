@@ -9,6 +9,7 @@
 		canIncrementTalentPoint,
 		componentSupportsMaxStacks,
 		computeBuild,
+		computeBuildFirepower,
 		createPlannerCatalog,
 		descriptionIndicatesStacking,
 		formatStatValue,
@@ -30,6 +31,7 @@
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
+	import { firepowerDefinitions, type FirepowerDefinition } from '$lib/game-engine/firepower';
 
 	import { onMount } from 'svelte';
 
@@ -560,6 +562,22 @@
 				})
 			: null
 	);
+
+	// Independent of the "Include conditional effects" toggle: firepower always shows the
+	// guaranteed figure, plus the conditional best case when it differs.
+	const buildFirepower = $derived(
+		selection ? computeBuildFirepower(catalog, selection, { assumeMaxStacks }) : null
+	);
+
+	function formatFirepowerValue(definition: FirepowerDefinition, value: number) {
+		if (definition.unit) return formatStatValue(value, definition.unit);
+		return Math.round(value).toLocaleString('en-US');
+	}
+
+	function formatFirepowerDelta(definition: FirepowerDefinition, delta: number) {
+		const rounded = definition.unit ? delta : Math.round(delta);
+		return `${rounded > 0 ? '+' : ''}${formatFirepowerValue(definition, rounded)}`;
+	}
 
 	const buildHasConditionals = $derived.by(() => {
 		if (!selection) return false;
@@ -1613,6 +1631,80 @@
 				</div>
 
 				{#if computedBuild}
+					{#if buildFirepower?.guaranteed}
+						{@const guaranteed = buildFirepower.guaranteed}
+						<div class="mt-4" aria-label="Firepower">
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+								{#each firepowerDefinitions as definition}
+									{@const value = guaranteed[definition.key]}
+									{@const base = buildFirepower.base?.[definition.key] ?? value}
+									{@const delta = value - base}
+									{@const deltaTone = getDeltaTone(definition, delta)}
+									{@const conditionalValue = buildFirepower.withConditional?.[definition.key]}
+									<div
+										class="rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)]"
+										title={definition.hint}
+									>
+										<div class="flex items-baseline justify-between gap-2">
+											<span
+												class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+											>
+												{definition.label}
+											</span>
+											<span class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+												Guaranteed
+											</span>
+										</div>
+										<div
+											class="mt-1 font-[var(--font-display)] text-2xl font-semibold tabular-nums text-[var(--hud-text)]"
+										>
+											{formatFirepowerValue(definition, value)}
+										</div>
+										<div class="mt-0.5 flex items-baseline gap-2 text-xs tabular-nums text-[var(--hud-dim)]">
+											<span>Base {formatFirepowerValue(definition, base)}</span>
+											<span
+												class={`font-semibold ${
+													deltaTone === 'positive'
+														? 'text-emerald-300'
+														: deltaTone === 'negative'
+															? 'text-rose-300'
+															: 'text-[var(--hud-dim)]'
+												}`}
+											>
+												{formatFirepowerDelta(definition, delta)}
+											</span>
+										</div>
+										{#if conditionalValue != null && Math.abs(conditionalValue - value) >= 0.005}
+											<div
+												class="mt-1.5 flex items-center gap-1.5 border-t border-[var(--hud-variant)]/60 pt-1.5 text-xs text-[var(--hud-teal)]"
+												title="Best case: also counts situational talents and components (on-hit, while unspotted, …){assumeMaxStacks ? ' at max stacks' : ''}."
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 24 24"
+													fill="currentColor"
+													class="h-3.5 w-3.5 shrink-0"
+													aria-hidden="true"
+												>
+													<path
+														d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.62 12 4c1.58 3.62 3.52 6.94 4.81 8.22.02.04.26.22.07.12-.19-.34-.2-.66.38-.66H13l1 7h-1v1h-2v-1z"
+													/>
+												</svg>
+												<span>With conditional effects</span>
+												<span class="ml-auto font-semibold tabular-nums">
+													{formatFirepowerValue(definition, conditionalValue)}
+												</span>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+							<p class="mt-2 text-[11px] leading-4 text-[var(--hud-dim)]">
+								Theoretical output with the previewed ammo: every shot hits and penetrates, full clip
+								then full reload. Event-triggered reload speed-ups (active reload) aren't counted.
+							</p>
+						</div>
+					{/if}
 					<div
 						class="mt-4 flex flex-wrap gap-1.5 border-b border-[var(--hud-variant)] pb-3"
 					>

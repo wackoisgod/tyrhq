@@ -8,6 +8,7 @@ import type {
 	TalentTreeRecord,
 	VehicleRecord
 } from '$lib/types/game';
+import { calculateFirepower, type Firepower } from '$lib/game-engine/firepower';
 import {
 	lowerBetterStats,
 	multiplierDefaultStats,
@@ -1058,6 +1059,42 @@ export function computeBuild(
 	};
 }
 
+export type BuildFirepower = {
+	/** Stock vehicle: no talents, components, or ammo modifiers. */
+	base: Firepower | null;
+	/** Previewed ammo plus permanent loadout bonuses only. */
+	guaranteed: Firepower | null;
+	/** Also counts situational effects (on-hit, while unspotted, …), honouring max stacks. */
+	withConditional: Firepower | null;
+};
+
+/**
+ * Firepower is reported twice so a build's DPM never silently assumes every
+ * situational bonus is active: `guaranteed` drops conditional effects and stacks,
+ * `withConditional` is the best case the planner can model.
+ */
+export function computeBuildFirepower(
+	catalog: PlannerCatalog,
+	selection: PlannerSelection,
+	options: { assumeMaxStacks?: boolean } = {}
+): BuildFirepower | null {
+	const guaranteedBuild = computeBuild(catalog, selection, {
+		includeConditionalEffects: false,
+		assumeMaxStacks: false
+	});
+	if (!guaranteedBuild) return null;
+	const conditionalBuild = computeBuild(catalog, selection, {
+		includeConditionalEffects: true,
+		assumeMaxStacks: options.assumeMaxStacks ?? false
+	});
+
+	return {
+		base: calculateFirepower(guaranteedBuild.baseStats),
+		guaranteed: calculateFirepower(guaranteedBuild.stats),
+		withConditional: conditionalBuild ? calculateFirepower(conditionalBuild.stats) : null
+	};
+}
+
 export function formatStatValue(value: number, unit?: string) {
 	if (!Number.isFinite(value)) return '-';
 	let rounded: string;
@@ -1073,7 +1110,7 @@ export function formatStatValue(value: number, unit?: string) {
 	return unit ? `${rounded} ${unit}` : rounded;
 }
 
-export function getDeltaTone(definition: StatDefinition, delta: number) {
+export function getDeltaTone(definition: Pick<StatDefinition, 'lowerBetter'>, delta: number) {
 	if (Math.abs(delta) < 0.0001) return 'neutral';
 	if (definition.lowerBetter) return delta < 0 ? 'positive' : 'negative';
 	return delta > 0 ? 'positive' : 'negative';
