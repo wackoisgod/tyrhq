@@ -709,7 +709,20 @@ describe('computeBuild aggregator math', () => {
 				[2],
 				'Increases Max Speed by 2 kph. Effect briefly quintuples on landing after being airborne.'
 			),
-			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne']
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne'],
+			// Mirrors the export: the +2 kph GE is always on, the airborne tracker is situational.
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'Components_MaxSpeedFlat',
+					effectPath: maxSpeedEffect.path
+				},
+				{
+					eventTag: 'Gameplay.Event.WhileAirborne',
+					effectId: 'ge-components-frictioncapacitorairbornetracker',
+					effectPath: trackerEffect.path
+				}
+			]
 		};
 		const vehicle = makeVehicle('blink', { MaxSpeed: 57 }, 'standard', 'tree_blink');
 		const tree = makeTree('tree_blink', 'blink', []);
@@ -739,6 +752,13 @@ describe('computeBuild aggregator math', () => {
 		expect(maxStacks!.stats.MaxSpeed).toBeCloseTo(67, 4);
 		const entry = maxStacks!.breakdown.MaxSpeed?.find((e) => e.source.includes('FRICTION CAPACITOR'));
 		expect(entry?.delta).toBeCloseTo(10, 4);
+
+		// The landing burst is situational: without conditional effects only the passive +2 applies.
+		const passiveOnly = computeBuild(catalog, selection, {
+			includeConditionalEffects: false,
+			assumeMaxStacks: true
+		});
+		expect(passiveOnly!.stats.MaxSpeed).toBeCloseTo(59, 4);
 	});
 
 	it('duplicator\'s "Doubles the number of shells gained" is not a stat-effect multiplier', () => {
