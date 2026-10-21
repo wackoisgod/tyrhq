@@ -616,18 +616,20 @@ function getEventStackCount(effect: EffectRecord | undefined, allowMaxStacks: bo
  * multiplier participates when it is not mirrored in the GE data — FRICTION CAPACITOR's
  * quintuple lives only in the text (its Max Speed GE has stackLimit 1 and its airborne
  * tracker is empty). See getTextOnlyEffectMultiplier.
+ *
+ * That burst lands on the component's always-on GE, but it is situational ("on landing"),
+ * so it only counts while conditional effects are included.
  */
 function getComponentEffectStackCount(
 	effect: EffectRecord,
 	component: ComponentRecord,
 	allowMaxStacks: boolean,
+	includeConditionalEffects: boolean,
 	effectById: Map<string, EffectRecord>
 ) {
 	if (!allowMaxStacks) return 1;
-	return Math.max(
-		getEventStackCount(effect, true),
-		getTextOnlyEffectMultiplier(component, effectById)
-	);
+	const textBurst = includeConditionalEffects ? getTextOnlyEffectMultiplier(component, effectById) : 1;
+	return Math.max(getEventStackCount(effect, true), textBurst);
 }
 
 function getDescriptionStackLimit(description: string) {
@@ -941,6 +943,7 @@ export function computeBuild(
 				effect,
 				component,
 				assumeMaxStacks && allowsStacking,
+				includeConditionalEffects,
 				catalog.effectById
 			);
 			let effectApplied = false;
