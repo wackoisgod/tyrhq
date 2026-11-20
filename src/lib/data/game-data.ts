@@ -3,6 +3,7 @@ import runtimeData from '$gamedata/generated/runtime.json';
 import { fillTemplatedComponentDescription } from '$lib/game-engine/component-format';
 import { calculateFirepower } from '$lib/game-engine/firepower';
 import { compareStatKeys } from '$lib/game-engine/tank-compare';
+import { applyPatchOverlay } from './patch-overlay';
 import { calculateRealAccelerationMps2 } from './vehicle-real-acceleration';
 import type {
 	AmmoSummary,
@@ -50,7 +51,9 @@ function normalizeBundle(rawBundle: GameDataBundle): GameDataBundle {
 	};
 }
 
-const bundle = normalizeBundle(runtimeData as RawGameDataBundle as GameDataBundle);
+const bundle = normalizeBundle(
+	applyPatchOverlay(runtimeData as RawGameDataBundle as GameDataBundle).bundle
+);
 
 function toTankSummary(): TankSummary[] {
 	return bundle.vehicles.map((vehicle) => {
