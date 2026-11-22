@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { ReplayAutoFillSuggestions } from '$lib/server/replay-upload';
+	
 	let { data, form } = $props();
 
 	const mapsById = $derived(new Map(data.detail.maps.map((map) => [map.id, map])));
@@ -178,6 +180,79 @@
 
 	{#if data.detail.canManage && data.detail.match.teamA && data.detail.match.teamB}
 		<div class="mt-4">
+			<!-- Replay auto-fill -->
+			{#if form && 'replaySuggestions' in form && form.replaySuggestions}
+				{@const suggestions = form.replaySuggestions as ReplayAutoFillSuggestions}
+				<div class="mb-6 hud-panel p-5">
+					<h3 class="font-semibold text-[var(--hud-text)]">Replay Auto-Fill Suggestions</h3>
+					<p class="mt-2 text-sm text-[var(--hud-muted)]">Review these suggestions extracted from the replay file. You can edit any fields before saving.</p>
+					
+					{#if suggestions.warnings && suggestions.warnings.length > 0}
+						<div class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-3 py-2 text-xs">
+							<strong>Warnings:</strong>
+							<ul class="mt-1 list-inside list-disc">
+								{#each suggestions.warnings as warning}
+									<li>{warning}</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+					
+					{#if suggestions.suggestedWinner}
+						<p class="mt-3 text-sm"><strong class="text-[var(--hud-teal)]">Suggested Winner:</strong> {teamName(suggestions.suggestedWinner)}</p>
+					{/if}
+					
+					{#if suggestions.playerSuggestions.length > 0}
+						<div class="mt-4">
+							<p class="text-sm font-semibold text-[var(--hud-text)]">Player Matches:</p>
+							<div class="mt-2 grid gap-2 text-xs">
+								{#each suggestions.playerSuggestions as player}
+									<div class="rounded bg-[var(--hud-inset)] px-3 py-2">
+										<span class="font-semibold text-[var(--hud-text)]">{player.name}</span>
+										{#if player.matchMethod === 'steam_id'}
+											<span class="ml-2 text-[var(--hud-teal)]">✓ Matched via Steam ID</span>
+										{:else if player.matchMethod === 'display_name'}
+											<span class="ml-2 text-[#ffd166]">~ Matched via display name</span>
+										{:else}
+											<span class="ml-2 text-[var(--hud-muted)]">⚠ No match found - assign manually</span>
+										{/if}
+										{#if player.stats.tankName}
+											<span class="ml-2 text-[var(--hud-muted)]">• {player.stats.tankName}</span>
+										{/if}
+										{#if player.stats.kills !== null || player.stats.damage !== null}
+											<span class="ml-2 text-[var(--hud-muted)]">
+												• K:{player.stats.kills ?? '?'} D:{player.stats.damage ?? '?'}
+											</span>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+					
+					<button type="button" onclick={(e) => e.currentTarget.parentElement?.remove()} class="mt-4 hud-cta-outline px-3 py-2 text-xs">
+						Dismiss Suggestions
+					</button>
+				</div>
+			{/if}
+			
+			<details class="mb-6 hud-panel p-5">
+				<summary class="cursor-pointer text-sm font-semibold uppercase tracking-[0.14em] text-[var(--hud-text)]">Upload Replay to Auto-Fill</summary>
+				<form method="POST" action="?/parseReplay" enctype="multipart/form-data" class="mt-4">
+					<input type="hidden" name="matchId" value={data.detail.match.id} />
+					<div class="grid gap-3">
+						<label class="grid gap-1.5">
+							<span class="hud-label">Replay File (.replay)</span>
+							<input type="file" name="replayFile" accept=".replay" required class="hud-input px-3 py-2 text-sm" />
+							<span class="text-xs text-[var(--hud-muted)]">
+								Extracts player roster, stats, and winner from replay file. Review suggestions before saving.
+							</span>
+						</label>
+						<button class="hud-cta w-fit px-4 py-2">Parse Replay</button>
+					</div>
+				</form>
+			</details>
+
 			<form method="POST" action="?/batchGames" id="batch-games-form">
 				<input type="hidden" name="matchId" value={data.detail.match.id} />
 				<input type="hidden" name="games" value={JSON.stringify(gameFormData)} />

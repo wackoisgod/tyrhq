@@ -18,6 +18,7 @@ import {
 	saveTournamentMatchGames,
 	updateTournamentMatchSettings
 } from '$lib/server/tournament-series';
+import { generateAutoFillSuggestions } from '$lib/server/replay-upload';
 
 function datetimeLocalToIso(value: FormDataEntryValue | null) {
 	const raw = String(value ?? '').trim();
@@ -170,6 +171,65 @@ export const actions: Actions = {
 			};
 		} catch (caught) {
 			return tournamentFailure(caught);
+		}
+	},
+	parseReplay: async ({ request, locals, params }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		
+		const form = await request.formData();
+		const replayFile = form.get('replayFile') as File | null;
+		const matchId = String(form.get('matchId') ?? '');
+		
+		if (!replayFile || replayFile.size === 0) {
+			return fail(400, { error: 'Please select a replay file.' });
+		}
+		
+		// Validate file size (max 50MB)
+		const MAX_SIZE = 50 * 1024 * 1024;
+		if (replayFile.size > MAX_SIZE) {
+			return fail(400, { error: 'Replay file is too large (max 50MB).' });
+		}
+		
+		try {
+			// Read file into buffer
+			const arrayBuffer = await replayFile.arrayBuffer();
+			const buffer = new Uint8Array(arrayBuffer);
+			
+			// Get tournament and match details
+			const tournament = await getTournamentBySlug(params.slug, user.id, role);
+			if (!tournament) return fail(404, { error: 'Tournament not found' });
+			
+			const detail = await getTournamentMatchDetail(tournament.id, matchId, user.id, role);
+			if (!detail.canManage) {
+				return fail(403, { error: 'You do not have permission to manage this match.' });
+			}
+			
+			if (!detail.match.teamA || !detail.match.teamB) {
+				return fail(400, { error: 'Match must have both teams assigned.' });
+			}
+			
+			// Generate suggestions
+			const result = await generateAutoFillSuggestions(
+				buffer,
+				tournament.id,
+				matchId,
+				detail.match.teamA.id,
+				detail.match.teamB.id
+			);
+			
+			if (!result.success) {
+				return fail(400, { error: result.error });
+			}
+			
+			return {
+				success: 'Replay parsed successfully. Review suggestions below.',
+				replaySuggestions: result.suggestions
+			};
+		} catch (caught) {
+			return fail(500, { 
+				error: caught instanceof Error ? caught.message : 'Failed to parse replay file.' 
+			});
 		}
 	}
 };

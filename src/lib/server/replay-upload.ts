@@ -59,6 +59,9 @@ async function matchPlayers(
 	teamBId: string
 ): Promise<ReplayAutoFillSuggestions['playerSuggestions']> {
 	const supabase = getSupabaseAdminClient();
+	if (!supabase) {
+		throw new Error('Failed to initialize database client');
+	}
 
 	// Get tournament roster with verified Steam IDs
 	const { data: rosterMembers } = await supabase
@@ -150,6 +153,9 @@ export async function generateAutoFillSuggestions(
 
 		// Check for duplicate GUID
 		const supabase = getSupabaseAdminClient();
+		if (!supabase) {
+			return { success: false, error: 'Database connection failed' };
+		}
 		const { data: existing } = await supabase
 			.from('tournament_match_games')
 			.select('id, match_id')
@@ -197,6 +203,9 @@ export async function generateAutoFillSuggestions(
  */
 export async function checkReplayGuidExists(guid: string): Promise<boolean> {
 	const supabase = getSupabaseAdminClient();
+	if (!supabase) {
+		return false;
+	}
 	const { data } = await supabase
 		.from('tournament_match_games')
 		.select('id')
