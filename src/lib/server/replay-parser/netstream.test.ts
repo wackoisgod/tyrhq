@@ -16,7 +16,9 @@ describe('Netstream Walker - Real Replay Validation', () => {
 			changelist: result.changelist,
 			rosterCount: result.roster.length,
 			warningCount: result.warnings.length,
-			firstWarning: result.warnings[0]
+			firstWarning: result.warnings[0],
+			playerIdentityCount: result.roster.length,
+			samplePlayer: result.roster[0]
 		});
 		
 		// Verify header extraction

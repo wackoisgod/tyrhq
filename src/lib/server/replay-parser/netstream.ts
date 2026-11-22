@@ -274,14 +274,22 @@ function processBunchPayload(
 	state: NetstreamState,
 	bHasMustBeMapped: boolean
 ): void {
+	// Check if we have enough data
+	if (bits.bitsLeft() < 8) {
+		return; // Not enough data for any meaningful content
+	}
+	
 	if (bHasMustBeMapped) {
+		if (bits.bitsLeft() < 16) return;
 		const numMustBeMapped = bits.u16();
 		for (let i = 0; i < numMustBeMapped; i++) {
+			if (bits.bitsLeft() < 8) break;
 			bits.intPacked(); // Skip guid
 		}
 	}
 	
 	if (bOpen) {
+		if (bits.bitsLeft() < 24) return; // Need at least actorGuid + bHasArchetype + maybe archetype
 		// Actor channel open: read actor GUID and class
 		ch.actorGuid = bits.intPacked();
 		
@@ -299,6 +307,10 @@ function processBunchPayload(
 			const parts = ch.class.split('.');
 			if (parts.length > 1) {
 				ch.class = parts[parts.length - 1];
+			}
+			
+			if (state.channels.size <= 20) {
+				console.log(`  bOpen=true, ch=${ch.chIndex}, actorGuid=${ch.actorGuid}, classGuid=${classGuid}, class=${ch.class}`);
 			}
 		}
 	}
@@ -471,6 +483,10 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 		}
 		if (chName) {
 			ch.name = chName;
+			if (state.channels.size <= 20) {
+				// Debug: log first few channel opens
+				console.log(`Channel ${chIndex} opened: ${chName}`);
+			}
 		}
 		
 		// Skip NetGUID exports (we don't need them for player identity)
@@ -505,6 +521,11 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 		if (!bPartial) {
 			try {
 				processBunchPayload(payload, ch, bOpen, state, bHasMustBeMapped);
+				
+				// Debug: log player identity classes
+				if ((ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C') && state.playerIdentity.size <= 10) {
+					console.log(`Player identity class detected: ch=${chIndex}, class=${ch.class}, actorGuid=${ch.actorGuid}`);
+				}
 			} catch (e) {
 				state.warnings.push(`Bunch content failed ch=${chIndex}: ${e}`);
 			}
