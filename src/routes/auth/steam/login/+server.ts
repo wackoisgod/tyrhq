@@ -29,11 +29,12 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	// Get optional redirect target
 	const next = sanitizePostAuthRedirect(url.searchParams.get('next'));
 
-	// Build return URL
-	const returnUrl = new URL('/auth/steam/login/callback', url.origin);
-
 	// Generate random state nonce for CSRF protection
 	const stateNonce = crypto.randomUUID();
+
+	// Build return URL with state nonce
+	const returnUrl = new URL('/auth/steam/login/callback', url.origin);
+	returnUrl.searchParams.set('state', stateNonce);
 
 	// Encode the mode and next path in the state
 	const state = JSON.stringify({ mode: 'login', next, nonce: stateNonce });

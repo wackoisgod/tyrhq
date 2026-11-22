@@ -8,9 +8,28 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseAdminClient } from '$lib/server/supabase-admin';
+import { sanitizePostAuthRedirect } from '$lib/server/security';
+import { timingSafeEqual } from 'crypto';
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
+const STEAM_API_TIMEOUT_MS = 3000;
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+function constantTimeCompare(a: string, b: string): boolean {
+	if (a.length !== b.length) {
+		return false;
+	}
+	try {
+		const bufA = Buffer.from(a, 'utf8');
+		const bufB = Buffer.from(b, 'utf8');
+		return timingSafeEqual(bufA, bufB);
+	} catch {
+		return false;
+	}
+}
 
 /**
  * Extract SteamID64 from claimed_id URL
@@ -18,6 +37,33 @@ const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
 function extractSteamId(claimedId: string): string | null {
 	const match = claimedId.match(STEAM_ID_REGEX);
 	return match ? match[1] : null;
+}
+
+/**
+ * Sanitize Steam persona name for use as display name
+ */
+function sanitizePersonaName(name: string | null | undefined): string | null {
+	if (!name) return null;
+	
+	// Trim whitespace
+	let sanitized = name.trim();
+	
+	// Remove control characters
+	sanitized = sanitized.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+	
+	// Cap length at 32 characters (profile limit)
+	if (sanitized.length > 32) {
+		sanitized = sanitized.slice(0, 32);
+	}
+	
+	return sanitized || null;
+}
+
+/**
+ * Escape SQL LIKE pattern wildcards
+ */
+function escapeLikePattern(str: string): string {
+	return str.replace(/[%_]/g, '\\$&');
 }
 
 /**
@@ -81,6 +127,16 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(400, 'Invalid authentication mode.');
 	}
 
+	// SECURITY: Verify state nonce with constant-time comparison
+	const stateParam = url.searchParams.get('state');
+	if (!stateParam) {
+		throw error(400, 'Missing state parameter. Please try again.');
+	}
+	
+	if (!constantTimeCompare(stateParam, state.nonce)) {
+		throw error(400, 'Invalid state nonce. Possible CSRF attack.');
+	}
+
 	// Check OpenID response
 	const mode = url.searchParams.get('openid.mode');
 	if (mode === 'cancel') {
@@ -97,10 +153,12 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(400, 'Invalid OpenID provider endpoint');
 	}
 
-	// SECURITY: Validate return_to matches our callback URL
+	// SECURITY: Validate return_to matches our callback URL with state nonce
 	const returnTo = url.searchParams.get('openid.return_to');
-	const expectedReturnTo = new URL('/auth/steam/login/callback', url.origin).toString();
-	if (returnTo !== expectedReturnTo) {
+	const expectedReturnTo = new URL('/auth/steam/login/callback', url.origin);
+	expectedReturnTo.searchParams.set('state', state.nonce);
+	
+	if (returnTo !== expectedReturnTo.toString()) {
 		throw error(400, 'Invalid return URL');
 	}
 
@@ -141,11 +199,17 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	if (steamApiKey) {
 		try {
 			const apiUrl = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${steamApiKey}&steamids=${steamId}`;
-			const apiResponse = await fetch(apiUrl);
-			const apiData = await apiResponse.json();
-
-			if (apiData.response?.players?.[0]?.personaname) {
-				steamDisplayName = apiData.response.players[0].personaname;
+			const apiResponse = await fetch(apiUrl, {
+				signal: AbortSignal.timeout(STEAM_API_TIMEOUT_MS)
+			});
+			
+			if (!apiResponse.ok) {
+				console.warn('[steam-login] Steam API returned non-OK status:', apiResponse.status);
+			} else {
+				const apiData = await apiResponse.json();
+				if (apiData.response?.players?.[0]?.personaname) {
+					steamDisplayName = sanitizePersonaName(apiData.response.players[0].personaname);
+				}
 			}
 		} catch (err) {
 			console.warn('[steam-login] Failed to fetch Steam display name:', err);
@@ -181,46 +245,65 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		});
 
 		if (createError) {
-			// Check for race condition - another concurrent request may have created this user
-			if (createError.message?.includes('already') || createError.code === '23505') {
-				// Retry lookup
-				const { data: retryProfile } = await supabaseAdmin
-					.from('profiles')
-					.select('id, display_name')
-					.eq('verified_steam_id', steamId)
-					.maybeSingle();
+			// IDEMPOTENT: Check if user already exists (stuck-account recovery)
+			// Look up by placeholder email instead of relying on error message
+			const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+				page: 1,
+				perPage: 1
+			});
 
-				if (retryProfile) {
-					profile = retryProfile;
-					userId = retryProfile.id;
-				} else {
-					console.error('[steam-login] User creation failed (race condition unresolved):', createError);
-					throw error(500, 'Failed to create account');
+			let existingUserId: string | null = null;
+
+			// Search for user with placeholder email
+			if (!listError && users?.users) {
+				const existingUser = users.users.find((u) => u.email === placeholderEmail);
+				if (existingUser) {
+					existingUserId = existingUser.id;
 				}
+			}
+
+			// Also try to find profile by Steam ID (may exist from race condition)
+			const { data: retryProfile } = await supabaseAdmin
+				.from('profiles')
+				.select('id, display_name')
+				.eq('verified_steam_id', steamId)
+				.maybeSingle();
+
+			if (retryProfile) {
+				// Profile exists with Steam ID already set
+				profile = retryProfile;
+				userId = retryProfile.id;
+			} else if (existingUserId) {
+				// User exists but profile needs initialization - complete the setup
+				userId = existingUserId;
 			} else {
 				console.error('[steam-login] User creation failed:', createError);
 				throw error(500, 'Failed to create account');
 			}
+		} else {
+			userId = newUser!.user.id;
 		}
 
 		if (!profile) {
-			userId = newUser!.user.id;
-
+			// Need to initialize profile (either new user or stuck-account recovery)
+			
 			// Generate display name from Steam persona name
 			const baseDisplayName = steamDisplayName || `Player_${steamId.slice(-6)}`;
 			let displayName = baseDisplayName;
 			let attempt = 0;
 			const maxAttempts = 10;
 
-			// Deduplicate username
+			// Deduplicate username with exact case-insensitive comparison
 			while (attempt < maxAttempts) {
-				const { data: existing } = await supabaseAdmin
+				const escapedPattern = escapeLikePattern(displayName);
+				const { data: existingProfiles, error: checkError } = await supabaseAdmin
 					.from('profiles')
 					.select('id')
-					.ilike('display_name', displayName)
-					.maybeSingle();
+					.ilike('display_name', escapedPattern)
+					.limit(10);
 
-				if (!existing) {
+				// Handle multiple matches or no matches
+				if (checkError || !existingProfiles || existingProfiles.length === 0) {
 					break;
 				}
 
@@ -228,19 +311,24 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 				displayName = `${baseDisplayName}${attempt}`;
 			}
 
-			// Update profile with Steam data
-			const { error: updateError } = await supabaseAdmin
+			// Upsert profile with Steam data (handles both update and insert)
+			const { error: upsertError, count } = await supabaseAdmin
 				.from('profiles')
-				.update({
-					display_name: displayName,
-					verified_steam_id: steamId,
-					steam_display_name: steamDisplayName,
-					steam_verified_at: new Date().toISOString()
-				})
-				.eq('id', userId);
+				.upsert(
+					{
+						id: userId,
+						display_name: displayName,
+						verified_steam_id: steamId,
+						steam_display_name: steamDisplayName,
+						steam_verified_at: new Date().toISOString()
+					},
+					{
+						onConflict: 'id'
+					}
+				);
 
-			if (updateError) {
-				console.error('[steam-login] Profile update failed:', updateError);
+			if (upsertError) {
+				console.error('[steam-login] Profile upsert failed:', upsertError);
 				throw error(500, 'Failed to initialize account');
 			}
 		}
@@ -278,6 +366,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(500, 'Failed to establish session');
 	}
 
-	// Success - redirect to next or home
-	throw redirect(303, state.next || '/');
+	// Success - redirect to next or home (defense in depth: re-sanitize)
+	const redirectTarget = sanitizePostAuthRedirect(state.next);
+	throw redirect(303, redirectTarget);
 };

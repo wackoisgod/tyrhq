@@ -6,8 +6,12 @@
  * - Valid authentication flow (returning user)
  * - Invalid signature
  * - Mismatched return_to
+ * - Nonce mismatch
+ * - Missing nonce
  * - Concurrent race condition
+ * - Stuck-account recovery path
  * - Open-redirect next parameter protection
+ * - Display name deduplication with wildcard characters
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -79,15 +83,17 @@ describe('Steam Login Callback', () => {
 
 	it('should create a new user when Steam ID is not linked', async () => {
 		// Setup valid OpenID response
-		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		const testNonce = 'test-nonce-12345';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
-				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
 				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
 				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
 		);
@@ -111,16 +117,16 @@ describe('Steam Login Callback', () => {
 		});
 
 		// Mock display name deduplication
-		mockSupabaseAdmin.from().select().ilike().maybeSingle.mockResolvedValueOnce({
-			data: null,
-			error: null
-		});
+		mockSupabaseAdmin.from().select().ilike = vi.fn(() => ({
+			limit: vi.fn(() => ({
+				then: vi.fn((cb) => cb({ data: [], error: null }))
+			}))
+		}));
 
-		// Mock profile update
-		mockSupabaseAdmin.from().update().eq.mockResolvedValueOnce({
-			data: {},
-			error: null
-		});
+		// Mock profile upsert
+		mockSupabaseAdmin.from().upsert = vi.fn(() => ({
+			then: vi.fn((cb) => cb({ data: {}, error: null, count: 1 }))
+		}));
 
 		// Mock auth user lookup
 		mockSupabaseAdmin.auth.admin.getUserById.mockResolvedValueOnce({
@@ -154,15 +160,17 @@ describe('Steam Login Callback', () => {
 	});
 
 	it('should sign in existing user when Steam ID is already linked', async () => {
-		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		const testNonce = 'test-nonce-existing';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
-				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
 				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
 				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
 		);
@@ -198,15 +206,17 @@ describe('Steam Login Callback', () => {
 	});
 
 	it('should reject invalid Steam signature', async () => {
-		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		const testNonce = 'test-nonce-invalid';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
-				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
 				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
 				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
 		);
@@ -223,12 +233,14 @@ describe('Steam Login Callback', () => {
 	});
 
 	it('should reject mismatched return_to', async () => {
-		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		const testNonce = 'test-nonce-mismatch';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
 				'&openid.return_to=http://evil.com/callback' +
@@ -240,15 +252,17 @@ describe('Steam Login Callback', () => {
 	});
 
 	it('should handle concurrent race condition when creating users', async () => {
-		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		const testNonce = 'test-nonce-race';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
-				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
 				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
 				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
 		);
@@ -297,19 +311,21 @@ describe('Steam Login Callback', () => {
 	});
 
 	it('should sanitize next parameter to prevent open redirects', async () => {
+		const testNonce = 'test-nonce-redirect';
 		const state = JSON.stringify({
 			mode: 'login',
 			next: '//evil.com/phishing',
-			nonce: 'test-nonce'
+			nonce: testNonce
 		});
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
 
 		mockEvent.url = new URL(
 			'http://localhost:5173/auth/steam/login/callback' +
-				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
 				'&openid.mode=id_res' +
 				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
-				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
 				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
 				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
 		);
@@ -346,5 +362,206 @@ describe('Steam Login Callback', () => {
 			expect(err.location).not.toContain('evil.com');
 			expect(err.location).toBe('/');
 		}
+	});
+
+	it('should reject mismatched nonce', async () => {
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'correct-nonce' });
+		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
+
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/steam/login/callback' +
+				'?state=wrong-nonce' +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
+				'&openid.mode=id_res' +
+				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=wrong-nonce' +
+				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
+				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
+		);
+
+		await expect(GET(mockEvent as RequestEvent)).rejects.toThrow(
+			'Invalid state nonce'
+		);
+	});
+
+	it('should reject missing nonce parameter', async () => {
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: 'test-nonce' });
+		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
+
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/steam/login/callback' +
+				'?openid.ns=http://specs.openid.net/auth/2.0' +
+				'&openid.mode=id_res' +
+				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback' +
+				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
+				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
+		);
+
+		await expect(GET(mockEvent as RequestEvent)).rejects.toThrow(
+			'Missing state parameter'
+		);
+	});
+
+	it('should recover from stuck-account bug', async () => {
+		const testNonce = 'test-nonce-stuck';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
+		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
+
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/steam/login/callback' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
+				'&openid.mode=id_res' +
+				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
+				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
+				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
+		);
+
+		mockFetch.mockResolvedValueOnce({
+			ok: true,
+			text: async () => 'is_valid:true\n'
+		});
+
+		// First lookup: no profile
+		mockSupabaseAdmin.from().select().eq().maybeSingle.mockResolvedValueOnce({
+			data: null,
+			error: null
+		});
+
+		// Create user fails (already exists)
+		mockSupabaseAdmin.auth.admin.createUser.mockResolvedValueOnce({
+			data: null,
+			error: { message: 'User already registered', status: 422 }
+		});
+
+		// List users finds the existing user
+		mockSupabaseAdmin.auth.admin.listUsers.mockResolvedValueOnce({
+			data: {
+				users: [
+					{
+						id: 'stuck-user-id',
+						email: 'steam_76561198012345678@users.tyrhq.invalid'
+					}
+				]
+			},
+			error: null
+		});
+
+		// Retry lookup still finds no profile (stuck account scenario)
+		mockSupabaseAdmin.from().select().eq().maybeSingle.mockResolvedValueOnce({
+			data: null,
+			error: null
+		});
+
+		// Mock display name check
+		mockSupabaseAdmin.from().select().ilike = vi.fn(() => ({
+			limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+		}));
+
+		// Upsert should complete initialization
+		mockSupabaseAdmin.from().upsert = vi.fn(() =>
+			Promise.resolve({ data: {}, error: null, count: 1 })
+		);
+
+		mockSupabaseAdmin.auth.admin.getUserById.mockResolvedValueOnce({
+			data: {
+				user: { id: 'stuck-user-id', email: 'steam_76561198012345678@users.tyrhq.invalid' }
+			},
+			error: null
+		});
+
+		mockSupabaseAdmin.auth.admin.generateLink.mockResolvedValueOnce({
+			data: { properties: { hashed_token: 'hashed-token' } },
+			error: null
+		});
+
+		vi.mocked(mockEvent.locals!.supabase.auth.verifyOtp).mockResolvedValueOnce({
+			data: { user: {}, session: {} },
+			error: null
+		});
+
+		await expect(GET(mockEvent as RequestEvent)).rejects.toThrow();
+		// Should have called upsert to complete initialization
+		expect(mockSupabaseAdmin.from().upsert).toHaveBeenCalled();
+	});
+
+	it('should handle display name deduplication with wildcard characters', async () => {
+		const testNonce = 'test-nonce-wildcard';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
+		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
+
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/steam/login/callback' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
+				'&openid.mode=id_res' +
+				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
+				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
+				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
+		);
+
+		mockFetch.mockResolvedValueOnce({
+			ok: true,
+			text: async () => 'is_valid:true\n'
+		});
+
+		// Mock Steam API response with wildcard characters in name
+		mockFetch.mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({
+				response: {
+					players: [{ personaname: 'Player_%_Name' }]
+				}
+			})
+		});
+
+		mockSupabaseAdmin.from().select().eq().maybeSingle.mockResolvedValueOnce({
+			data: null,
+			error: null
+		});
+
+		mockSupabaseAdmin.auth.admin.createUser.mockResolvedValueOnce({
+			data: { user: { id: 'new-user-id' } },
+			error: null
+		});
+
+		// Mock display name check - should escape wildcards
+		let ilikeCallCount = 0;
+		mockSupabaseAdmin.from().select().ilike = vi.fn((column, pattern) => {
+			ilikeCallCount++;
+			// First call should have escaped pattern
+			if (ilikeCallCount === 1) {
+				expect(pattern).toContain('\\%');
+				expect(pattern).toContain('\\_');
+			}
+			return {
+				limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+			};
+		});
+
+		mockSupabaseAdmin.from().upsert = vi.fn(() =>
+			Promise.resolve({ data: {}, error: null, count: 1 })
+		);
+
+		mockSupabaseAdmin.auth.admin.getUserById.mockResolvedValueOnce({
+			data: { user: { id: 'new-user-id', email: 'steam_76561198012345678@users.tyrhq.invalid' } },
+			error: null
+		});
+
+		mockSupabaseAdmin.auth.admin.generateLink.mockResolvedValueOnce({
+			data: { properties: { hashed_token: 'hashed-token' } },
+			error: null
+		});
+
+		vi.mocked(mockEvent.locals!.supabase.auth.verifyOtp).mockResolvedValueOnce({
+			data: { user: {}, session: {} },
+			error: null
+		});
+
+		await expect(GET(mockEvent as RequestEvent)).rejects.toThrow();
+		expect(ilikeCallCount).toBeGreaterThan(0);
 	});
 });
