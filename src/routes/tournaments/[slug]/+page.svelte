@@ -91,7 +91,10 @@
 	}
 
 	function matchStatusLabel(status: string) {
-		return status.replaceAll('_', ' ');
+		return status
+			.split('_')
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
 	}
 
 	function formatDate(iso: string) {
@@ -216,10 +219,10 @@
 	function registrationLabel() {
 		if (data.tournament.status === 'cancelled') return 'Cancelled';
 		if (data.tournament.status === 'completed') return 'Completed';
-		if (data.tournament.status === 'in_progress') return 'In progress';
-		if (data.tournament.registrationMode === 'manual_bracket') return 'Invite bracket';
-		if (!data.tournament.registrationClosesAt) return 'Registration open';
-		return registrationClosed ? 'Registration closed' : 'Registration open';
+		if (data.tournament.status === 'in_progress') return 'In Progress';
+		if (data.tournament.registrationMode === 'manual_bracket') return 'Invite Bracket';
+		if (!data.tournament.registrationClosesAt) return 'Registration Open';
+		return registrationClosed ? 'Registration Closed' : 'Registration Open';
 	}
 
 	function registrationMeta() {
@@ -255,6 +258,15 @@
 		}
 		return [...stats.values()].sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.team.name.localeCompare(b.team.name));
 	}
+
+	function getSeedingMethod() {
+		if (data.tournament.registrationMode === 'manual_bracket') {
+			return 'Manual seeding by organizer';
+		}
+		const hasSeeds = data.tournament.registrations.some((r) => r.seed !== null);
+		if (!hasSeeds) return 'Not yet seeded';
+		return 'Snake seeding (manual ranking)';
+	}
 </script>
 
 <svelte:head>
@@ -277,7 +289,7 @@
 					<span class="text-[var(--hud-dim)]">Organizer: <a href="/players/{data.tournament.organizerId}" class="text-[var(--hud-teal)] hover:text-[var(--hud-text)]">{data.tournament.organizerName || 'Unknown'}</a></span>
 				</div>
 				<div class="mt-3 flex flex-wrap gap-2">
-					<span class="tournament-pill">{data.tournament.status}</span>
+					<span class="tournament-pill">{matchStatusLabel(data.tournament.status)}</span>
 					<span class="tournament-pill">Team Size {teamSizeLabel()}</span>
 				</div>
 				<div class="mt-5 flex flex-wrap gap-2">
@@ -454,13 +466,17 @@
 						</div>
 						<div class="overview-fact">
 							<dt>Status</dt>
-							<dd>{data.tournament.status}</dd>
+							<dd>{matchStatusLabel(data.tournament.status)}</dd>
 						</div>
 						<div class="overview-fact overview-fact--wide">
 							<dt>Registration</dt>
 							<dd>
 								<span>{registrationMeta()}</span>
 							</dd>
+						</div>
+						<div class="overview-fact overview-fact--wide">
+							<dt>Seeding</dt>
+							<dd>{getSeedingMethod()}</dd>
 						</div>
 					</dl>
 					{#if data.tournament.summary}
@@ -1009,18 +1025,27 @@
 						<p class="mt-2 hud-numeric text-2xl text-[var(--hud-text)]">+{data.tournament.substituteCount}</p>
 					</div>
 				</div>
-				<div class="mt-4 flex flex-wrap items-center gap-2">
+				<div class="mt-4 flex flex-col gap-2">
 					{#each data.tournament.registrations.slice(0, 8) as registration}
 						{#if registration.team}
-							<a href="/teams/{registration.team.slug}" class="team-dot" title={registration.team.name}>
+							<a href="/teams/{registration.team.slug}" class="flex items-center gap-3 rounded px-2 py-1.5 transition hover:bg-[var(--hud-inset)]" title={registration.team.name}>
 								{#if registration.team.logoUrl}
-									<img src={registration.team.logoUrl} alt="" />
+									<img src={registration.team.logoUrl} alt="" class="h-8 w-8 rounded-sm object-cover" />
 								{:else}
-									<span>{registration.team.name.slice(0, 2)}</span>
+									<div class="flex h-8 w-8 items-center justify-center rounded-sm bg-[var(--hud-inset)] text-xs font-bold text-[var(--hud-text)]">
+										{registration.team.name.slice(0, 2)}
+									</div>
+								{/if}
+								<span class="min-w-0 flex-1 truncate text-sm text-[var(--hud-text)]">{registration.team.name}</span>
+								{#if registration.seed}
+									<span class="hud-numeric text-xs text-[var(--hud-muted)]">#{registration.seed}</span>
 								{/if}
 							</a>
 						{/if}
 					{/each}
+					{#if data.tournament.registrations.length > 8}
+						<p class="px-2 text-xs text-[var(--hud-muted)]">+{data.tournament.registrations.length - 8} more</p>
+					{/if}
 				</div>
 				<button type="button" class="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]" onclick={() => (activeTab = 'teams')}>
 					View teams
@@ -1029,20 +1054,42 @@
 
 			<section class="hud-panel overflow-hidden">
 				<div class="flex items-center justify-between gap-3 p-5 pb-3">
-					<h2 class="text-xl font-semibold text-[var(--hud-text)]">Results</h2>
+					<h2 class="text-xl font-semibold text-[var(--hud-text)]">{data.tournament.status === 'completed' ? 'Results' : 'Current Standings'}</h2>
 					<button type="button" class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--hud-teal)]" onclick={() => (activeTab = 'bracket')}>
 						View bracket
 					</button>
 				</div>
-				{#each rankedResults.slice(0, 3) as result, index}
-					<a href="/teams/{result.team.slug}" class="result-row">
-						<span class="hud-numeric text-[var(--hud-text)]">{index + 1}</span>
-						<span class="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--hud-text)]">{result.team.name}</span>
-						<span class="hud-numeric text-xs text-[var(--hud-muted)]">{result.wins}-{result.losses}</span>
-					</a>
+				{#if data.tournament.status === 'completed'}
+					{#each rankedResults.slice(0, 4) as result, index}
+						<a href="/teams/{result.team.slug}" class="result-row">
+							<span class="hud-numeric text-[var(--hud-text)]">{index + 1}</span>
+							<span class="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--hud-text)]">{result.team.name}</span>
+							<span class="hud-numeric text-xs text-[var(--hud-muted)]">{result.wins}-{result.losses}</span>
+						</a>
+					{:else}
+						<p class="p-5 pt-2 text-sm text-[var(--hud-muted)]">No completed matches yet.</p>
+					{/each}
+				{:else if data.tournament.status === 'in_progress'}
+					{#each rankedResults.slice(0, 4) as result, index}
+						<a href="/teams/{result.team.slug}" class="result-row">
+							<span class="hud-numeric text-[var(--hud-text)]">{index + 1}</span>
+							<span class="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--hud-text)]">{result.team.name}</span>
+							<span class="hud-numeric text-xs text-[var(--hud-muted)]">{result.wins}-{result.losses}</span>
+						</a>
+					{:else}
+						<p class="p-5 pt-2 text-sm text-[var(--hud-muted)]">No completed matches yet.</p>
+					{/each}
 				{:else}
-					<p class="p-5 pt-2 text-sm text-[var(--hud-muted)]">No completed matches yet.</p>
-				{/each}
+					<p class="p-5 pt-2 text-sm text-[var(--hud-muted)]">
+						{#if data.tournament.status === 'open'}
+							Registration is open. Results will appear when matches begin.
+						{:else if data.tournament.status === 'cancelled'}
+							Tournament was cancelled.
+						{:else}
+							Results will appear when the tournament starts.
+						{/if}
+					</p>
+				{/if}
 			</section>
 		</aside>
 	</div>
@@ -1405,28 +1452,6 @@
 		.overview-fact:nth-child(odd) {
 			border-right: 0;
 		}
-	}
-
-	.team-dot {
-		display: grid;
-		place-items: center;
-		width: 2.4rem;
-		aspect-ratio: 1;
-		overflow: hidden;
-		border: 1px solid var(--hud-variant);
-		border-radius: 999px;
-		background: var(--hud-inset);
-		color: var(--hud-teal);
-		font-family: var(--font-display);
-		font-size: 0.75rem;
-		font-weight: 700;
-		text-transform: uppercase;
-	}
-
-	.team-dot img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
 	}
 
 	.result-row {
