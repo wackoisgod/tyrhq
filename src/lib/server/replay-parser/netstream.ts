@@ -85,10 +85,19 @@ export interface PlayerIdentity {
 	keystoneTag?: number;
 }
 
+interface NetFieldExportGroup {
+	path: string;
+	index: number;
+	num: number;
+	fields: Map<number, string>; // handle -> field name
+}
+
 export interface NetstreamState {
 	guidMap: Map<number, NetGUIDExport>;
 	channels: Map<number, Channel>;
 	playerIdentity: Map<number, PlayerIdentity>;
+	groupsByPath: Map<string, NetFieldExportGroup>;
+	groupsByIndex: Map<number, NetFieldExportGroup>;
 	warnings: string[];
 	frameCount: number;
 	packetCount: number;
@@ -274,68 +283,104 @@ function processBunchPayload(
 	state: NetstreamState,
 	bHasMustBeMapped: boolean
 ): void {
-	// Check if we have enough data
-	if (bits.bitsLeft() < 8) {
-		return; // Not enough data for any meaningful content
-	}
+	// Port of Python process_bunch_payload (decode.py:1228)
 	
+	// MustBeMapped guid list
 	if (bHasMustBeMapped) {
 		if (bits.bitsLeft() < 16) return;
-		const numMustBeMapped = bits.u16();
-		for (let i = 0; i < numMustBeMapped; i++) {
+		const n = bits.u16();
+		for (let i = 0; i < n; i++) {
 			if (bits.bitsLeft() < 8) break;
 			bits.intPacked(); // Skip guid
 		}
 	}
 	
-	if (bOpen) {
-		if (bits.bitsLeft() < 24) return; // Need at least actorGuid + bHasArchetype + maybe archetype
-		// Actor channel open: read actor GUID and class
-		ch.actorGuid = bits.intPacked();
-		
-		const bHasArchetype = bits.readBit();
-		if (bHasArchetype) {
-			ch.archetype = bits.intPacked();
+	// SerializeNewActor if channel not opened yet
+	if (ch.actorGuid === 0) {
+		if (!bOpen) {
+			state.warnings.push(`Non-open bunch on actorless channel ${ch.chIndex}`);
+			return;
 		}
 		
-		// Read actor class from NetGUID map
-		const classGuid = bits.intPacked();
-		const classExport = state.guidMap.get(classGuid);
+		// UPackageMapClient::SerializeNewActor
+		const actorGuid = readNetGuidExport(bits, state, false);
+		ch.actorGuid = actorGuid;
+		
+		const dynamic = actorGuid > 1 && (actorGuid & 1) === 0;
+		
+		if (bits.atEnd() && dynamic) {
+			return; // Early exit for dynamic actors with no more data
+		}
+		
+		if (dynamic) {
+			ch.archetype = readNetGuidExport(bits, state, false);
+			readNetGuidExport(bits, state, false); // level guid
+			
+			// Skip location/rotation/scale/velocity for now
+			// (would need conditionally_quantized_vector implementation)
+			// For player identity extraction, we don't need these
+		}
+		
+		// Get actor class from archetype or actor guid
+		const archetypeGuid = ch.archetype || 0;
+		const classExport = state.guidMap.get(archetypeGuid) || state.guidMap.get(actorGuid);
 		if (classExport) {
 			ch.class = classExport.pathName;
-			// Extract class name from path like "/Script/TyrGame.BP_TyrPlayerState_C"
+			// Extract class name from path
 			const parts = ch.class.split('.');
 			if (parts.length > 1) {
 				ch.class = parts[parts.length - 1];
 			}
+			// Remove Default__ prefix if present
+			ch.class = ch.class.replace(/^Default__/, '');
 			
-			if (state.channels.size <= 20) {
-				console.log(`  bOpen=true, ch=${ch.chIndex}, actorGuid=${ch.actorGuid}, classGuid=${classGuid}, class=${ch.class}`);
+			if (state.channels.size <= 30) {
+				console.log(`  Actor open: ch=${ch.chIndex}, actorGuid=${ch.actorGuid}, class=${ch.class}`);
 			}
 		}
 	}
 	
-	// Read properties
+	// Content blocks (property replications)
+	// Port of Python's content block reading loop (decode.py:1265+)
 	while (!bits.atEnd()) {
-		const repObject = bits.intPacked();
-		if (repObject === 0) break;
+		if (bits.bitsLeft() < 8) break;
 		
-		// Read property handle
-		const handle = bits.intPacked();
-		if (handle === 0) continue;
+		// read_content_block_header
+		const bHasRepLayout = bits.readBit();
+		const bIsActor = bits.readBit();
 		
-		// Read property payload length in bits
-		const numBits = bits.serializedInt(2048 * 8);
-		if (numBits === 0 || numBits > bits.bitsLeft()) {
+		let repObj: number;
+		if (bIsActor) {
+			repObj = ch.archetype || ch.actorGuid;
+		} else {
+			// sub-object
+			repObj = readNetGuidExport(bits, state, false);
+			const bStablyNamed = bits.readBit();
+			// For now, skip sub-objects - we only care about actor-level properties
+			if (!bIsActor) {
+				// Skip this content block
+				const payloadBits = bits.intPacked();
+				if (payloadBits > bits.bitsLeft()) break;
+				bits.readBitsBytes(payloadBits);
+				continue;
+			}
+		}
+		
+		// Read property payload
+		const payloadBits = bits.intPacked();
+		if (payloadBits === 0 || payloadBits > bits.bitsLeft()) {
 			break;
 		}
 		
-		const payload = bits.readBitsBytes(numBits);
+		const payload = bits.readBitsBytes(payloadBits);
 		
 		// Extract properties for player identity classes
 		const isPlayerIdentityClass = ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C';
-		if (isPlayerIdentityClass) {
-			extractPlayerProperty(ch, handle, payload, numBits, state);
+		if (isPlayerIdentityClass && bHasRepLayout) {
+			if (state.playerIdentity.size < 5) {
+				console.log(`  Extracting property: ch=${ch.chIndex}, class=${ch.class}, bIsActor=${bIsActor}, payloadBits=${payloadBits}`);
+			}
+			extractPlayerProperty(ch, 0, payload, payloadBits, state);
 		}
 	}
 }
@@ -361,44 +406,121 @@ function extractPlayerProperty(
 		state.playerIdentity.set(ch.chIndex, rec);
 	}
 	
-	// We need to match property handles to names, but we don't have the
-	// NetFieldExportGroups mapped yet. For now, try to decode known property
-	// types by their structure and context.
+	// Get NetFieldExportGroup for this class
+	const group = state.groupsByPath.get(ch.class);
+	if (!group) {
+		// No group yet, can't decode properties
+		if (state.playerIdentity.size <= 3) {
+			console.log(`      No group found for class: ${ch.class}`);
+			console.log(`      Available groups: ${Array.from(state.groupsByPath.keys()).slice(0, 10).join(', ')}`);
+		}
+		return;
+	}
 	
-	// Try as FString (PlayerName/PlayerNamePrivate)
-	// FString in property: has SavedNumBits prefix
-	if (numBits > 32) {
-		try {
-			const bits = new BitReader(payload, numBits);
-			bits.u32(); // Skip savedNumBits
-			const str = bits.fstring();
-			if (str.length > 0 && str.length < 100) {
-				rec.name = str;
+	if (state.playerIdentity.size <= 3) {
+		console.log(`      Using group for ${ch.class}, ${group.fields.size} fields`);
+		// Show first 16 bytes of payload
+		const hexDump = Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+		console.log(`      Payload hex: ${hexDump}`);
+	}
+	
+	const bits = new BitReader(payload, numBits);
+	
+	// receive_properties: packed property-handle loop
+	// Port from Python decode.py:957+
+	try {
+		const doChecksum = bits.readBit();
+		
+		if (state.playerIdentity.size <= 3) {
+			console.log(`      doChecksum: ${doChecksum}, bitsLeft: ${bits.bitsLeft()}, pos: ${bits.getPos()}`);
+		}
+		
+		let propCount = 0;
+		while (!bits.atEnd() && bits.bitsLeft() > 8) {
+			let propHandle;
+			try {
+				propHandle = bits.intPacked();
+			} catch (e) {
+				if (state.playerIdentity.size <= 3) {
+					console.log(`      Error reading propHandle: ${e}`);
+				}
+				break;
+			}
+			
+			if (propHandle === 0) {
+				if (state.playerIdentity.size <= 3) {
+					console.log(`      End of properties (handle=0) after ${propCount} props`);
+				}
+				break;
+			}
+			
+			if (state.playerIdentity.size <= 3 && propCount === 0) {
+				console.log(`      First propHandle: ${propHandle}`);
+			}
+			
+			const handle = propHandle - 1; // 1-based on wire
+			if (handle > group.num) {
+				if (state.playerIdentity.size <= 3) {
+					console.log(`      Handle ${handle} > group.num ${group.num}`);
+				}
+				break;
+			}
+			
+			const propBits = bits.intPacked();
+			if (propBits === 0 || propBits > bits.bitsLeft()) {
+				if (state.playerIdentity.size <= 3) {
+					console.log(`      Invalid propBits: ${propBits}, bitsLeft: ${bits.bitsLeft()}`);
+				}
+				break;
+			}
+			
+			const propPayload = bits.readBitsBytes(propBits);
+			const propName = group.fields.get(handle) || `handle${handle}`;
+			
+			if (state.playerIdentity.size <= 3 && propCount < 5) {
+				console.log(`        Prop ${propCount}: handle=${handle}, name=${propName}, bits=${propBits}`);
+			}
+			propCount++;
+			
+			// Extract known player identity properties
+			if ((propName === 'PlayerName' || propName === 'PlayerNamePrivate') && propBits >= 40) {
+				try {
+					const sub = new BitReader(propPayload, propBits);
+					const str = sub.fstring();
+					if (sub.atEnd() && str && str.length > 0) {
+						rec.name = str;
+						rec.class = ch.class;
+						rec.actorGuid = ch.actorGuid;
+						if (state.playerIdentity.size <= 3) {
+							console.log(`      Found ${propName}: "${str}" on ch=${ch.chIndex}`);
+						}
+					}
+				} catch (e) {
+					// Failed to decode
+				}
+			} else if (propName === 'TeamId' && propBits > 0 && propBits <= 32) {
+				rec.teamId = readIntFromBytes(propPayload, propBits);
 				rec.class = ch.class;
 				rec.actorGuid = ch.actorGuid;
+				if (state.playerIdentity.size <= 3) {
+					console.log(`      Found TeamId: ${rec.teamId} on ch=${ch.chIndex}`);
+				}
+			} else if ((propName === 'UniqueID' || propName === 'UniqueId') && propBits >= 16) {
+				const steamId = decodeUniqueNetId(propPayload);
+				if (steamId) {
+					rec.steamId = steamId;
+					rec.class = ch.class;
+					rec.actorGuid = ch.actorGuid;
+					if (state.playerIdentity.size <= 3) {
+						console.log(`      Found UniqueID: ${steamId} on ch=${ch.chIndex}`);
+					}
+				}
 			}
-		} catch (e) {
-			// Not a string
 		}
-	}
-	
-	// Try as small int (TeamId: usually 8 bits)
-	if (numBits > 0 && numBits <= 32) {
-		const teamId = readIntFromBytes(payload, numBits);
-		if (teamId >= 0 && teamId < 10) {
-			rec.teamId = teamId;
-			rec.class = ch.class;
-			rec.actorGuid = ch.actorGuid;
-		}
-	}
-	
-	// Try as FUniqueNetIdRepl (UniqueID/UniqueId: usually >16 bits)
-	if (numBits >= 16) {
-		const steamId = decodeUniqueNetId(payload);
-		if (steamId) {
-			rec.steamId = steamId;
-			rec.class = ch.class;
-			rec.actorGuid = ch.actorGuid;
+	} catch (e) {
+		// Property parsing failed
+		if (state.warnings.length < 300) {
+			state.warnings.push(`Property receive failed on ch=${ch.chIndex}: ${e}`);
 		}
 	}
 }
@@ -434,41 +556,118 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 		nbits--;
 	}
 	
+	if (state.packetCount < 3) {
+		console.log(`\n=== PACKET ${state.packetCount} size=${data.length} ===`);
+		console.log(`  Packet bits: ${nbits}`);
+	}
+	
 	const bits = new BitReader(data, nbits);
 	
-	while (!bits.atEnd()) {
+	let bunchNum = 0;
+	while (!bits.atEnd() && bunchNum < 10) {
+		const bunchStart = bits.getPos();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`\n  --- Bunch ${bunchNum} at bit ${bits.getPos()} ---`);
+		}
+		
 		// Read bunch header
 		const bControl = bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bControl: ${bControl} (pos now ${bits.getPos()})`);
+		}
+		
 		const bOpen = bControl && bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bOpen: ${bOpen} (pos now ${bits.getPos()})`);
+		}
+		
 		const bClose = bControl && bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bClose: ${bClose} (pos now ${bits.getPos()})`);
+		}
+		
 		const closeReason = bClose ? bits.serializedInt(15) : 0; // CHANNEL_CLOSE_REASON_MAX
+		if (bClose && bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    closeReason: ${closeReason} (pos now ${bits.getPos()})`);
+		}
+		
 		bits.readBit(); // bIsReplicationPaused
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    after bIsReplicationPaused (pos now ${bits.getPos()})`);
+		}
+		
 		const bReliable = bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bReliable: ${bReliable} (pos now ${bits.getPos()})`);
+		}
+		
 		const chIndex = bits.intPacked();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    chIndex: ${chIndex} (pos now ${bits.getPos()})`);
+		}
 		
 		if (chIndex > 32767) {
 			throw new DecodeError(`chIndex ${chIndex} implausible`);
 		}
 		
 		const bHasExports = bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bHasExports: ${bHasExports} (pos now ${bits.getPos()})`);
+		}
+		
 		const bHasMustBeMapped = bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bHasMustBeMapped: ${bHasMustBeMapped} (pos now ${bits.getPos()})`);
+		}
+		
 		const bPartial = bits.readBit();
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bPartial: ${bPartial} (pos now ${bits.getPos()})`);
+		}
+		
 		const bPartialInitial = bPartial && bits.readBit();
+		if (bPartial && bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bPartialInitial: ${bPartialInitial} (pos now ${bits.getPos()})`);
+		}
+		
 		bPartial && bits.readBit(); // bHasPartialCustomExportsFinalBit
+		if (bPartial && bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    after bHasPartialCustomExportsFinalBit (pos now ${bits.getPos()})`);
+		}
+		
 		const bPartialFinal = bPartial && bits.readBit();
+		if (bPartial && bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bPartialFinal: ${bPartialFinal} (pos now ${bits.getPos()})`);
+		}
 		
 		let chName: string | undefined;
 		if (bReliable || bOpen) {
+			if (bunchNum < 2 && state.packetCount < 3) {
+				console.log(`    Reading chName at pos ${bits.getPos()}`);
+			}
 			chName = bits.fname();
+			if (bunchNum < 2 && state.packetCount < 3) {
+				console.log(`    chName: ${chName} (pos now ${bits.getPos()})`);
+			}
 		}
 		
 		const bunchBits = bits.serializedInt(2048 * 8); // MAX_PACKET_SIZE_IN_BITS
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    bunchBits: ${bunchBits} (pos now ${bits.getPos()})`);
+		}
+		
 		if (bunchBits > bits.bitsLeft()) {
 			throw new DecodeError(`bunch size ${bunchBits} > bits left ${bits.bitsLeft()}`);
 		}
 		
 		const payload = new BitReader(bits.readBitsBytes(bunchBits), bunchBits);
+		if (bunchNum < 2 && state.packetCount < 3) {
+			console.log(`    Payload: ${Math.ceil(bunchBits / 8)} bytes = ${bunchBits} bits`);
+			console.log(`    After bunch (pos now ${bits.getPos()}, bits left ${bits.bitsLeft()})`);
+		}
+		
 		state.bunchCount++;
+		bunchNum++;
 		
 		// Get or create channel
 		let ch = state.channels.get(chIndex);
@@ -566,21 +765,48 @@ function processDemoFrame(
 			const pathNameIndex = r.intPacked();
 			const isExported = r.intPacked() === 1;
 			
+			let group: NetFieldExportGroup | undefined;
+			
 			if (isExported) {
 				const pathName = r.fstring();
 				const numExports = r.intPacked();
 				if (numExports > 100_000) {
 					throw new DecodeError(`numExports ${numExports} implausible`);
 				}
-				// For now, skip group tracking - we don't need it for player identity
+				
+				// Get or create group
+				group = state.groupsByPath.get(pathName);
+				if (!group) {
+					group = {
+						path: pathName,
+						index: pathNameIndex,
+						num: numExports,
+						fields: new Map()
+					};
+					state.groupsByPath.set(pathName, group);
+					
+					// Extract class key from path
+					const parts = pathName.split('.');
+					const className = parts.length > 1 ? parts[parts.length - 1] : pathName;
+					state.groupsByPath.set(className, group);
+				}
+				group.num = Math.max(group.num, numExports);
+				state.groupsByIndex.set(pathNameIndex, group);
+			} else {
+				group = state.groupsByIndex.get(pathNameIndex);
 			}
 			
 			// read_net_field_export - ONE field per layout
 			const bExported = r.bool8();
 			if (bExported) {
-				r.intPacked(); // handle
+				const handle = r.intPacked();
 				r.u32(); // compatibleChecksum
-				r.fname(); // name
+				const name = r.fname();
+				
+				// Store field in group
+				if (group) {
+					group.fields.set(handle, name);
+				}
 			}
 		}
 		
@@ -644,6 +870,8 @@ export function walkNetstream(
 		guidMap: new Map(),
 		channels: new Map(),
 		playerIdentity: new Map(),
+		groupsByPath: new Map(),
+		groupsByIndex: new Map(),
 		warnings: [],
 		frameCount: 0,
 		packetCount: 0,
