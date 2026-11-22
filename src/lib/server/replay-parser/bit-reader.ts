@@ -138,10 +138,17 @@ export class BitReader {
 	 * Bit-level FIntPacked: groups of 8 bits; bit0=continuation, bits1-7=value.
 	 */
 	intPacked(): number {
+		const startPos = this.pos;
 		let value = 0;
 		for (let it = 0; it < 5; it++) {
 			const b = this.readBitsInt(8);
 			value |= (b >> 1) << (7 * it);
+			
+			// Debug for position 24
+			if (startPos === 24 && it === 0) {
+				console.log(`        intPacked at pos=24: byte=0x${b.toString(16).padStart(2, '0')}, value=${value}`);
+			}
+			
 			if (!(b & 1)) {
 				break;
 			}

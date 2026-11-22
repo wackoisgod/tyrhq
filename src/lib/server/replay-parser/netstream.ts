@@ -380,6 +380,10 @@ function processBunchPayload(
 	}
 	
 	// SerializeNewActor if channel not opened yet
+	if (state.bunchCount >= 8 && state.bunchCount <= 15) {
+		console.log(`    Before SerializeNewActor check (bunch ${state.bunchCount}): ch=${ch.chIndex}, ch.actorGuid=${ch.actorGuid}, bOpen=${bOpen}`);
+	}
+	
 	if (ch.actorGuid === 0) {
 		if (!bOpen) {
 			if (state.bunchCount <= 15) {
@@ -392,6 +396,11 @@ function processBunchPayload(
 		// UPackageMapClient::SerializeNewActor
 		const bitsBeforeActor = bits.bitsLeft();
 		const posBeforeActor = bits.getPos();
+		
+		if (state.bunchCount >= 9 && state.bunchCount <= 12) {
+			console.log(`    About to readNetGuidExport (bunch ${state.bunchCount}): ch=${ch.chIndex}, pos=${posBeforeActor}, bitsLeft=${bitsBeforeActor}, atEnd=${bits.atEnd()}`);
+		}
+		
 		const actorGuid = readNetGuidExport(bits, state, false);
 		ch.actorGuid = actorGuid;
 		
@@ -790,7 +799,13 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 			throw new DecodeError(`bunch size ${bunchBits} > bits left ${bits.bitsLeft()}`);
 		}
 		
-		const payload = new BitReader(bits.readBitsBytes(bunchBits), bunchBits);
+		const payloadBytes = bits.readBitsBytes(bunchBits);
+		const payload = new BitReader(payloadBytes, bunchBits);
+		
+		if (state.bunchCount + 1 === 9) {
+			console.log(`    Bunch 9 payload: bunchBits=${bunchBits}, bytes=${payloadBytes.length}, first 8 bytes: ${Array.from(payloadBytes.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+		}
+		
 		if (bunchNum < 2 && state.packetCount < 3) {
 			console.log(`    Payload: ${Math.ceil(bunchBits / 8)} bytes = ${bunchBits} bits`);
 			console.log(`    After bunch (pos now ${bits.getPos()}, bits left ${bits.bitsLeft()})`);
