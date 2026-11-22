@@ -210,27 +210,6 @@
 						</div>
 
 						<div class="grid gap-3 border-t border-[var(--hud-variant)] p-4 md:grid-cols-2 xl:grid-cols-4">
-							<details class="col-span-full mb-3 rounded-sm bg-[var(--hud-inset)] p-3">
-								<summary class="cursor-pointer text-sm font-semibold uppercase tracking-[0.14em] text-[var(--hud-text)]">
-									📁 Upload Replay to Auto-Fill
-								</summary>
-								<form method="POST" action="?/uploadReplay" enctype="multipart/form-data" class="mt-3 grid gap-3">
-									<input type="hidden" name="matchId" value={data.detail.match.id} />
-									<input type="hidden" name="gameNumber" value={gameNumber} />
-									<div class="grid gap-2">
-										<label class="hud-label">
-											<span>Replay file (.replay)</span>
-											<input type="file" name="replayFile" accept=".replay" class="mt-1.5 block w-full text-sm text-[var(--hud-muted)] file:mr-4 file:rounded file:border-0 file:bg-[var(--hud-teal)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-black hover:file:bg-[#4cd4c7]" />
-										</label>
-										<p class="text-xs text-[var(--hud-muted)]">
-											Upload a .replay file from <code class="rounded bg-[var(--hud-variant)] px-1 py-0.5">%LOCALAPPDATA%\Tyr\Saved\Demos</code> to automatically extract match data, player stats, and winner.
-											You'll review the data before saving.
-										</p>
-									</div>
-									<button class="hud-cta-outline w-fit px-3 py-2 text-xs">Parse Replay</button>
-								</form>
-							</details>
-							
 							<label class="grid gap-1.5">
 								<span class="hud-label">Map</span>
 								<select bind:value={gameFormData[index].mapId} class="hud-input px-3 py-2" form="batch-games-form">

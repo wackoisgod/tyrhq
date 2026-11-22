@@ -110,7 +110,11 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
-		const { error: updateError } = await locals.supabase
+		// Use admin client to bypass the Steam column protection trigger
+		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+		const supabaseAdmin = getSupabaseAdminClient();
+
+		const { error: updateError } = await supabaseAdmin
 			.from('profiles')
 			.update({
 				verified_steam_id: null,

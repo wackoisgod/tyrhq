@@ -73,13 +73,6 @@ export const lineupSchema = z
 	})
 	.strict();
 
-export const replayUploadSchema = z
-	.object({
-		matchId: z.string().uuid(),
-		gameNumber: z.number().int().min(1).max(15)
-	})
-	.strict();
-
 type TournamentStatus = 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
 type BuildVisibility = 'immediate' | 'after_match' | 'after_tournament';
 
@@ -946,185 +939,17 @@ export async function deleteTournamentGameLineup(
 	if (error) throw new TournamentError('Could not delete lineup entry.', 500);
 }
 
-export interface ReplayUploadResult {
-	gameId: string;
-	replayGuid: string;
-	changelist: number;
-	mapId?: string;
-	suggestedWinner?: string;
-	players: Array<{
-		name: string;
-		teamId: number;
-		steamId64?: string;
-		matchedProfileId?: string;
-		tank: string;
-		tankDisplayName?: string;
-		kills: number;
-		damage: number;
-		assists: number;
-		blocked: number;
-	}>;
-	warnings: string[];
-}
-
-/**
- * Process an uploaded replay file and extract match data for pre-filling.
- * Does NOT auto-save - returns suggestions for organizer review.
- *
- * @throws TournamentError if replay is invalid or duplicate
- */
-export async function processReplayUpload(
-	input: z.infer<typeof replayUploadSchema>,
-	replayBuffer: Buffer,
-	actorId: string,
-	role: string
-): Promise<ReplayUploadResult> {
-	const { parseReplay, mapTankCodename } = await import('$lib/server/replay-parser');
-
-	// Parse replay file
-	let replayData;
-	try {
-		replayData = await parseReplay(replayBuffer);
-	} catch (err) {
-		throw new TournamentError(
-			`Failed to parse replay: ${err instanceof Error ? err.message : 'Unknown error'}`,
-			400
-		);
-	}
-
-	// Verify access and get match/game
-	const admin = requireAdminClient();
-	const { data: match } = await admin
-		.from('tournament_matches')
-		.select('*, tournament:tournaments!inner(*)')
-		.eq('id', input.matchId)
-		.maybeSingle<MatchRow & { tournament: TournamentRow }>();
-
-	if (!match) throw new TournamentError('Match not found.', 404);
-	await assertTournamentManager(match.tournament_id, actorId, role);
-
-	// Check for duplicate replay GUID in this tournament
-	const { data: existingReplay } = await admin
-		.from('tournament_match_games')
-		.select('id, match_id, game_number')
-		.eq('replay_guid', replayData.matchGuid)
-		.single();
-
-	if (existingReplay) {
-		throw new TournamentError(
-			`This replay has already been uploaded for game ${existingReplay.game_number} in this tournament.`,
-			409
-		);
-	}
-
-	// Get or create the game entry
-	const { data: existingGame } = await admin
-		.from('tournament_match_games')
-		.select('*')
-		.eq('match_id', input.matchId)
-		.eq('game_number', input.gameNumber)
-		.maybeSingle<GameRow>();
-
-	let gameId: string;
-	if (existingGame) {
-		gameId = existingGame.id;
-	} else {
-		// Create a placeholder game entry
-		const { data: newGame, error: createError } = await admin
-			.from('tournament_match_games')
-			.insert({
-				match_id: input.matchId,
-				game_number: input.gameNumber,
-				map_id: '', // Will be filled from replay
-				map_picked_by_team_id: match.team_a_id!,
-				replay_guid: replayData.matchGuid,
-				replay_changelist: replayData.info.changelist,
-				replay_uploaded_at: new Date().toISOString(),
-				replay_uploaded_by: actorId
-			})
-			.select('id')
-			.single();
-
-		if (createError || !newGame) {
-			throw new TournamentError('Failed to create game entry.', 500);
-		}
-		gameId = newGame.id;
-	}
-
-	// Map tank codenames to display names
-	const warnings: string[] = [];
-	const players = await Promise.all(
-		replayData.endgameStats.map(async (stat) => {
-			const tankDisplayName = await mapTankCodename(stat.tank);
-			if (!tankDisplayName) {
-				warnings.push(`Unknown tank codename: ${stat.tank}`);
-			}
-			return {
-				name: stat.name,
-				teamId: stat.team,
-				steamId64: undefined, // TODO: Extract from replay when available
-				matchedProfileId: undefined,
-				tank: stat.tank,
-				tankDisplayName,
-				kills: stat.kills,
-				damage: stat.damage,
-				assists: stat.assists,
-				blocked: stat.blocked
-			};
-		})
-	);
-
-	// Try to match players by verified Steam ID or exact name
-	for (const player of players) {
-		if (player.steamId64) {
-			const { data: profile } = await admin
-				.from('profiles')
-				.select('id')
-				.eq('verified_steam_id', player.steamId64)
-				.maybeSingle();
-
-			if (profile) {
-				player.matchedProfileId = profile.id;
-				continue;
-			}
-		}
-
-		// Fall back to exact display name match
-		const { data: profile } = await admin
-			.from('profiles')
-			.select('id')
-			.eq('display_name', player.name)
-			.maybeSingle();
-
-		if (profile) {
-			player.matchedProfileId = profile.id;
-		} else {
-			warnings.push(`Could not auto-match player: ${player.name}`);
-		}
-	}
-
-	// Determine suggested winner from team scores
-	let suggestedWinner: string | undefined;
-	const team0Players = players.filter((p) => p.teamId === 0);
-	const team1Players = players.filter((p) => p.teamId === 1);
-
-	// Winner is the team that has players remaining (or more players if both have some)
-	if (team0Players.length > 0 && team1Players.length === 0) {
-		suggestedWinner = match.team_a_id!;
-	} else if (team1Players.length > 0 && team0Players.length === 0) {
-		suggestedWinner = match.team_b_id!;
-	}
-
-	// Extract map from replay
-	const mapId = replayData.header.levelName.split('/').pop()?.replace('Map_', '').toLowerCase();
-
-	return {
-		gameId,
-		replayGuid: replayData.matchGuid,
-		changelist: replayData.info.changelist,
-		mapId,
-		suggestedWinner,
-		players,
-		warnings
-	};
-}
+// NOTE: Replay upload auto-fill feature removed pending full netstream walker implementation
+// Porting the endgame stats extraction requires ~1000+ LOC of bit-packed netstream parsing
+// (ReplayData chunks, demo frames, packets, bunches, NetGUID exports, RPC capture)
+// plus the endgame stats decoder. This is deferred to a future enhancement.
+// 
+// Current migration 029 provides:
+// - Steam account verification (verified_steam_id on profiles)
+// - Replay GUID tracking (replay_guid on tournament_match_games for version/duplicate checks)
+//
+// Future enhancement would add:
+// - Full netstream walker
+// - Endgame stats extraction (kills/damage/assists/blocked per player)
+// - Winner determination from last-stand events
+// - tournament_game_replay_stats table for extracted player stats

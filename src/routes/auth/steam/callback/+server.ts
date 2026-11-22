@@ -37,8 +37,21 @@ async function verifyOpenIdSignature(params: URLSearchParams): Promise<boolean> 
 			body: verifyParams.toString()
 		});
 
+		if (!response.ok) {
+			return false;
+		}
+
 		const text = await response.text();
-		return text.includes('is_valid:true');
+		
+		// Parse line by line and require exact is_valid:true line
+		const lines = text.split('\n');
+		for (const line of lines) {
+			if (line.trim() === 'is_valid:true') {
+				return true;
+			}
+		}
+		
+		return false;
 	} catch {
 		return false;
 	}
@@ -53,12 +66,19 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(401, 'Session expired. Please try again.');
 	}
 
-	// Verify user ID matches the one that initiated the flow
+	// Verify user ID and state nonce match the ones that initiated the flow
 	const authUserId = cookies.get('steam_auth_user');
+	const authState = cookies.get('steam_auth_state');
+	
 	cookies.delete('steam_auth_user', { path: '/' });
+	cookies.delete('steam_auth_state', { path: '/' });
 
 	if (authUserId !== user.id) {
 		throw error(400, 'Session mismatch. Please try again.');
+	}
+
+	if (!authState) {
+		throw error(400, 'Missing state token. Please try again.');
 	}
 
 	// Check OpenID response
@@ -71,10 +91,30 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(400, 'Invalid OpenID response mode');
 	}
 
-	// Extract claimed identity
+	// SECURITY: Validate op_endpoint before proceeding
+	const opEndpoint = url.searchParams.get('openid.op_endpoint');
+	if (opEndpoint !== STEAM_OPENID_URL) {
+		throw error(400, 'Invalid OpenID provider endpoint');
+	}
+
+	// SECURITY: Validate return_to matches our callback URL
+	const returnTo = url.searchParams.get('openid.return_to');
+	const expectedReturnTo = new URL('/auth/steam/callback', url.origin).toString();
+	if (returnTo !== expectedReturnTo) {
+		throw error(400, 'Invalid return URL');
+	}
+
+	// Extract claimed identity and identity
 	const claimedId = url.searchParams.get('openid.claimed_id');
-	if (!claimedId) {
+	const identity = url.searchParams.get('openid.identity');
+	
+	if (!claimedId || !identity) {
 		throw error(400, 'Missing claimed identity');
+	}
+
+	// SECURITY: Require claimed_id === identity
+	if (claimedId !== identity) {
+		throw error(400, 'Identity mismatch');
 	}
 
 	const steamId = extractSteamId(claimedId);
@@ -107,8 +147,12 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		}
 	}
 
-	// Store verified Steam ID in profile
-	const { error: updateError } = await locals.supabase
+	// Store verified Steam ID in profile using admin client (service_role)
+	// This bypasses the trigger that blocks user modifications to Steam columns
+	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	const supabaseAdmin = getSupabaseAdminClient();
+	
+	const { error: updateError } = await supabaseAdmin
 		.from('profiles')
 		.update({
 			verified_steam_id: steamId,

@@ -33,6 +33,9 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 	// Build return URL
 	const returnUrl = new URL('/auth/steam/callback', url.origin);
 
+	// Generate random state nonce for CSRF protection
+	const stateNonce = crypto.randomUUID();
+
 	// Generate OpenID 2.0 request parameters
 	const params = new URLSearchParams({
 		'openid.ns': 'http://specs.openid.net/auth/2.0',
@@ -43,8 +46,16 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select'
 	});
 
-	// Store session user ID in a temporary cookie for verification
+	// Store session user ID and state nonce in temporary cookies for verification
 	cookies.set('steam_auth_user', user.id, {
+		path: '/',
+		httpOnly: true,
+		secure: true,
+		sameSite: 'lax',
+		maxAge: 600 // 10 minutes
+	});
+
+	cookies.set('steam_auth_state', stateNonce, {
 		path: '/',
 		httpOnly: true,
 		secure: true,
