@@ -26,7 +26,8 @@
 	const urlSuccess = $page.url.searchParams.get('success');
 	const successMessages: Record<string, string> = {
 		google_linked: 'Google account linked successfully!',
-		email_confirmed: 'Email confirmed successfully!'
+		email_confirmed: 'Email confirmed successfully!',
+		password_set: 'Password set successfully!'
 	};
 	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
 
@@ -58,6 +59,52 @@
 		return password.length >= 8;
 	}
 	
+	async function handleSetPassword() {
+		if (!supabase) return;
+		
+		emailFormError = '';
+		
+		// Validation
+		if (!emailFormData.password || !validatePassword(emailFormData.password)) {
+			emailFormError = 'Password must be at least 8 characters long.';
+			return;
+		}
+		
+		if (emailFormData.password !== emailFormData.confirmPassword) {
+			emailFormError = 'Passwords do not match.';
+			return;
+		}
+		
+		emailFormLoading = true;
+		
+		try {
+			// Set password on existing real email account
+			const { error: passwordError } = await supabase.auth.updateUser({
+				password: emailFormData.password
+			});
+			
+			if (passwordError) {
+				console.error('[settings] Failed to set password:', passwordError);
+				emailFormError = 'Failed to set password. Please try again.';
+				emailFormLoading = false;
+				return;
+			}
+			
+			// Success
+			showEmailForm = false;
+			emailFormData = { email: '', password: '', confirmPassword: '' };
+			emailFormLoading = false;
+			
+			// Reload to show updated state
+			await invalidateAll();
+			goto('/settings?success=password_set');
+		} catch (err) {
+			console.error('[settings] Exception setting password:', err);
+			emailFormError = 'An unexpected error occurred. Please try again.';
+			emailFormLoading = false;
+		}
+	}
+	
 	async function handleAddEmail() {
 		if (!supabase) return;
 		
@@ -82,11 +129,23 @@
 		emailFormLoading = true;
 		
 		try {
+			// Set password FIRST (works on placeholder account, avoids half-done state)
+			const { error: passwordError } = await supabase.auth.updateUser({
+				password: emailFormData.password
+			});
+			
+			if (passwordError) {
+				console.error('[settings] Failed to set password:', passwordError);
+				emailFormError = 'Failed to set password. Please try again.';
+				emailFormLoading = false;
+				return;
+			}
+			
 			// Build callback URL with link marker
 			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
 			const callbackWithMarker = `${callbackUrl}&link=email`;
 			
-			// Update email (Supabase will send confirmation email)
+			// Then update email (Supabase will send confirmation email)
 			const { error: emailError } = await supabase.auth.updateUser(
 				{ email: emailFormData.email },
 				{
@@ -97,25 +156,16 @@
 			if (emailError) {
 				console.error('[settings] Failed to update email:', emailError);
 				
-				// Map known error messages
-				if (emailError.message?.toLowerCase().includes('already') || 
-				    emailError.message?.toLowerCase().includes('exists')) {
+				// Map by error code if available, fallback to message
+				const errorCode = (emailError as any).code || (emailError as any).error_code;
+				if (errorCode === 'email_exists' || errorCode === 'email_address_taken') {
+					emailFormError = 'This email is already in use by another account.';
+				} else if (emailError.message?.toLowerCase().includes('already') || 
+				           emailError.message?.toLowerCase().includes('exists')) {
 					emailFormError = 'This email is already in use by another account.';
 				} else {
 					emailFormError = 'Failed to update email. Please try again.';
 				}
-				emailFormLoading = false;
-				return;
-			}
-			
-			// Set password
-			const { error: passwordError } = await supabase.auth.updateUser({
-				password: emailFormData.password
-			});
-			
-			if (passwordError) {
-				console.error('[settings] Failed to set password:', passwordError);
-				emailFormError = 'Email change initiated, but password update failed. Please try again.';
 				emailFormLoading = false;
 				return;
 			}
@@ -211,11 +261,11 @@
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
 
 	// Check if user can unlink (must have at least 2 sign-in methods)
-	// Count: identities + (email+password if has real confirmed email)
+	// Count: identities + (email+password ONLY if email identity exists)
 	const signInMethodCount = $derived(() => {
 		let count = data.linkedIdentities.length;
-		// If user has confirmed real email (not placeholder), email+password counts as a method
-		if (data.hasRealEmail) {
+		// Email+password counts as a method ONLY when user has email provider identity (can sign in with password)
+		if (data.hasEmailIdentity) {
 			count += 1;
 		}
 		return count;
@@ -378,40 +428,67 @@
 				</p>
 
 				<div class="mt-4 space-y-3">
-				<!-- Email/Password -->
-				{#if data.hasRealEmail}
-					<div class="rounded-sm bg-[var(--hud-inset)] p-4">
-						<div class="flex items-center justify-between gap-4">
-							<div>
-								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Email & Password</p>
-								<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
-							</div>
+			<!-- Email/Password -->
+			{#if data.hasEmailIdentity}
+				<!-- User has email+password (can sign in with password) -->
+				<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Email & Password</p>
+							<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
 						</div>
 					</div>
-				{:else if pendingEmailChange}
-					<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-						<div class="flex items-center justify-between gap-4">
-							<div>
-								<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password (Pending)</p>
-								<p class="mt-1 text-xs text-[var(--hud-dim)]">Check <span class="text-[var(--hud-text)]">{pendingEmailChange}</span> to confirm your email address.</p>
-							</div>
+				</div>
+			{:else if pendingEmailChange}
+				<!-- Email change pending confirmation -->
+				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password (Pending)</p>
+							<p class="mt-1 text-xs text-[var(--hud-dim)]">Check <span class="text-[var(--hud-text)]">{pendingEmailChange}</span> to confirm your email address.</p>
 						</div>
 					</div>
-				{:else if showEmailForm}
-					<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-						<div class="space-y-3">
-							<div>
+				</div>
+			{:else if data.canSetPassword && !showEmailForm}
+				<!-- User has real email (e.g. from Google) but no password set -->
+				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<p class="text-sm font-semibold text-[var(--hud-muted)]">Email (no password)</p>
+							<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
+							<p class="mt-1 text-xs text-[var(--hud-dim)]">Set a password to enable email sign-in.</p>
+						</div>
+						<button 
+							type="button"
+							class="hud-cta-outline px-3 py-2 text-xs"
+							onclick={() => showEmailForm = true}
+						>
+							Set Password
+						</button>
+					</div>
+				</div>
+			{:else if showEmailForm}
+				<!-- Form for adding email+password or setting password -->
+				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+					<div class="space-y-3">
+						<div>
+							{#if data.canSetPassword}
+								<p class="text-sm font-semibold text-[var(--hud-text)]">Set Password</p>
+								<p class="mt-1 text-xs text-[var(--hud-dim)]">Create a password to enable email sign-in for {data.userEmail}.</p>
+							{:else}
 								<p class="text-sm font-semibold text-[var(--hud-text)]">Add Email & Password</p>
 								<p class="mt-1 text-xs text-[var(--hud-dim)]">Set up email and password to enable password recovery and email sign-in.</p>
-							</div>
-							
-							{#if emailFormError}
-								<div class="rounded-sm bg-red-900/20 border border-red-700/50 p-3 text-xs text-red-200">
-									{emailFormError}
-								</div>
 							{/if}
-							
-							<div class="space-y-2">
+						</div>
+						
+						{#if emailFormError}
+							<div class="rounded-sm bg-red-900/20 border border-red-700/50 p-3 text-xs text-red-200">
+								{emailFormError}
+							</div>
+						{/if}
+						
+						<div class="space-y-2">
+							{#if !data.canSetPassword}
 								<label class="flex flex-col gap-1">
 									<span class="text-xs font-semibold text-[var(--hud-muted)]">Email Address</span>
 									<input
@@ -423,75 +500,79 @@
 										required
 									/>
 								</label>
-								
-								<label class="flex flex-col gap-1">
-									<span class="text-xs font-semibold text-[var(--hud-muted)]">Password</span>
-									<input
-										type="password"
-										bind:value={emailFormData.password}
-										class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
-										placeholder="Minimum 8 characters"
-										disabled={emailFormLoading}
-										required
-										minlength={8}
-									/>
-								</label>
-								
-								<label class="flex flex-col gap-1">
-									<span class="text-xs font-semibold text-[var(--hud-muted)]">Confirm Password</span>
-									<input
-										type="password"
-										bind:value={emailFormData.confirmPassword}
-										class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
-										placeholder="Re-enter password"
-										disabled={emailFormLoading}
-										required
-										minlength={8}
-									/>
-								</label>
-							</div>
+							{/if}
 							
-							<div class="flex gap-2">
-								<button 
-									type="button" 
-									class="hud-cta px-3 py-2 text-xs" 
-									onclick={handleAddEmail}
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-semibold text-[var(--hud-muted)]">Password</span>
+								<input
+									type="password"
+									bind:value={emailFormData.password}
+									class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
+									placeholder="Minimum 8 characters"
 									disabled={emailFormLoading}
-								>
-									{#if emailFormLoading}
-										Saving...
-									{:else}
-										Add Email
-									{/if}
-								</button>
-								<button 
-									type="button" 
-									class="hud-cta-outline px-3 py-2 text-xs" 
-									onclick={cancelEmailForm}
+									required
+									minlength={8}
+								/>
+							</label>
+							
+							<label class="flex flex-col gap-1">
+								<span class="text-xs font-semibold text-[var(--hud-muted)]">Confirm Password</span>
+								<input
+									type="password"
+									bind:value={emailFormData.confirmPassword}
+									class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
+									placeholder="Re-enter password"
 									disabled={emailFormLoading}
-								>
-									Cancel
-								</button>
-							</div>
+									required
+									minlength={8}
+								/>
+							</label>
 						</div>
-					</div>
-				{:else}
-					<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-						<div class="flex items-center justify-between gap-4">
-							<div>
-								<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password</p>
-								<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Add an email to enable password recovery.</p>
-							</div>
+						
+						<div class="flex gap-2">
 							<button 
-								type="button"
-								class="hud-cta-outline px-3 py-2 text-xs"
-								onclick={() => showEmailForm = true}
+								type="button" 
+								class="hud-cta px-3 py-2 text-xs" 
+								onclick={data.canSetPassword ? handleSetPassword : handleAddEmail}
+								disabled={emailFormLoading}
 							>
-								Add Email
+								{#if emailFormLoading}
+									Saving...
+								{:else if data.canSetPassword}
+									Set Password
+								{:else}
+									Add Email
+								{/if}
+							</button>
+							<button 
+								type="button" 
+								class="hud-cta-outline px-3 py-2 text-xs" 
+								onclick={cancelEmailForm}
+								disabled={emailFormLoading}
+							>
+								Cancel
 							</button>
 						</div>
 					</div>
-				{/if}
+				</div>
+			{:else}
+				<!-- No email at all (Steam-only user with placeholder email) -->
+				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password</p>
+							<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Add an email to enable password recovery.</p>
+						</div>
+						<button 
+							type="button"
+							class="hud-cta-outline px-3 py-2 text-xs"
+							onclick={() => showEmailForm = true}
+						>
+							Add Email
+						</button>
+					</div>
+				</div>
+			{/if}
 
 				<!-- Google -->
 				{#if data.linkedIdentities.some((i) => i.provider === 'google')}

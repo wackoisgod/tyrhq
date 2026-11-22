@@ -37,13 +37,23 @@ describe('Auth Callback - Email Confirmation', () => {
 	});
 
 	describe('Email confirmation success', () => {
-		it('should show success message when link=email marker present', async () => {
+		it('should show success message when email is confirmed and real', async () => {
 			mockEvent.url = new URL(
 				'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=email'
 			);
 
 			mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
 				data: { session: {} },
+				error: null
+			});
+
+			mockSupabase.auth.getUser.mockResolvedValue({
+				data: {
+					user: {
+						email: 'user@example.com',
+						email_confirmed_at: '2024-01-01T00:00:00Z'
+					}
+				},
 				error: null
 			});
 
@@ -54,6 +64,66 @@ describe('Auth Callback - Email Confirmation', () => {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
 				expect(err.location).toContain('success=email_confirmed');
+			}
+		});
+
+		it('should not show success when email is placeholder', async () => {
+			mockEvent.url = new URL(
+				'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=email'
+			);
+
+			mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
+				data: { session: {} },
+				error: null
+			});
+
+			mockSupabase.auth.getUser.mockResolvedValue({
+				data: {
+					user: {
+						email: 'steam_123456@users.tyrhq.invalid',
+						email_confirmed_at: null
+					}
+				},
+				error: null
+			});
+
+			try {
+				await GET(mockEvent as RequestEvent);
+			} catch (err: any) {
+				// Should redirect to /settings without success banner
+				expect(err.status).toBe(303);
+				expect(err.location).toBe('/settings');
+				expect(err.location).not.toContain('success=email_confirmed');
+			}
+		});
+
+		it('should not show success when email not confirmed yet', async () => {
+			mockEvent.url = new URL(
+				'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=email'
+			);
+
+			mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
+				data: { session: {} },
+				error: null
+			});
+
+			mockSupabase.auth.getUser.mockResolvedValue({
+				data: {
+					user: {
+						email: 'user@example.com',
+						email_confirmed_at: null
+					}
+				},
+				error: null
+			});
+
+			try {
+				await GET(mockEvent as RequestEvent);
+			} catch (err: any) {
+				// Should redirect to /settings without success banner
+				expect(err.status).toBe(303);
+				expect(err.location).toBe('/settings');
+				expect(err.location).not.toContain('success=email_confirmed');
 			}
 		});
 

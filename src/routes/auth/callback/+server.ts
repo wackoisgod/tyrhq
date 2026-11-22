@@ -76,9 +76,18 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			}
 			
 			if (isEmailLinkFlow) {
-				const settingsUrl = new URL('/settings', url.origin);
-				settingsUrl.searchParams.set('success', 'email_confirmed');
-				redirect(303, settingsUrl.toString());
+				// Verify user's email is now confirmed and is a real (non-placeholder) email
+				const { data: { user } } = await locals.supabase.auth.getUser();
+				const hasRealConfirmedEmail = 
+					user?.email && 
+					!user.email.endsWith('@users.tyrhq.invalid') &&
+					user.email_confirmed_at;
+				
+				if (hasRealConfirmedEmail) {
+					const settingsUrl = new URL('/settings', url.origin);
+					settingsUrl.searchParams.set('success', 'email_confirmed');
+					redirect(303, settingsUrl.toString());
+				}
 			}
 			
 			// Normal sign-in or linking without verification

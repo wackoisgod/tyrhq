@@ -48,8 +48,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Determine if user has a real email (not placeholder)
 	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
 	
-	// Check if user has email+password identity (for unlink rules)
+	// Check if user has email+password identity (can sign in with password)
 	const hasEmailIdentity = linkedIdentities.some((i) => i.provider === 'email');
+	
+	// User can set a password if they have real email but no email identity yet
+	const canSetPassword = hasRealEmail && !hasEmailIdentity;
 
 	return {
 		profile,
@@ -61,7 +64,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		linkedIdentities,
 		hasRealEmail,
 		userEmail: user.email,
-		hasEmailIdentity
+		hasEmailIdentity,
+		canSetPassword
 	};
 };
 

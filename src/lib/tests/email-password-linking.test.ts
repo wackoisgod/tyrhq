@@ -91,22 +91,52 @@ describe('Email & Password Linking', () => {
 	});
 
 	describe('Sign-in method counting', () => {
-		it('should count confirmed real email as a sign-in method', () => {
-			const hasRealEmail = true;
-			const identitiesCount = 1; // Google only
-			const totalMethods = identitiesCount + (hasRealEmail ? 1 : 0);
+		it('should count email+password when email identity exists', () => {
+			const identities = [
+				{ provider: 'email' }, // Has password
+				{ provider: 'google' }
+			];
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
 			
-			expect(totalMethods).toBe(2);
-			expect(totalMethods >= 2).toBe(true);
+			expect(hasEmailIdentity).toBe(true);
+			expect(totalMethods).toBe(3); // 2 identities + 1 for email+password
 		});
 
-		it('should prevent unlinking when only one method exists', () => {
-			const hasRealEmail = false;
-			const identitiesCount = 1; // Google only
-			const totalMethods = identitiesCount + (hasRealEmail ? 1 : 0);
+		it('should NOT count email+password for Google-only users (no password)', () => {
+			const identities = [
+				{ provider: 'google' } // Has email from Google but no password
+			];
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
+			
+			expect(hasEmailIdentity).toBe(false);
+			expect(totalMethods).toBe(1); // Only Google identity, no email+password
+		});
+
+		it('should prevent unlinking Google when it is the only method', () => {
+			const identities = [
+				{ provider: 'google' } // Google-only user
+			];
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
+			const canUnlinkGoogle = totalMethods >= 2 && identities.some((i) => i.provider === 'google');
 			
 			expect(totalMethods).toBe(1);
-			expect(totalMethods >= 2).toBe(false);
+			expect(canUnlinkGoogle).toBe(false);
+		});
+
+		it('should allow unlinking Google when user has set password', () => {
+			const identities = [
+				{ provider: 'google' },
+				{ provider: 'email' } // User set a password
+			];
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
+			const canUnlinkGoogle = totalMethods >= 2 && identities.some((i) => i.provider === 'google');
+			
+			expect(totalMethods).toBe(3);
+			expect(canUnlinkGoogle).toBe(true);
 		});
 	});
 
@@ -191,6 +221,32 @@ describe('Email & Password Linking', () => {
 			const confirmPassword = 'mypassword123';
 
 			expect(password === confirmPassword).toBe(false);
+		});
+	});
+
+	describe('Google-only user states', () => {
+		it('should detect when user can set password (has real email, no email identity)', () => {
+			const hasRealEmail = true; // From Google
+			const hasEmailIdentity = false; // No password set
+			const canSetPassword = hasRealEmail && !hasEmailIdentity;
+			
+			expect(canSetPassword).toBe(true);
+		});
+
+		it('should not allow setting password for placeholder email users', () => {
+			const hasRealEmail = false; // Steam placeholder
+			const hasEmailIdentity = false;
+			const canSetPassword = hasRealEmail && !hasEmailIdentity;
+			
+			expect(canSetPassword).toBe(false);
+		});
+
+		it('should not show set password option when password already exists', () => {
+			const hasRealEmail = true;
+			const hasEmailIdentity = true; // Already has password
+			const canSetPassword = hasRealEmail && !hasEmailIdentity;
+			
+			expect(canSetPassword).toBe(false);
 		});
 	});
 });
