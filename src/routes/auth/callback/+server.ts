@@ -24,7 +24,7 @@ function mapErrorCode(errorCode: string | undefined, linkType: 'google' | 'email
 	return linkType === 'email' ? 'email_change_failed' : 'link_failed';
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 	const code = url.searchParams.get('code');
 	const error = url.searchParams.get('error');
 	const errorCode = url.searchParams.get('error_code');
@@ -36,6 +36,11 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const isGoogleLinkFlow = linkMarker === 'google';
 	const isEmailLinkFlow = linkMarker === 'email';
 	const isLinkFlow = isGoogleLinkFlow || isEmailLinkFlow;
+	
+	// Check if this is a merge flow
+	const { verifyMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+	const mergeCookie = verifyMergeCookie(cookies.get(MERGE_COOKIE_NAME));
+	const isMergeFlow = mergeCookie !== null;
 
 	// Handle OAuth errors (Supabase rejected the flow before returning code)
 	if (error || errorCode) {
@@ -62,6 +67,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const { error: exchangeError } = await locals.supabase.auth.exchangeCodeForSession(code);
 		
 		if (!exchangeError) {
+			// Check if this is a merge flow
+			if (isMergeFlow) {
+				// Redirect to merge confirmation page
+				redirect(303, '/auth/merge/confirm');
+			}
+			
 			// Success - check if this was a linking flow
 			if (isGoogleLinkFlow) {
 				// Verify user actually has Google identity now
