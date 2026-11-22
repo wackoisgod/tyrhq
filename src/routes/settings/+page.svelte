@@ -35,10 +35,14 @@
 		if (!supabase) return;
 		
 		try {
+			// Build callback URL with link marker to distinguish from normal sign-in
+			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
+			const callbackWithMarker = `${callbackUrl}&link=google`;
+			
 			const { data: linkData, error } = await supabase.auth.linkIdentity({
 				provider: 'google',
 				options: {
-					redirectTo: getAuthCallbackUrl(window.location.origin, '/settings')
+					redirectTo: callbackWithMarker
 				}
 			});
 
