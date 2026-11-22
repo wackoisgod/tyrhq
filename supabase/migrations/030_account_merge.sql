@@ -51,6 +51,8 @@ DECLARE
     v_tournament_free_agent_requests_moved integer := 0;
     v_tournament_roster_members_moved integer := 0;
     v_tournament_build_submissions_moved integer := 0;
+    v_tournament_build_submissions_dropped integer := 0;
+    v_tournament_roster_members_dropped integer := 0;
     v_tournament_game_lineups_moved integer := 0;
     v_community_events_moved integer := 0;
     v_tournaments_repointed integer := 0;
@@ -379,6 +381,8 @@ BEGIN
         )
     );
     
+    GET DIAGNOSTICS v_tournament_build_submissions_dropped = ROW_COUNT;
+    
     DELETE FROM public.tournament_roster_members trm
     WHERE trm.user_id = p_secondary_user_id
     AND EXISTS (
@@ -387,6 +391,8 @@ BEGIN
         AND tournament_id = trm.tournament_id
         AND team_id != trm.team_id  -- Different teams
     );
+    
+    GET DIAGNOSTICS v_tournament_roster_members_dropped = ROW_COUNT;
     
     -- Insert primary roster rows for secondary's submissions that primary doesn't have
     INSERT INTO public.tournament_roster_members (tournament_id, team_id, user_id, source, joined_at)
@@ -527,7 +533,9 @@ BEGIN
             'tournament_free_agents', v_tournament_free_agents_moved,
             'tournament_free_agent_requests', v_tournament_free_agent_requests_moved,
             'tournament_roster_members', v_tournament_roster_members_moved,
+            'tournament_roster_members_dropped_cross_team', v_tournament_roster_members_dropped,
             'tournament_build_submissions', v_tournament_build_submissions_moved,
+            'tournament_build_submissions_dropped_cross_team', v_tournament_build_submissions_dropped,
             'tournament_game_lineups', v_tournament_game_lineups_moved,
             'replay_uploads', v_replay_uploads_moved,
             'community_events', v_community_events_moved

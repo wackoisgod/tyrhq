@@ -16,6 +16,12 @@ vi.mock('$lib/server/security', () => ({
 	}
 }));
 
+vi.mock('$env/dynamic/private', () => ({
+	env: {
+		MERGE_SECRET: 'a'.repeat(64)
+	}
+}));
+
 describe('Auth Callback - Email Confirmation', () => {
 	let mockEvent: Partial<RequestEvent>;
 	let mockSupabase: any;
@@ -32,6 +38,11 @@ describe('Auth Callback - Email Confirmation', () => {
 			url: new URL('http://localhost:5173/auth/callback'),
 			locals: {
 				supabase: mockSupabase
+			},
+			cookies: {
+				get: () => undefined,
+				set: vi.fn(),
+				delete: vi.fn()
 			}
 		};
 	});
