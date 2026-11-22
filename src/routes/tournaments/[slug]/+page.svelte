@@ -28,6 +28,7 @@
 	let startsAtLocal = $state('');
 	let registrationClosesAtLocal = $state('');
 	let reopenClosesAtLocal = $state('');
+	let teamSearchQuery = $state('');
 	const registrationClosed = $derived(isRegistrationClosed());
 	let seedOrder = $state(initialSeedOrder());
 	let draggedSeedIndex = $state<number | null>(null);
@@ -41,6 +42,13 @@
 	);
 	const availableTeams = $derived(
 		data.allTeams.filter((team) => !seedOrder.some((entry) => entry.team.id === team.id))
+	);
+	const filteredTeams = $derived(
+		data.tournament.registrations.filter((registration) => {
+			if (!teamSearchQuery.trim()) return true;
+			const query = teamSearchQuery.toLowerCase();
+			return registration.team?.name.toLowerCase().includes(query);
+		})
 	);
 	const seedingChanged = $derived(seedOrder.some((entry, index) => entry.savedSeed !== index + 1));
 	const firstRoundPreview = $derived(getFirstRoundPreview());
@@ -470,27 +478,51 @@
 				</section>
 			{/if}
 
-			{#if activeTab === 'teams'}
-				<section>
+		{#if activeTab === 'teams'}
+			<section>
+				<div class="flex flex-wrap items-end justify-between gap-3">
 					<h2 class="text-2xl font-semibold text-[var(--hud-text)]">Teams</h2>
-					<div class="mt-4 grid gap-3 sm:grid-cols-2">
-						{#each data.tournament.registrations as registration}
-							{#if registration.team}
-								<a href="/teams/{registration.team.slug}" class="rounded-sm bg-[var(--hud-panel)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]" style="box-shadow: var(--hud-surface-ghost);">
-									<p class="font-semibold uppercase text-[var(--hud-text)]">
-										{#if registration.seed}<span class="text-[var(--hud-teal)]">#{registration.seed}</span> {/if}{registration.team.name}
-									</p>
-									<p class="mt-1 text-xs text-[var(--hud-muted)]">
-										{registration.team.record.wins}-{registration.team.record.losses}
-									</p>
-								</a>
-							{/if}
-						{:else}
-							<div class="hud-panel p-6 text-sm text-[var(--hud-muted)]">No teams registered yet.</div>
-						{/each}
+					<span class="tournament-pill">{data.tournament.registrations.length} registered</span>
+				</div>
+				
+				{#if data.tournament.registrations.length > 0}
+					<div class="mt-4">
+						<label class="sr-only" for="team-search">Search teams</label>
+						<input
+							id="team-search"
+							type="text"
+							bind:value={teamSearchQuery}
+							placeholder="Search teams by name..."
+							class="hud-input px-3 py-2 w-full max-w-md"
+						/>
 					</div>
-				</section>
-			{/if}
+				{/if}
+				
+				<div class="mt-4 grid gap-3 sm:grid-cols-2">
+					{#each filteredTeams as registration}
+						{#if registration.team}
+							<a href="/teams/{registration.team.slug}" class="rounded-sm bg-[var(--hud-panel)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]" style="box-shadow: var(--hud-surface-ghost);">
+								<p class="font-semibold uppercase text-[var(--hud-text)]">
+									{#if registration.seed}<span class="text-[var(--hud-teal)]">#{registration.seed}</span> {/if}{registration.team.name}
+								</p>
+								<p class="mt-1 text-xs text-[var(--hud-muted)]">
+									Tournament Record: {registration.team.record.wins}-{registration.team.record.losses}
+								</p>
+								{#if registration.team.description}
+									<p class="mt-2 text-sm text-[var(--hud-muted)] line-clamp-2">
+										{registration.team.description}
+									</p>
+								{/if}
+							</a>
+						{/if}
+					{:else}
+						<div class="hud-panel p-6 text-sm text-[var(--hud-muted)]">
+							{teamSearchQuery ? 'No teams match your search.' : 'No teams registered yet.'}
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
 
 			{#if activeTab === 'free-agents'}
 				<section>

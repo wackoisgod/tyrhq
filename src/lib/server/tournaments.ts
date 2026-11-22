@@ -122,7 +122,7 @@ interface TeamRow {
 interface MemberRow {
 	team_id: string;
 	user_id: string;
-	role: 'captain' | 'member';
+	role: 'captain' | 'co-captain' | 'member' | 'substitute';
 	joined_at: string;
 	profile?: ProfileRef | ProfileRef[] | null;
 }
@@ -752,7 +752,7 @@ export async function leaveTeam(teamId: string, actorId: string) {
 		.select('role')
 		.eq('team_id', teamId)
 		.eq('user_id', actorId)
-		.maybeSingle<{ role: 'captain' | 'member' }>();
+		.maybeSingle<{ role: 'captain' | 'co-captain' | 'member' | 'substitute' }>();
 	if (!member) return;
 	if (member.role === 'captain') {
 		throw new TournamentError('Captains cannot leave their team while they own it.', 409);
@@ -822,19 +822,43 @@ export async function getTournamentBySlug(slug: string, viewerId?: string | null
 			.order('match_number', { ascending: true })
 	]);
 
-	const normalizedRegistrations = ((registrations as RegistrationRow[]) ?? []).map((row) => ({
-		teamId: row.team_id,
-		status: row.status,
-		seed: row.seed,
-		registeredAt: row.registered_at,
-		team: one(row.team) ? toTeam(one(row.team)!) : null
-	}));
+	// Calculate W/L records for each team in this tournament
+	const matchRows = (matches as MatchRow[]) ?? [];
+	const recordsByTeamId = new Map<string, { wins: number; losses: number }>();
+	
+	for (const match of matchRows) {
+		if (match.status === 'completed' && match.winner_team_id) {
+			// Winner gets a win
+			const winnerRecord = recordsByTeamId.get(match.winner_team_id) ?? { wins: 0, losses: 0 };
+			winnerRecord.wins++;
+			recordsByTeamId.set(match.winner_team_id, winnerRecord);
+			
+			// Loser gets a loss
+			const loserId = match.winner_team_id === match.team_a_id ? match.team_b_id : match.team_a_id;
+			if (loserId) {
+				const loserRecord = recordsByTeamId.get(loserId) ?? { wins: 0, losses: 0 };
+				loserRecord.losses++;
+				recordsByTeamId.set(loserId, loserRecord);
+			}
+		}
+	}
+
+	const normalizedRegistrations = ((registrations as RegistrationRow[]) ?? []).map((row) => {
+		const record = recordsByTeamId.get(row.team_id) ?? { wins: 0, losses: 0 };
+		return {
+			teamId: row.team_id,
+			status: row.status,
+			seed: row.seed,
+			registeredAt: row.registered_at,
+			team: one(row.team) ? toTeam(one(row.team)!, [], record) : null
+		};
+	});
 
 	return {
 		...toTournament(tournament),
 		canManage,
 		registrations: normalizedRegistrations,
-		matches: ((matches as MatchRow[]) ?? []).map((match) => ({
+		matches: matchRows.map((match) => ({
 			id: match.id,
 			round: match.round,
 			matchNumber: match.match_number,
