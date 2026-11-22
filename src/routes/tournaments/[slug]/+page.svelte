@@ -98,6 +98,26 @@
 		return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 	}
 
+	function getTeamColor(teamId: string) {
+		const colors = [
+			'#06b6d4',
+			'#8b5cf6',
+			'#f59e0b',
+			'#10b981',
+			'#ef4444',
+			'#ec4899',
+			'#14b8a6',
+			'#f97316',
+			'#6366f1',
+			'#eab308'
+		];
+		let hash = 0;
+		for (let i = 0; i < teamId.length; i++) {
+			hash = teamId.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		return colors[Math.abs(hash) % colors.length];
+	}
+
 	function datetimeInputValue(iso: string | null) {
 		if (!iso) return '';
 		const date = new Date(iso);
@@ -904,18 +924,28 @@
 															<span class="bracket-match-card__status">{matchStatusLabel(match.status)}</span>
 															<span>Bo{match.bestOf}</span>
 														</header>
-														<div class="bracket-teams">
-															<div class="bracket-team" class:bracket-team--winner={match.winnerTeamId === match.teamA?.id}>
-																<span class="bracket-team__seed">{teamSeed(match.teamA?.id) ? `#${teamSeed(match.teamA?.id)}` : '—'}</span>
-																<span class="bracket-team__name">{match.teamA?.name ?? 'TBD'}</span>
-																<strong>{match.scoreA}</strong>
-															</div>
-															<div class="bracket-team" class:bracket-team--winner={match.winnerTeamId === match.teamB?.id}>
-																<span class="bracket-team__seed">{teamSeed(match.teamB?.id) ? `#${teamSeed(match.teamB?.id)}` : '—'}</span>
-																<span class="bracket-team__name">{match.teamB?.name ?? 'TBD'}</span>
-																<strong>{match.scoreB}</strong>
-															</div>
+													<div class="bracket-teams">
+														<div class="bracket-team" class:bracket-team--winner={match.winnerTeamId === match.teamA?.id}>
+															<span class="bracket-team__seed">{teamSeed(match.teamA?.id) ? `#${teamSeed(match.teamA?.id)}` : '—'}</span>
+															{#if match.teamA?.logoUrl}
+																<img src={match.teamA.logoUrl} alt="{match.teamA.name} logo" class="bracket-team__logo" />
+															{:else if match.teamA}
+																<div class="bracket-team__logo-placeholder" style={`background-color: ${getTeamColor(match.teamA.id)};`}></div>
+															{/if}
+															<span class="bracket-team__name">{match.teamA?.name ?? 'TBD'}</span>
+															<strong>{match.scoreA}</strong>
 														</div>
+														<div class="bracket-team" class:bracket-team--winner={match.winnerTeamId === match.teamB?.id}>
+															<span class="bracket-team__seed">{teamSeed(match.teamB?.id) ? `#${teamSeed(match.teamB?.id)}` : '—'}</span>
+															{#if match.teamB?.logoUrl}
+																<img src={match.teamB.logoUrl} alt="{match.teamB.name} logo" class="bracket-team__logo" />
+															{:else if match.teamB}
+																<div class="bracket-team__logo-placeholder" style={`background-color: ${getTeamColor(match.teamB.id)};`}></div>
+															{/if}
+															<span class="bracket-team__name">{match.teamB?.name ?? 'TBD'}</span>
+															<strong>{match.scoreB}</strong>
+														</div>
+													</div>
 														<div class="bracket-match-card__footer">
 															<a href="/tournaments/{data.tournament.slug}/matches/{match.id}">Series details</a>
 															{#if match.winner}<span>{match.winner.name} advances</span>{/if}
@@ -1239,7 +1269,7 @@
 
 	.bracket-team {
 		display: grid;
-		grid-template-columns: 2rem minmax(0, 1fr) auto;
+		grid-template-columns: 2rem 1.5rem minmax(0, 1fr) auto;
 		align-items: center;
 		gap: 0.5rem;
 		min-height: 2.25rem;
@@ -1260,6 +1290,20 @@
 		color: var(--hud-dim);
 		font-family: var(--font-display);
 		font-size: 0.68rem;
+	}
+
+	.bracket-team__logo {
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 0.25rem;
+		object-fit: cover;
+	}
+
+	.bracket-team__logo-placeholder {
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 0.25rem;
+		opacity: 0.6;
 	}
 
 	.bracket-team__name {
