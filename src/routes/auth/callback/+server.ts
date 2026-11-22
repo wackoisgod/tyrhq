@@ -5,14 +5,23 @@ import { sanitizePostAuthRedirect } from '$lib/server/security';
 /**
  * Map Supabase error codes to user-friendly error keys
  */
-function mapErrorCode(errorCode: string | undefined): string {
+function mapErrorCode(errorCode: string | undefined, linkType: 'google' | 'email' | null): string {
 	const errorMap: Record<string, string> = {
+		// Google linking errors
 		'identity_already_exists': 'identity_already_exists',
 		'manual_linking_disabled': 'manual_linking_disabled',
-		'provider_disabled': 'manual_linking_disabled'
+		'provider_disabled': 'manual_linking_disabled',
+		// Email linking errors
+		'email_exists': 'email_exists',
+		'email_not_confirmed': 'email_not_confirmed',
+		'invalid_credentials': 'invalid_credentials'
 	};
 	
-	return errorMap[errorCode || ''] || 'link_failed';
+	const mapped = errorMap[errorCode || ''];
+	if (mapped) return mapped;
+	
+	// Fallback based on link type
+	return linkType === 'email' ? 'email_change_failed' : 'link_failed';
 }
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -24,7 +33,9 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	
 	// Check if this is a linking flow by looking for the link marker in the callback URL
 	const linkMarker = url.searchParams.get('link');
-	const isLinkFlow = linkMarker === 'google';
+	const isGoogleLinkFlow = linkMarker === 'google';
+	const isEmailLinkFlow = linkMarker === 'email';
+	const isLinkFlow = isGoogleLinkFlow || isEmailLinkFlow;
 
 	// Handle OAuth errors (Supabase rejected the flow before returning code)
 	if (error || errorCode) {
@@ -32,7 +43,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		
 		if (isLinkFlow) {
 			// Linking-specific error - redirect to settings with mapped error
-			const mappedError = mapErrorCode(errorCode);
+			const linkType = isEmailLinkFlow ? 'email' : 'google';
+			const mappedError = mapErrorCode(errorCode, linkType);
 			const settingsUrl = new URL('/settings', url.origin);
 			settingsUrl.searchParams.set('error', mappedError);
 			redirect(303, settingsUrl.toString());
@@ -51,7 +63,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		
 		if (!exchangeError) {
 			// Success - check if this was a linking flow
-			if (isLinkFlow) {
+			if (isGoogleLinkFlow) {
 				// Verify user actually has Google identity now
 				const { data: { user } } = await locals.supabase.auth.getUser();
 				const hasGoogleIdentity = user?.identities?.some((i) => i.provider === 'google');
@@ -63,6 +75,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				}
 			}
 			
+			if (isEmailLinkFlow) {
+				const settingsUrl = new URL('/settings', url.origin);
+				settingsUrl.searchParams.set('success', 'email_confirmed');
+				redirect(303, settingsUrl.toString());
+			}
+			
 			// Normal sign-in or linking without verification
 			redirect(303, next);
 		}
@@ -71,8 +89,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		console.error('[auth-callback] Exchange failed:', exchangeError);
 		
 		if (isLinkFlow) {
+			const linkType = isEmailLinkFlow ? 'email' : 'google';
+			const errorKey = linkType === 'email' ? 'email_change_failed' : 'link_failed';
 			const settingsUrl = new URL('/settings', url.origin);
-			settingsUrl.searchParams.set('error', 'link_failed');
+			settingsUrl.searchParams.set('error', errorKey);
 			redirect(303, settingsUrl.toString());
 		}
 	}

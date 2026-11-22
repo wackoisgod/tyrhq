@@ -47,6 +47,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Determine if user has a real email (not placeholder)
 	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
+	
+	// Check if user has email+password identity (for unlink rules)
+	const hasEmailIdentity = linkedIdentities.some((i) => i.provider === 'email');
 
 	return {
 		profile,
@@ -57,7 +60,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		eventsEnabled: isSupabaseAdminConfigured(),
 		linkedIdentities,
 		hasRealEmail,
-		userEmail: user.email
+		userEmail: user.email,
+		hasEmailIdentity
 	};
 };
 
