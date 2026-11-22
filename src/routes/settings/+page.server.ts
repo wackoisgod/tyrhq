@@ -32,13 +32,32 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const events = await listEventsForUser(user.id);
 
+	// Get linked identities from admin client
+	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	const supabaseAdmin = getSupabaseAdminClient();
+	let linkedIdentities: { provider: string; email?: string }[] = [];
+
+	if (supabaseAdmin) {
+		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
+		linkedIdentities = (authUser?.user?.identities || []).map((identity: any) => ({
+			provider: identity.provider,
+			email: identity.identity_data?.email
+		}));
+	}
+
+	// Determine if user has a real email (not placeholder)
+	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
+
 	return {
 		profile,
 		isOnboarding,
 		role,
 		events,
 		editEvent,
-		eventsEnabled: isSupabaseAdminConfigured()
+		eventsEnabled: isSupabaseAdminConfigured(),
+		linkedIdentities,
+		hasRealEmail,
+		userEmail: user.email
 	};
 };
 

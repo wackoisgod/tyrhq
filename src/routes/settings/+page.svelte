@@ -157,41 +157,102 @@
 
 		{#if !data.isOnboarding}
 			<div class="mt-8 border-t border-[var(--hud-variant)] pt-6">
-				<h2 class="text-xl font-semibold text-[var(--hud-text)]">Steam Account</h2>
+				<h2 class="text-xl font-semibold text-[var(--hud-text)]">Linked Accounts</h2>
 				<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
-					Link your Steam account to auto-match your profile when organizers upload replay files for tournament matches.
+					Manage your sign-in methods and linked accounts. Add multiple methods to access your account.
 				</p>
 
-				{#if data.profile?.verified_steam_id}
-					<div class="mt-4 rounded-sm bg-[var(--hud-inset)] p-4">
-						<div class="flex items-start justify-between gap-4">
+				<div class="mt-4 space-y-3">
+					<!-- Email/Password -->
+					{#if data.hasRealEmail}
+						<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Email & Password</p>
+									<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
+								</div>
+							</div>
+						</div>
+					{:else}
+						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password</p>
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Add an email to enable password recovery.</p>
+								</div>
+								<button class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed" disabled title="Coming soon">
+									Add Email
+								</button>
+							</div>
+						</div>
+					{/if}
+
+				<!-- Google -->
+				{#if data.linkedIdentities.some((i) => i.provider === 'google')}
+					{@const googleIdentity = data.linkedIdentities.find((i) => i.provider === 'google')}
+					<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+						<div class="flex items-center justify-between gap-4">
 							<div>
-								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Steam Account Linked</p>
-								{#if data.profile.steam_display_name}
-									<p class="mt-1 text-sm text-[var(--hud-muted)]">Steam Name: <strong class="text-[var(--hud-text)]">{data.profile.steam_display_name}</strong></p>
-								{/if}
-								<p class="mt-1 text-xs text-[var(--hud-muted)]">SteamID64: {data.profile.verified_steam_id}</p>
-								{#if data.profile.steam_verified_at}
-									<p class="mt-1 text-xs text-[var(--hud-muted)]">
-										Verified {new Date(data.profile.steam_verified_at).toLocaleDateString()}
-									</p>
+								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Google</p>
+								{#if googleIdentity?.email}
+									<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
 								{/if}
 							</div>
-							<form method="POST" action="?/unlinkSteam">
-								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">Unlink</button>
-							</form>
 						</div>
 					</div>
-				{:else}
-					<div class="mt-4">
-						<a href="/auth/steam" class="hud-cta inline-block px-4 py-3 text-sm">
-							Sign in through Steam to Link Account
-						</a>
-						<p class="mt-2 text-xs text-[var(--hud-muted)]">
-							You'll be redirected to Steam to verify ownership. We only store your SteamID64 for player matching.
-						</p>
-					</div>
-				{/if}
+					{:else}
+						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-muted)]">Google</p>
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked</p>
+								</div>
+								<button class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed" disabled title="Requires Manual Linking to be enabled in Supabase">
+									Link Google
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Steam -->
+					{#if data.profile?.verified_steam_id}
+						<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+							<div class="flex items-start justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Steam</p>
+									{#if data.profile.steam_display_name}
+										<p class="mt-1 text-xs text-[var(--hud-muted)]">Steam Name: {data.profile.steam_display_name}</p>
+									{/if}
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">SteamID64: {data.profile.verified_steam_id}</p>
+									{#if data.profile.steam_verified_at}
+										<p class="mt-1 text-xs text-[var(--hud-dim)]">
+											Verified {new Date(data.profile.steam_verified_at).toLocaleDateString()}
+										</p>
+									{/if}
+								</div>
+								<form method="POST" action="?/unlinkSteam">
+									<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">Unlink</button>
+								</form>
+							</div>
+						</div>
+					{:else}
+						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-muted)]">Steam</p>
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Link Steam for tournament match auto-matching.</p>
+								</div>
+								<a href="/auth/steam" class="hud-cta-outline px-3 py-2 text-xs">
+									Link Steam
+								</a>
+							</div>
+						</div>
+					{/if}
+				</div>
+
+				<div class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] p-3 text-xs text-[var(--hud-dim)]">
+					<strong class="text-[var(--hud-muted)]">Note:</strong> To link Google to an existing account, Manual Linking must be enabled in Supabase Auth settings. Contact your administrator if the Link Google button is disabled.
+				</div>
 			</div>
 
 			<div class="mt-8 hud-panel-muted p-4">
