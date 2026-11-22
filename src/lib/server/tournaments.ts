@@ -41,6 +41,47 @@ const urlSchema = z
 	.optional()
 	.or(z.literal('').transform(() => undefined));
 
+const discordUrlSchema = z
+	.string()
+	.trim()
+	.max(URL_MAX)
+	.refine(
+		(val) => {
+			if (!val) return true;
+			try {
+				const url = new URL(val);
+				return (
+					(url.hostname === 'discord.gg' || url.hostname === 'discord.com') &&
+					(url.pathname.startsWith('/invite/') || url.hostname === 'discord.gg')
+				);
+			} catch {
+				return false;
+			}
+		},
+		{ message: 'Must be a valid Discord invite link (discord.gg/code or discord.com/invite/code)' }
+	)
+	.optional()
+	.or(z.literal('').transform(() => undefined));
+
+const httpsUrlSchema = z
+	.string()
+	.trim()
+	.max(URL_MAX)
+	.refine(
+		(val) => {
+			if (!val) return true;
+			try {
+				const url = new URL(val);
+				return url.protocol === 'https:';
+			} catch {
+				return false;
+			}
+		},
+		{ message: 'Must be a valid HTTPS URL' }
+	)
+	.optional()
+	.or(z.literal('').transform(() => undefined));
+
 export const createTeamSchema = z
 	.object({
 		name: z.string().trim().min(3).max(TEAM_NAME_MAX),
@@ -59,8 +100,10 @@ export const createTournamentSchema = z
 		registrationMode: z.enum(['open', 'manual_bracket']),
 		teamSize: z.literal(TYR_TEAM_SIZE),
 		substituteCount: z.number().int().min(0).max(16),
-		rulesUrl: urlSchema,
-		discordUrl: urlSchema
+		maxTeams: z.number().int().min(2).max(256),
+		prizeInfo: z.string().trim().max(TOURNAMENT_SUMMARY_MAX).optional(),
+		rulesUrl: httpsUrlSchema,
+		discordUrl: discordUrlSchema
 	})
 	.strict()
 	.superRefine((body, ctx) => {
@@ -150,6 +193,8 @@ interface TournamentRow {
 	status: 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
 	team_size: number;
 	substitute_count: number;
+	max_teams: number;
+	prize_info: string | null;
 	rules_url: string | null;
 	discord_url: string | null;
 	created_at: string;
@@ -179,6 +224,7 @@ interface MatchRow {
 	status: 'pending' | 'completed';
 	completed_at: string | null;
 	best_of: number;
+	target_score: number | null;
 	scheduled_at: string | null;
 	stream_url: string | null;
 	notes: string | null;
@@ -442,6 +488,8 @@ function toTournament(row: TournamentRow) {
 		status: row.status,
 		teamSize: row.team_size,
 		substituteCount: row.substitute_count,
+		maxTeams: row.max_teams,
+		prizeInfo: row.prize_info,
 		maxTeamMembers: row.team_size + row.substitute_count,
 		rulesUrl: row.rules_url,
 		discordUrl: row.discord_url,
@@ -875,6 +923,8 @@ export async function createTournament(
 			status: input.registrationMode === 'open' ? 'open' : 'draft',
 			team_size: input.teamSize,
 			substitute_count: input.substituteCount,
+			max_teams: input.maxTeams,
+			prize_info: input.prizeInfo || null,
 			rules_url: input.rulesUrl || null,
 			discord_url: input.discordUrl || null
 		})
@@ -934,6 +984,8 @@ export async function updateTournament(
 			status: input.status,
 			team_size: input.teamSize,
 			substitute_count: input.substituteCount,
+			max_teams: input.maxTeams,
+			prize_info: input.prizeInfo || null,
 			rules_url: input.rulesUrl || null,
 			discord_url: input.discordUrl || null
 		})
@@ -1020,6 +1072,9 @@ export async function registerTeam(tournamentId: string, teamId: string, actorId
 		if (error.message.includes('captain')) throw new TournamentError('Only the team captain can register.', 403);
 		if (error.message.includes('closed') || error.message.includes('locked')) {
 			throw new TournamentError('Tournament registration is closed.', 409);
+		}
+		if (error.message.includes('maximum number of teams')) {
+			throw new TournamentError(error.message, 409);
 		}
 		throw new TournamentError('Could not register team.', 500);
 	}

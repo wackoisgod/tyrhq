@@ -45,6 +45,8 @@ export const actions: Actions = {
 			registrationMode: String(form.get('registrationMode') ?? 'open'),
 			teamSize: 8,
 			substituteCount: Number(form.get('substituteCount') ?? 1),
+			maxTeams: Number(form.get('maxTeams') ?? 16),
+			prizeInfo: String(form.get('prizeInfo') ?? ''),
 			rulesUrl: String(form.get('rulesUrl') ?? ''),
 			discordUrl: String(form.get('discordUrl') ?? '')
 		});
