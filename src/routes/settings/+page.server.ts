@@ -49,31 +49,60 @@ export const actions: Actions = {
 
 		const formData = await request.formData();
 		const displayName = (formData.get('display_name') as string)?.trim() ?? '';
+		const discordHandle = (formData.get('discord_handle') as string)?.trim() ?? '';
+		const steamProfile = (formData.get('steam_profile') as string)?.trim() ?? '';
 
 		if (!displayName) {
-			return fail(400, { profileError: 'Display name is required', displayName });
+			return fail(400, { profileError: 'Display name is required', displayName, discordHandle, steamProfile });
 		}
 
 		if (displayName.length > 32) {
 			return fail(400, {
 				profileError: 'Display name must be 32 characters or less',
-				displayName
+				displayName,
+				discordHandle,
+				steamProfile
+			});
+		}
+
+		if (discordHandle.length > 100) {
+			return fail(400, {
+				profileError: 'Discord handle must be 100 characters or less',
+				displayName,
+				discordHandle,
+				steamProfile
+			});
+		}
+
+		if (steamProfile.length > 200) {
+			return fail(400, {
+				profileError: 'Steam profile must be 200 characters or less',
+				displayName,
+				discordHandle,
+				steamProfile
 			});
 		}
 
 		const { error } = await locals.supabase
 			.from('profiles')
-			.update({ display_name: displayName, updated_at: new Date().toISOString() })
+			.update({ 
+				display_name: displayName,
+				discord_handle: discordHandle || null,
+				steam_profile: steamProfile || null,
+				updated_at: new Date().toISOString() 
+			})
 			.eq('id', user.id);
 
 		if (error) {
 			console.error('[settings] Failed to update profile', error);
 			return fail(500, {
 				profileError: 'Unable to update profile right now.',
-				displayName
+				displayName,
+				discordHandle,
+				steamProfile
 			});
 		}
 
-		return { profileSuccess: 'Callsign updated.' };
+		return { profileSuccess: 'Profile updated.' };
 	}
 };
