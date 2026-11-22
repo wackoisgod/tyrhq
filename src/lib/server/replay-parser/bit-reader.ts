@@ -150,6 +150,21 @@ export class BitReader {
 	}
 
 	/**
+	 * Read FName (bit-level, UPackageMap::StaticSerializeName).
+	 * Port of BitReader.fname from Python decode.py:369-375
+	 */
+	fname(): string {
+		const bHardcoded = this.readBit();
+		if (bHardcoded) {
+			const idx = this.intPacked();
+			return `HardcodedName_${idx}`;
+		}
+		const s = this.fstring();
+		this.i32(); // InNumber
+		return s;
+	}
+
+	/**
 	 * FBitReader::SerializeInt: write as many bits as needed for max_value,
 	 * LSB first, stopping once the next mask bit could exceed max_value-1.
 	 */

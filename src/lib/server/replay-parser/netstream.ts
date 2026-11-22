@@ -92,6 +92,7 @@ export interface NetstreamState {
 	warnings: string[];
 	frameCount: number;
 	packetCount: number;
+	bunchCount: number;
 }
 
 /**
@@ -226,201 +227,289 @@ function internalLoadObject(
  * Process property replication in a bunch.
  * This is a simplified version that extracts just the properties we care about.
  */
-function receiveProperties(
-	reader: BitReader,
-	channel: Channel,
-	state: NetstreamState
-): void {
-	// Get or create player identity entry
-	let identity = state.playerIdentity.get(channel.actorGuid);
-	if (!identity) {
-		identity = {
-			actorGuid: channel.actorGuid,
-			class: channel.class
-		};
-		state.playerIdentity.set(channel.actorGuid, identity);
-	}
-
-	// Read property handles and payloads
-	while (true) {
-		if (reader.bitsLeft() < 16) break;
-
-		const handle = reader.readBitsInt(16);
-		if (handle === 0) break; // End marker
-
-		// Read property payload length
-		const numBits = reader.readBitsInt(16);
-		if (numBits === 0 || numBits > reader.bitsLeft()) {
-			state.warnings.push(`Invalid property payload size: ${numBits}`);
-			break;
-		}
-
-		const payloadStart = reader.getPos();
-		const payloadBytes = reader.readBitsBytes(numBits);
-
-		// Try to decode known property types based on handle
-		// This is simplified - real implementation would use NetFieldExport groups
-		// For now, we'll scan for FString patterns and UniqueNetId signatures
-		
-		try {
-			const propReader = new BitReader(payloadBytes, numBits);
-			
-			// Try FString (player name, clan)
-			try {
-				const str = propReader.fstring();
-				if (str && str.length > 0 && str.length < 100) {
-					// Could be PlayerName or PlayerClan
-					if (!identity.name && str.match(/^[a-zA-Z0-9_-]+$/)) {
-						identity.name = str;
-					} else if (!identity.clan && str.match(/^[a-zA-Z0-9_-]+$/)) {
-						identity.clan = str;
-					}
-				}
-			} catch {
-				// Not an FString, try other types
-			}
-			
-			// Try UniqueNetId (Steam ID)
-			if (!identity.steamId && payloadBytes.length >= 11) {
-				const steamId = decodeUniqueNetId(payloadBytes);
-				if (steamId) {
-					identity.steamId = steamId;
-				}
-			}
-			
-			// Try uint8 (TeamId is typically 0 or 1)
-			if (identity.teamId === undefined && payloadBytes.length === 1) {
-				const teamId = payloadBytes[0];
-				if (teamId === 0 || teamId === 1) {
-					identity.teamId = teamId;
-				}
-			}
-			
-			// Try uint32 (GameplayTag indices)
-			if (payloadBytes.length === 4) {
-				const view = new DataView(payloadBytes.buffer, payloadBytes.byteOffset);
-				const tagValue = view.getUint32(0, true);
-				
-				// GameplayTag values are typically in range 5000-15000 for Tyr
-				if (tagValue >= 5000 && tagValue < 20000) {
-					if (!identity.vehicleTag) {
-						identity.vehicleTag = tagValue;
-					} else if (!identity.skinTag) {
-						identity.skinTag = tagValue;
-					} else if (!identity.keystoneTag) {
-						identity.keystoneTag = tagValue;
-					}
-				}
-			}
-		} catch (e) {
-			// Property decode failed, skip it
-		}
-	}
-}
 
 /**
  * Process a single bunch (content block on a channel).
  */
-function processBunch(
-	reader: BitReader,
-	state: NetstreamState
-): void {
-	// Read bunch header
-	const chIndex = reader.serializedInt(1024); // Max 1024 channels
-	
-	const bOpen = reader.readBit();
-	const bClose = reader.readBit();
-	const bReliable = reader.readBit();
-	
-	// Read size
-	const bunchBits = reader.readBitsInt(16);
-	if (bunchBits === 0 || bunchBits > reader.bitsLeft()) {
-		state.warnings.push(`Invalid bunch size: ${bunchBits}`);
-		return;
-	}
-
-	const bunchStart = reader.getPos();
-	const bunchData = reader.readBitsBytes(bunchBits);
-	const bunchReader = new BitReader(bunchData, bunchBits);
-
-	// Handle channel open
-	if (bOpen) {
-		const actorGuid = bunchReader.u32();
-		const archetypeGuid = bunchReader.u32();
-		
-		// Read archetype object path to get class name
-		const guidExport = state.guidMap.get(archetypeGuid);
-		let className = 'Unknown';
-		if (guidExport) {
-			// Extract class name from path like "Default__BP_TyrPlayerState_C"
-			const match = guidExport.pathName.match(/(?:Default__)?([^.]+)$/);
-			if (match) {
-				className = match[1];
-			}
-		}
-		
-		const channel: Channel = {
-			chIndex,
-			actorGuid,
-			archetype: archetypeGuid,
-			class: className
-		};
-		
-		state.channels.set(chIndex, channel);
-	}
-
-	// Get existing channel
-	const channel = state.channels.get(chIndex);
-	if (!channel) {
-		return; // Channel not opened yet or already closed
-	}
-
-	// Only process player identity classes
-	if (PLAYER_IDENTITY_CLASSES.has(channel.class)) {
-		try {
-			receiveProperties(bunchReader, channel, state);
-		} catch (e) {
-			state.warnings.push(`Property receive failed for ch${chIndex}: ${e}`);
-		}
-	}
-
-	// Handle channel close
-	if (bClose) {
-		state.channels.delete(chIndex);
-	}
-}
 
 /**
  * Process a single packet (contains multiple bunches).
  */
-function processPacket(
-	reader: BitReader,
-	state: NetstreamState
-): void {
-	// Read packet header
-	const bHasPacketInfo = reader.readBit();
-	if (bHasPacketInfo) {
-		// Skip packet info (seq, acks, etc.)
-		reader.readBitsInt(32); // seq
-		const ackCount = reader.readBitsInt(16);
-		for (let i = 0; i < Math.min(ackCount, 1000); i++) {
-			reader.readBitsInt(32);
+
+/**
+ * Read a NetGUID export from a bunch (bit-level internal_load_object).
+ * Simplified version that just skips the data.
+ */
+function readNetGuidExport(bits: BitReader, state: NetstreamState, isExporting: boolean): number {
+	const guid = bits.intPacked();
+	if (guid === 0) return guid;
+	
+	if (guid === 1 || isExporting) {
+		const flags = bits.u8();
+		const EXPORT_FLAG_HAS_PATH = 1;
+		const EXPORT_FLAG_HAS_NETWORK_CHECKSUM = 2;
+		
+		if (flags & EXPORT_FLAG_HAS_PATH) {
+			bits.fstring(); // Skip path
+			// outer
+			readNetGuidExport(bits, state, isExporting);
+		}
+		
+		if (flags & EXPORT_FLAG_HAS_NETWORK_CHECKSUM) {
+			bits.u32(); // Skip checksum
 		}
 	}
+	
+	return guid;
+}
 
-	// Read bunches in this packet
-	let bunchCount = 0;
-	while (reader.bitsLeft() > 32 && bunchCount < MAX_BUNCHES_PER_PACKET) {
-		try {
-			processBunch(reader, state);
-			bunchCount++;
-		} catch (e) {
-			if (e instanceof DecodeError) {
-				state.warnings.push(`Bunch decode error: ${e.message}`);
-				break;
-			}
-			throw e;
+/**
+ * Process bunch payload to extract actor opens and property replications.
+ * Port of process_bunch_payload from Python decode.py
+ */
+function processBunchPayload(
+	bits: BitReader,
+	ch: Channel,
+	bOpen: boolean,
+	state: NetstreamState,
+	bHasMustBeMapped: boolean
+): void {
+	if (bHasMustBeMapped) {
+		const numMustBeMapped = bits.u16();
+		for (let i = 0; i < numMustBeMapped; i++) {
+			bits.intPacked(); // Skip guid
 		}
+	}
+	
+	if (bOpen) {
+		// Actor channel open: read actor GUID and class
+		ch.actorGuid = bits.intPacked();
+		
+		const bHasArchetype = bits.readBit();
+		if (bHasArchetype) {
+			ch.archetype = bits.intPacked();
+		}
+		
+		// Read actor class from NetGUID map
+		const classGuid = bits.intPacked();
+		const classExport = state.guidMap.get(classGuid);
+		if (classExport) {
+			ch.class = classExport.pathName;
+			// Extract class name from path like "/Script/TyrGame.BP_TyrPlayerState_C"
+			const parts = ch.class.split('.');
+			if (parts.length > 1) {
+				ch.class = parts[parts.length - 1];
+			}
+		}
+	}
+	
+	// Read properties
+	while (!bits.atEnd()) {
+		const repObject = bits.intPacked();
+		if (repObject === 0) break;
+		
+		// Read property handle
+		const handle = bits.intPacked();
+		if (handle === 0) continue;
+		
+		// Read property payload length in bits
+		const numBits = bits.serializedInt(2048 * 8);
+		if (numBits === 0 || numBits > bits.bitsLeft()) {
+			break;
+		}
+		
+		const payload = bits.readBitsBytes(numBits);
+		
+		// Extract properties for player identity classes
+		const isPlayerIdentityClass = ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C';
+		if (isPlayerIdentityClass) {
+			extractPlayerProperty(ch, handle, payload, numBits, state);
+		}
+	}
+}
+
+/**
+ * Extract player identity properties from replicated data.
+ * Port of property extraction logic from Python decode.py:1008-1115
+ */
+function extractPlayerProperty(
+	ch: Channel,
+	handle: number,
+	payload: Uint8Array,
+	numBits: number,
+	state: NetstreamState
+): void {
+	// Get or create player identity record for this channel
+	let rec = state.playerIdentity.get(ch.chIndex);
+	if (!rec) {
+		rec = {
+			actorGuid: ch.actorGuid,
+			class: ch.class
+		};
+		state.playerIdentity.set(ch.chIndex, rec);
+	}
+	
+	// We need to match property handles to names, but we don't have the
+	// NetFieldExportGroups mapped yet. For now, try to decode known property
+	// types by their structure and context.
+	
+	// Try as FString (PlayerName/PlayerNamePrivate)
+	// FString in property: has SavedNumBits prefix
+	if (numBits > 32) {
+		try {
+			const bits = new BitReader(payload, numBits);
+			bits.u32(); // Skip savedNumBits
+			const str = bits.fstring();
+			if (str.length > 0 && str.length < 100) {
+				rec.name = str;
+				rec.class = ch.class;
+				rec.actorGuid = ch.actorGuid;
+			}
+		} catch (e) {
+			// Not a string
+		}
+	}
+	
+	// Try as small int (TeamId: usually 8 bits)
+	if (numBits > 0 && numBits <= 32) {
+		const teamId = readIntFromBytes(payload, numBits);
+		if (teamId >= 0 && teamId < 10) {
+			rec.teamId = teamId;
+			rec.class = ch.class;
+			rec.actorGuid = ch.actorGuid;
+		}
+	}
+	
+	// Try as FUniqueNetIdRepl (UniqueID/UniqueId: usually >16 bits)
+	if (numBits >= 16) {
+		const steamId = decodeUniqueNetId(payload);
+		if (steamId) {
+			rec.steamId = steamId;
+			rec.class = ch.class;
+			rec.actorGuid = ch.actorGuid;
+		}
+	}
+}
+
+/**
+ * Read an integer from bytes (little-endian).
+ */
+function readIntFromBytes(bytes: Uint8Array, numBits: number): number {
+	const numBytes = Math.ceil(numBits / 8);
+	let value = 0;
+	for (let i = 0; i < numBytes && i < bytes.length; i++) {
+		value |= bytes[i] << (i * 8);
+	}
+	return value;
+}
+
+/**
+ * Process a packet and extract bunches.
+ * Port of process_packet from Python decode.py:1376
+ */
+function processPacket(data: Uint8Array, state: NetstreamState): void {
+	// Packet must have terminating 1-bit
+	if (data.length === 0 || data[data.length - 1] === 0) {
+		state.warnings.push('Packet has no termination bit');
+		return;
+	}
+	
+	// Strip terminating 1-bit to get actual bit length
+	let last = data[data.length - 1];
+	let nbits = data.length * 8 - 1;
+	while (!(last & 0x80)) {
+		last = (last << 1) & 0xff;
+		nbits--;
+	}
+	
+	const bits = new BitReader(data, nbits);
+	
+	while (!bits.atEnd()) {
+		// Read bunch header
+		const bControl = bits.readBit();
+		const bOpen = bControl && bits.readBit();
+		const bClose = bControl && bits.readBit();
+		const closeReason = bClose ? bits.serializedInt(15) : 0; // CHANNEL_CLOSE_REASON_MAX
+		bits.readBit(); // bIsReplicationPaused
+		const bReliable = bits.readBit();
+		const chIndex = bits.intPacked();
+		
+		if (chIndex > 32767) {
+			throw new DecodeError(`chIndex ${chIndex} implausible`);
+		}
+		
+		const bHasExports = bits.readBit();
+		const bHasMustBeMapped = bits.readBit();
+		const bPartial = bits.readBit();
+		const bPartialInitial = bPartial && bits.readBit();
+		bPartial && bits.readBit(); // bHasPartialCustomExportsFinalBit
+		const bPartialFinal = bPartial && bits.readBit();
+		
+		let chName: string | undefined;
+		if (bReliable || bOpen) {
+			chName = bits.fname();
+		}
+		
+		const bunchBits = bits.serializedInt(2048 * 8); // MAX_PACKET_SIZE_IN_BITS
+		if (bunchBits > bits.bitsLeft()) {
+			throw new DecodeError(`bunch size ${bunchBits} > bits left ${bits.bitsLeft()}`);
+		}
+		
+		const payload = new BitReader(bits.readBitsBytes(bunchBits), bunchBits);
+		state.bunchCount++;
+		
+		// Get or create channel
+		let ch = state.channels.get(chIndex);
+		if (!ch) {
+			ch = {
+				chIndex,
+				actorGuid: 0,
+				archetype: null,
+				class: ''
+			};
+			state.channels.set(chIndex, ch);
+		}
+		if (chName) {
+			ch.name = chName;
+		}
+		
+		// Skip NetGUID exports (we don't need them for player identity)
+		if (bHasExports) {
+			try {
+				// receiveNetGUIDBunch - skip for now
+				const bHasReplayout = payload.readBit();
+				if (bHasReplayout) {
+					state.warnings.push('Unexpected ReceiveNetFieldExportsCompat path');
+					continue;
+				}
+				const numGuids = payload.i32();
+				if (numGuids < 0 || numGuids > 1024) {
+					throw new DecodeError(`NumGUIDs ${numGuids} out of range`);
+				}
+				for (let i = 0; i < numGuids; i++) {
+					// Skip internalLoadObject
+					readNetGuidExport(payload, state, true);
+				}
+			} catch (e) {
+				state.warnings.push(`NetGUID bunch failed: ${e}`);
+				continue;
+			}
+		}
+		
+		// Skip Control and Voice channels
+		if (ch.name === 'Control' || ch.name === 'Voice') {
+			continue;
+		}
+		
+		// Process bunch payload to extract properties
+		if (!bPartial) {
+			try {
+				processBunchPayload(payload, ch, bOpen, state, bHasMustBeMapped);
+			} catch (e) {
+				state.warnings.push(`Bunch content failed ch=${chIndex}: ${e}`);
+			}
+		}
+		// TODO: Handle partial bunches if needed
 	}
 }
 
@@ -504,8 +593,12 @@ function processDemoFrame(
 			}
 			const pkt = r.rd(size);
 			
-			// For now, skip packet processing - we have the NetGUIDs which is enough
-			// to see the channel opens
+			try {
+				processPacket(pkt, state);
+			} catch (e) {
+				state.warnings.push(`Packet process error: ${e}`);
+				// Continue to next packet
+			}
 			state.packetCount++;
 		}
 		
@@ -532,7 +625,8 @@ export function walkNetstream(
 		playerIdentity: new Map(),
 		warnings: [],
 		frameCount: 0,
-		packetCount: 0
+		packetCount: 0,
+		bunchCount: 0
 	};
 
 	let offset = 0;
