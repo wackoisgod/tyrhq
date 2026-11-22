@@ -48,11 +48,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Determine if user has a real email (not placeholder)
 	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
 	
-	// Check if user has email+password identity (can sign in with password)
+	// Check if user has email provider identity
 	const hasEmailIdentity = linkedIdentities.some((i) => i.provider === 'email');
 	
-	// User can set a password if they have real email but no email identity yet
-	const canSetPassword = hasRealEmail && !hasEmailIdentity;
+	// Email+password counts as a usable sign-in method ONLY when:
+	// - Email is real (not placeholder) AND
+	// - Email identity exists (password is set)
+	const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+	
+	// User can set a password if they have real email (from OAuth or confirmed)
+	// Note: After updateUser({password}), Supabase doesn't create a new identity for OAuth users
+	// The password is added to their existing account, so we show "Set password" for any real-email user
+	const canSetPassword = hasRealEmail;
 
 	return {
 		profile,
@@ -65,6 +72,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasRealEmail,
 		userEmail: user.email,
 		hasEmailIdentity,
+		hasEmailPassword,
 		canSetPassword
 	};
 };

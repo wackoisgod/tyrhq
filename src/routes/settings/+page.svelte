@@ -260,14 +260,29 @@
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
 
-	// Check if user can unlink (must have at least 2 sign-in methods)
-	// Count: identities + (email+password ONLY if email identity exists)
+	// Check if user can unlink (must have at least 2 distinct usable sign-in methods)
+	// Count distinct methods without double-counting:
+	// - Google identity (can sign in via Google OAuth)
+	// - Email+password (real email + email identity = can sign in with password)
+	// - Verified Steam (profile.verified_steam_id = can sign in via Steam OpenID)
 	const signInMethodCount = $derived(() => {
-		let count = data.linkedIdentities.length;
-		// Email+password counts as a method ONLY when user has email provider identity (can sign in with password)
-		if (data.hasEmailIdentity) {
+		let count = 0;
+		
+		// Google identity
+		if (data.linkedIdentities.some((i) => i.provider === 'google')) {
 			count += 1;
 		}
+		
+		// Email+password (real email AND email identity)
+		if (data.hasEmailPassword) {
+			count += 1;
+		}
+		
+		// Verified Steam
+		if (data.profile?.verified_steam_id) {
+			count += 1;
+		}
+		
 		return count;
 	});
 	
@@ -429,8 +444,8 @@
 
 				<div class="mt-4 space-y-3">
 			<!-- Email/Password -->
-			{#if data.hasEmailIdentity}
-				<!-- User has email+password (can sign in with password) -->
+			{#if data.hasEmailPassword}
+				<!-- User has real email+password (can sign in with password) -->
 				<div class="rounded-sm bg-[var(--hud-inset)] p-4">
 					<div class="flex items-center justify-between gap-4">
 						<div>

@@ -91,52 +91,110 @@ describe('Email & Password Linking', () => {
 	});
 
 	describe('Sign-in method counting', () => {
-		it('should count email+password when email identity exists', () => {
+		it('should count distinct methods without double-counting', () => {
 			const identities = [
-				{ provider: 'email' }, // Has password
+				{ provider: 'email' },
 				{ provider: 'google' }
 			];
+			const hasRealEmail = true;
 			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
-			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
+			const verifiedSteamId = null;
 			
-			expect(hasEmailIdentity).toBe(true);
-			expect(totalMethods).toBe(3); // 2 identities + 1 for email+password
+			// Count: Google + Email+password (not double-counted)
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1;
+			if (verifiedSteamId) count += 1;
+			
+			expect(count).toBe(2); // Google + Email+password, no double-count
 		});
 
-		it('should NOT count email+password for Google-only users (no password)', () => {
+		it('should NOT count email+password for Steam placeholder users', () => {
+			const identities = [
+				{ provider: 'email' } // Created by admin.createUser with placeholder
+			];
+			const hasRealEmail = false; // steam_*@users.tyrhq.invalid
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const verifiedSteamId = '76561198012345678';
+			
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1; // FALSE: placeholder email
+			if (verifiedSteamId) count += 1;
+			
+			expect(count).toBe(1); // Only Steam, placeholder email doesn't count
+		});
+
+		it('should NOT count email+password for Google-only users (no password set)', () => {
 			const identities = [
 				{ provider: 'google' } // Has email from Google but no password
 			];
+			const hasRealEmail = true; // Real email from Google
 			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
-			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
+			const verifiedSteamId = null;
 			
-			expect(hasEmailIdentity).toBe(false);
-			expect(totalMethods).toBe(1); // Only Google identity, no email+password
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1; // FALSE: no email identity
+			if (verifiedSteamId) count += 1;
+			
+			expect(count).toBe(1); // Only Google, no password
 		});
 
 		it('should prevent unlinking Google when it is the only method', () => {
 			const identities = [
-				{ provider: 'google' } // Google-only user
+				{ provider: 'google' }
 			];
-			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
-			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
-			const canUnlinkGoogle = totalMethods >= 2 && identities.some((i) => i.provider === 'google');
+			const hasRealEmail = true;
+			const hasEmailIdentity = false;
+			const verifiedSteamId = null;
 			
-			expect(totalMethods).toBe(1);
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1;
+			if (verifiedSteamId) count += 1;
+			
+			const canUnlinkGoogle = count >= 2 && identities.some((i) => i.provider === 'google');
+			
+			expect(count).toBe(1);
 			expect(canUnlinkGoogle).toBe(false);
 		});
 
-		it('should allow unlinking Google when user has set password', () => {
+		it('should allow unlinking Google when user has real email+password', () => {
 			const identities = [
 				{ provider: 'google' },
 				{ provider: 'email' } // User set a password
 			];
+			const hasRealEmail = true;
 			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
-			const totalMethods = identities.length + (hasEmailIdentity ? 1 : 0);
-			const canUnlinkGoogle = totalMethods >= 2 && identities.some((i) => i.provider === 'google');
+			const verifiedSteamId = null;
 			
-			expect(totalMethods).toBe(3);
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1;
+			if (verifiedSteamId) count += 1;
+			
+			const canUnlinkGoogle = count >= 2 && identities.some((i) => i.provider === 'google');
+			
+			expect(count).toBe(2); // Google + Email+password
 			expect(canUnlinkGoogle).toBe(true);
+		});
+
+		it('should count Steam+Google as 2 methods (can unlink either)', () => {
+			const identities = [
+				{ provider: 'google' },
+				{ provider: 'email' } // Placeholder from Steam creation
+			];
+			const hasRealEmail = false; // Placeholder
+			const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+			const verifiedSteamId = '76561198012345678';
+			
+			let count = 0;
+			if (identities.some((i) => i.provider === 'google')) count += 1;
+			if (hasRealEmail && hasEmailIdentity) count += 1;
+			if (verifiedSteamId) count += 1;
+			
+			expect(count).toBe(2); // Google + Steam only
 		});
 	});
 
@@ -224,29 +282,43 @@ describe('Email & Password Linking', () => {
 		});
 	});
 
-	describe('Google-only user states', () => {
-		it('should detect when user can set password (has real email, no email identity)', () => {
+	describe('User UI states', () => {
+		it('should show Add Email form for Steam placeholder users', () => {
+			const hasRealEmail = false; // steam_*@users.tyrhq.invalid
+			const hasEmailIdentity = true; // Created by admin.createUser
+			const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+			const canSetPassword = hasRealEmail;
+			
+			// Steam placeholder user should:
+			// - NOT show "✓ Email & Password" (hasEmailPassword is false)
+			// - NOT show "Set Password" (canSetPassword is false)
+			// - Show "Add Email" form
+			expect(hasEmailPassword).toBe(false);
+			expect(canSetPassword).toBe(false);
+		});
+
+		it('should show Set Password for Google-only users', () => {
 			const hasRealEmail = true; // From Google
 			const hasEmailIdentity = false; // No password set
-			const canSetPassword = hasRealEmail && !hasEmailIdentity;
+			const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+			const canSetPassword = hasRealEmail;
 			
+			// Google-only user should:
+			// - NOT show "✓ Email & Password" (hasEmailPassword is false)
+			// - Show "Set Password" button (canSetPassword is true)
+			expect(hasEmailPassword).toBe(false);
 			expect(canSetPassword).toBe(true);
 		});
 
-		it('should not allow setting password for placeholder email users', () => {
-			const hasRealEmail = false; // Steam placeholder
-			const hasEmailIdentity = false;
-			const canSetPassword = hasRealEmail && !hasEmailIdentity;
-			
-			expect(canSetPassword).toBe(false);
-		});
-
-		it('should not show set password option when password already exists', () => {
+		it('should show confirmed Email & Password for users with both', () => {
 			const hasRealEmail = true;
-			const hasEmailIdentity = true; // Already has password
-			const canSetPassword = hasRealEmail && !hasEmailIdentity;
+			const hasEmailIdentity = true;
+			const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+			const canSetPassword = hasRealEmail;
 			
-			expect(canSetPassword).toBe(false);
+			// User with real email+password should:
+			// - Show "✓ Email & Password" (hasEmailPassword is true)
+			expect(hasEmailPassword).toBe(true);
 		});
 	});
 });
