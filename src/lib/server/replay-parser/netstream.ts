@@ -484,20 +484,10 @@ export function walkNetstream(
 		
 		// Process ReplayData chunks
 		if (chunkType === CHUNK_TYPE_REPLAY_DATA) {
-			const chunkData = buffer.slice(offset, offset + chunkSize);
-			let chunkOffset = 0;
-			
-			// Walk demo frames in this chunk
-			while (chunkOffset < chunkData.length && state.frameCount < MAX_FRAMES) {
-				try {
-					const bytesRead = processDemoFrame(chunkData, chunkOffset, state);
-					chunkOffset += bytesRead;
-					
-					if (bytesRead === 0) break; // No progress
-				} catch (e) {
-					state.warnings.push(`Frame process failed: ${e}`);
-					break;
-				}
+			try {
+				processReplayDataChunk(buffer.slice(offset, offset + chunkSize), state);
+			} catch (e) {
+				state.warnings.push(`Chunk process failed: ${e}`);
 			}
 		}
 		
@@ -506,4 +496,50 @@ export function walkNetstream(
 	}
 
 	return state;
+}
+
+/**
+ * Process a ReplayData chunk (contains demo frames).
+ */
+function processReplayDataChunk(chunkData: Uint8Array, state: NetstreamState): void {
+	// ReplayData chunk structure:
+	// uint32 time1
+	// uint32 time2  
+	// int32 length
+	// int32 memorySizeInBytes (file version >= 6)
+	// then demo frames
+	
+	let offset = 0;
+	
+	// Skip time1, time2
+	offset += 8;
+	
+	// Read length
+	if (offset + 4 > chunkData.length) return;
+	const length = readI32(chunkData, offset);
+	offset += 4;
+	
+	// Skip memorySizeInBytes
+	offset += 4;
+	
+	if (length < 0 || offset + length > chunkData.length) {
+		state.warnings.push(`Invalid stream length: ${length}`);
+		return;
+	}
+	
+	// Process demo frames within this stream
+	const streamData = chunkData.slice(offset, offset + length);
+	let streamOffset = 0;
+	
+	while (streamOffset < streamData.length && state.frameCount < MAX_FRAMES) {
+		try {
+			const bytesRead = processDemoFrame(streamData, streamOffset, state);
+			streamOffset += bytesRead;
+			
+			if (bytesRead === 0) break;
+		} catch (e) {
+			state.warnings.push(`Frame process failed: ${e}`);
+			break;
+		}
+	}
 }
