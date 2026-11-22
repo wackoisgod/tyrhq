@@ -18,6 +18,7 @@
  */
 
 import { BitReader, DecodeError } from './bit-reader';
+import { ByteReader } from './byte-reader';
 import { decodeUniqueNetId } from './steam-id';
 
 // Engine network version constants
@@ -159,26 +160,66 @@ function readI32(data: Uint8Array, offset: number): number {
 }
 
 /**
- * Parse NetGUID export table from demo frame.
+ * Read NetGUID exports from demo frame (byte-aligned).
+ * This matches read_net_export_guids from Python decoder.
  */
-function readNetExportGuids(reader: BitReader, state: NetstreamState): void {
-	const numGuids = reader.u32();
-	if (numGuids > 10000) {
-		state.warnings.push(`Suspiciously large NetGUID count: ${numGuids}`);
-		return;
+function readNetExportGuids(r: ByteReader, state: NetstreamState): void {
+	const n = r.intPacked();
+	if (n > 100_000) {
+		throw new DecodeError(`numGuids ${n} implausible`);
 	}
+	
+	for (let i = 0; i < n; i++) {
+		const size = r.i32();
+		if (!(size >= 0 && size <= (1 << 20))) {
+			throw new DecodeError(`export guid blob size ${size} implausible`);
+		}
+		const sub = new ByteReader(r.rd(size));
+		internalLoadObject(sub, state, true, 0);
+	}
+}
 
-	for (let i = 0; i < numGuids; i++) {
-		const guid = reader.u32();
-		const [pathName, outerGuid, type] = [reader.fstring(), reader.u32(), reader.u32()];
-		
-		state.guidMap.set(guid, {
-			guid,
-			pathName,
-			outerGuid,
-			type
-		});
+/**
+ * InternalLoadObject - reads a NetGUID export entry.
+ * Simplified version that just tracks guid -> path mappings.
+ */
+function internalLoadObject(
+	r: ByteReader,
+	state: NetstreamState,
+	isExporting: boolean,
+	depth: number
+): number {
+	if (depth > 16) {
+		throw new DecodeError('InternalLoadObject recursion limit');
 	}
+	
+	const guid = r.intPacked();
+	if (guid === 0) {
+		return guid;
+	}
+	
+	if (guid === 1 || isExporting) {
+		const flags = r.u8();
+		const EXPORT_FLAG_HAS_PATH = 1;
+		const EXPORT_FLAG_HAS_NETWORK_CHECKSUM = 4;
+		
+		if (flags & EXPORT_FLAG_HAS_PATH) {
+			const outer = internalLoadObject(r, state, true, depth + 1);
+			const path = r.fstring();
+			if (flags & EXPORT_FLAG_HAS_NETWORK_CHECKSUM) {
+				r.u32(); // networkChecksum
+			}
+			
+			state.guidMap.set(guid, {
+				guid,
+				pathName: path,
+				outerGuid: outer,
+				type: 0
+			});
+		}
+	}
+	
+	return guid;
 }
 
 /**
@@ -384,66 +425,95 @@ function processPacket(
 }
 
 /**
- * Process a single demo frame.
+ * Process a single demo frame (byte-aligned).
+ * Matches parse_demo_frame from Python decoder.
  */
 function processDemoFrame(
 	data: Uint8Array,
 	offset: number,
 	state: NetstreamState
 ): number {
-	const reader = new BitReader(data.slice(offset));
+	// Don't slice - work directly on data with offset awareness
+	const r = new ByteReader(data.slice(offset));
+	const startOff = r.off;
 	
-	// Skip CurrentLevelIndex (uint32)
-	reader.u32();
-	
-	// Skip TimeSeconds (float)
-	reader.f32();
-	
-	// Read export data if present
-	const exportDataSize = reader.u32();
-	if (exportDataSize > 0) {
-		const exportStart = reader.getPos() / 8; // Convert to bytes
-		const exportData = data.slice(offset + Math.floor(exportStart), offset + Math.floor(exportStart) + exportDataSize);
-		const exportReader = new BitReader(exportData, exportDataSize * 8);
+	try {
+		// currentLevelIndex (int32)
+		r.i32();
 		
-		try {
-			readNetExportGuids(exportReader, state);
-		} catch (e) {
-			state.warnings.push(`Export data parse failed: ${e}`);
-		}
-	}
-	
-	// Skip external data offset (uint32) if present
-	const hasExternalData = reader.readBit();
-	if (hasExternalData) {
-		reader.u32();
-	}
-	
-	// Read packet data
-	while (reader.bitsLeft() > 32 && state.packetCount < MAX_PACKETS_PER_FRAME) {
-		const packetBits = reader.readBitsInt(32);
-		if (packetBits === 0) break;
-		
-		if (packetBits > reader.bitsLeft()) {
-			state.warnings.push(`Packet size ${packetBits} exceeds remaining bits`);
-			break;
+		// timeSeconds (float32)
+		const t = r.f32();
+		if (!(t >= 0.0 && t < 100_000.0)) {
+			throw new DecodeError(`frame time ${t} implausible`);
 		}
 		
-		const packetStart = reader.getPos();
-		const packetData = reader.readBitsBytes(packetBits);
-		const packetReader = new BitReader(packetData, packetBits);
+		// Skip read_net_field_exports for now (we don't need it for basic roster)
+		const numLayoutCmdExports = r.intPacked();
+		if (numLayoutCmdExports > 100_000 || numLayoutCmdExports < 0) {
+			throw new DecodeError(`numLayoutCmdExports ${numLayoutCmdExports} implausible at offset ${r.off}`);
+		}
+		for (let i = 0; i < numLayoutCmdExports; i++) {
+			try {
+				r.intPacked(); // pathNameIndex
+				const isExported = r.intPacked();
+				if (isExported === 1) {
+					r.fstring(); // pathName
+					const numExports = r.intPacked();
+					for (let j = 0; j < numExports; j++) {
+						const bExported = r.bool8();
+						if (bExported) {
+							r.intPacked(); // handle
+							r.u32(); // compatibleChecksum  
+							r.fname(); // name - calls fstring
+						}
+					}
+				}
+			} catch (e) {
+				throw new DecodeError(`Field export ${i}/${numLayoutCmdExports} failed: ${e}`);
+			}
+		}
 		
-		try {
-			processPacket(packetReader, state);
+		// read_net_export_guids
+		readNetExportGuids(r, state);
+		
+		// Skip streaming level data
+		const nStreaming = r.intPacked();
+		for (let i = 0; i < nStreaming; i++) {
+			r.fstring(); // PackageName
+			r.fstring(); // PackageNameToLoad
+			for (let j = 0; j < 10; j++) {
+				r.f64(); // FTransform components
+			}
+		}
+		
+		// read_external_data
+		while (true) {
+			const numBits = r.intPacked();
+			if (numBits === 0) break;
+			r.intPacked(); // guid
+			r.rd((numBits + 7) >> 3); // payload
+		}
+		
+		// Read packets
+		while (!r.atEnd()) {
+			const size = r.i32();
+			if (size === 0) break;
+			if (size < 0 || size > 2048) {
+				throw new DecodeError(`packet size ${size} out of range`);
+			}
+			const pkt = r.rd(size);
+			
+			// For now, skip packet processing - we have the NetGUIDs which is enough
+			// to see the channel opens
 			state.packetCount++;
-		} catch (e) {
-			state.warnings.push(`Packet process failed: ${e}`);
-			break;
 		}
+		
+		state.frameCount++;
+		return r.off;
+		
+	} catch (e) {
+		throw new DecodeError(`Frame parse failed: ${e}`);
 	}
-	
-	state.frameCount++;
-	return Math.ceil(reader.getPos() / 8);
 }
 
 /**
@@ -468,6 +538,7 @@ export function walkNetstream(
 	
 	// Find ReplayData chunks
 	let chunkCount = 0;
+	let replayDataChunkCount = 0;
 	while (offset < buffer.length && chunkCount < MAX_CHUNKS) {
 		if (offset + 8 > buffer.length) break;
 		
@@ -484,10 +555,11 @@ export function walkNetstream(
 		
 		// Process ReplayData chunks
 		if (chunkType === CHUNK_TYPE_REPLAY_DATA) {
+			replayDataChunkCount++;
 			try {
 				processReplayDataChunk(buffer.slice(offset, offset + chunkSize), state);
 			} catch (e) {
-				state.warnings.push(`Chunk process failed: ${e}`);
+				state.warnings.push(`Chunk ${replayDataChunkCount} process failed: ${e}`);
 			}
 		}
 		
@@ -509,26 +581,25 @@ function processReplayDataChunk(chunkData: Uint8Array, state: NetstreamState): v
 	// int32 memorySizeInBytes (file version >= 6)
 	// then demo frames
 	
-	let offset = 0;
+	const r = new ByteReader(chunkData);
 	
 	// Skip time1, time2
-	offset += 8;
+	r.u32();
+	r.u32();
 	
 	// Read length
-	if (offset + 4 > chunkData.length) return;
-	const length = readI32(chunkData, offset);
-	offset += 4;
+	const length = r.i32();
 	
 	// Skip memorySizeInBytes
-	offset += 4;
+	r.i32();
 	
-	if (length < 0 || offset + length > chunkData.length) {
+	if (length < 0 || length > chunkData.length) {
 		state.warnings.push(`Invalid stream length: ${length}`);
 		return;
 	}
 	
 	// Process demo frames within this stream
-	const streamData = chunkData.slice(offset, offset + length);
+	const streamData = r.rd(Math.min(length, r.remaining()));
 	let streamOffset = 0;
 	
 	while (streamOffset < streamData.length && state.frameCount < MAX_FRAMES) {
