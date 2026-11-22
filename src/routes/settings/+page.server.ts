@@ -104,5 +104,26 @@ export const actions: Actions = {
 		}
 
 		return { profileSuccess: 'Profile updated.' };
+	},
+
+	unlinkSteam: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		const { error: updateError } = await locals.supabase
+			.from('profiles')
+			.update({
+				verified_steam_id: null,
+				steam_display_name: null,
+				steam_verified_at: null
+			})
+			.eq('id', user.id);
+
+		if (updateError) {
+			console.error('Error unlinking Steam:', updateError);
+			return fail(500, { profileError: 'Failed to unlink Steam account' });
+		}
+
+		return { profileSuccess: 'Steam account unlinked' };
 	}
 };

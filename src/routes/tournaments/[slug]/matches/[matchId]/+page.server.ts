@@ -13,6 +13,8 @@ import {
 	lineupSchema,
 	matchGameSchema,
 	matchSettingsSchema,
+	processReplayUpload,
+	replayUploadSchema,
 	saveTournamentGameLineup,
 	saveTournamentMatchGame,
 	saveTournamentMatchGames,
@@ -167,6 +169,52 @@ export const actions: Actions = {
 				success: state.isComplete
 					? 'All games saved and series completed.'
 					: `All games saved. Series score is ${state.scoreA}-${state.scoreB}.`
+			};
+		} catch (caught) {
+			return tournamentFailure(caught);
+		}
+	},
+	uploadReplay: async ({ request, locals }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+
+		const form = await request.formData();
+		const matchId = String(form.get('matchId') ?? '');
+		const gameNumber = Number(form.get('gameNumber') ?? 0);
+		const replayFile = form.get('replayFile') as File | null;
+
+		if (!replayFile || replayFile.size === 0) {
+			return fail(400, { error: 'Please select a replay file' });
+		}
+
+		// Check file size (100 MB limit)
+		const MAX_SIZE = 100 * 1024 * 1024;
+		if (replayFile.size > MAX_SIZE) {
+			return fail(400, { error: 'Replay file too large (max 100 MB)' });
+		}
+
+		// Check file extension
+		if (!replayFile.name.endsWith('.replay')) {
+			return fail(400, { error: 'File must be a .replay file' });
+		}
+
+		const parsed = replayUploadSchema.safeParse({ matchId, gameNumber });
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+		}
+
+		try {
+			// Read file buffer
+			const arrayBuffer = await replayFile.arrayBuffer();
+			const buffer = Buffer.from(arrayBuffer);
+
+			// Process replay
+			const result = await processReplayUpload(parsed.data, buffer, user.id, role);
+
+			// Return suggested data to the UI for review
+			return {
+				success: 'Replay processed successfully',
+				replayData: result
 			};
 		} catch (caught) {
 			return tournamentFailure(caught);
