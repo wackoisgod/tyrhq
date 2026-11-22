@@ -447,29 +447,30 @@ function processDemoFrame(
 			throw new DecodeError(`frame time ${t} implausible`);
 		}
 		
-		// Skip read_net_field_exports for now (we don't need it for basic roster)
+		// read_net_field_exports - port from Python decode.py:790-818
 		const numLayoutCmdExports = r.intPacked();
 		if (numLayoutCmdExports > 100_000 || numLayoutCmdExports < 0) {
-			throw new DecodeError(`numLayoutCmdExports ${numLayoutCmdExports} implausible at offset ${r.off}`);
+			throw new DecodeError(`numLayoutCmdExports ${numLayoutCmdExports} implausible`);
 		}
 		for (let i = 0; i < numLayoutCmdExports; i++) {
-			try {
-				r.intPacked(); // pathNameIndex
-				const isExported = r.intPacked();
-				if (isExported === 1) {
-					r.fstring(); // pathName
-					const numExports = r.intPacked();
-					for (let j = 0; j < numExports; j++) {
-						const bExported = r.bool8();
-						if (bExported) {
-							r.intPacked(); // handle
-							r.u32(); // compatibleChecksum  
-							r.fname(); // name - calls fstring
-						}
-					}
+			const pathNameIndex = r.intPacked();
+			const isExported = r.intPacked() === 1;
+			
+			if (isExported) {
+				const pathName = r.fstring();
+				const numExports = r.intPacked();
+				if (numExports > 100_000) {
+					throw new DecodeError(`numExports ${numExports} implausible`);
 				}
-			} catch (e) {
-				throw new DecodeError(`Field export ${i}/${numLayoutCmdExports} failed: ${e}`);
+				// For now, skip group tracking - we don't need it for player identity
+			}
+			
+			// read_net_field_export - ONE field per layout
+			const bExported = r.bool8();
+			if (bExported) {
+				r.intPacked(); // handle
+				r.u32(); // compatibleChecksum
+				r.fname(); // name
 			}
 		}
 		
