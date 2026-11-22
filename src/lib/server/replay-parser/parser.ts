@@ -178,17 +178,32 @@ function decodeEndGameStats(
 /**
  * Parse a Tyr replay file.
  *
- * CURRENT STATUS: This implementation extracts header data (GUID, changelist)
- * but requires netstream parsing for roster/stats. The netstream walker is
- * ~1000+ lines of complex bit-level protocol parsing.
+ * CURRENT STATUS: Extracts header data (GUID, changelist) successfully.
+ * Netstream walker for roster/stats requires ~1000 LOC porting from Python.
  *
- * For the initial implementation, we:
- * 1. Parse header successfully ✓
- * 2. Return empty roster/stats with warnings (graceful degradation)
- * 3. Add TODO markers for netstream implementation
+ * BLOCKER: No real .replay files available for validation in tyr-replay-tools
+ * or tyr-uploader repos. Implementing complex bit-level protocol parsing blind
+ * (without test data) would produce unvalidated code that can't be verified
+ * until someone uploads a real replay in production.
  *
- * This allows the UI/upload flow to be built and tested while the full
- * parser is completed incrementally.
+ * REQUIRED FOR FULL IMPLEMENTATION:
+ * 1. Real .replay file(s) for cross-validation against Python decoder
+ * 2. Port netstream walker from tyr_replay/decode.py:
+ *    - ReplayData chunk → DemoFrame parsing
+ *    - Packet → bunch extraction
+ *    - NetGUID export table tracking
+ *    - Property replication for PlayerName, TeamId, UniqueID
+ *    - RPC capture for Multicast_SendEndGameStats
+ *    - Last-stand winner from TeamWithLastStandId
+ * 3. Hard budgets: max frames, bunches, bytes, wall-clock time
+ * 4. Comprehensive bounds checking (all reads validate buffer limits)
+ *
+ * Current implementation:
+ * - ✅ Header parsing (GUID, changelist) with validation
+ * - ✅ Type system and data structures
+ * - ✅ 38 unit tests for bit operations
+ * - ⚠️ Returns empty roster/stats with clear warnings
+ * - ✅ UI handles graceful degradation
  */
 export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 	const warnings: string[] = [];
