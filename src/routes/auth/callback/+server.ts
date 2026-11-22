@@ -67,8 +67,9 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		const { error: exchangeError } = await locals.supabase.auth.exchangeCodeForSession(code);
 		
 		if (!exchangeError) {
-			// Check if this is a merge flow
-			if (isMergeFlow) {
+			// Check if this is a merge flow (MUST check before link flow)
+			// Never allow link=google to hijack into merge
+			if (isMergeFlow && !isLinkFlow && mergeCookie && mergeCookie.phase === 'initiated') {
 				// Redirect to merge confirmation page
 				redirect(303, '/auth/merge/confirm');
 			}

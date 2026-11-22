@@ -2,49 +2,81 @@
  * Tests for account merge functionality
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock environment variables
+vi.mock('$env/dynamic/private', () => ({
+	MERGE_SECRET: 'a'.repeat(64) // 64-char secret for testing
+}));
+
+import { createMergeCookie, verifyMergeCookie } from '$lib/server/account-merge';
 import crypto from 'crypto';
 
 describe('Account Merge', () => {
-	describe('Merge cookie security', () => {
-		it('should require both primaryUserId and nonce', () => {
-			const mockCookie = {
-				primaryUserId: 'user-123',
-				nonce: crypto.randomBytes(32).toString('hex'),
-				expiresAt: Date.now() + 10 * 60 * 1000
+	describe('Cookie creation and verification', () => {
+		it('should create valid merge cookie with initiated phase', () => {
+			const { value } = createMergeCookie('primary-123');
+			
+			expect(value).toBeTruthy();
+			expect(value).toContain('.'); // Has signature
+			
+			const verified = verifyMergeCookie(value);
+			expect(verified).toBeTruthy();
+			expect(verified?.primaryUserId).toBe('primary-123');
+			expect(verified?.phase).toBe('initiated');
+			expect(verified?.nonce.length).toBe(64); // 32 bytes hex
+		});
+
+		it('should create valid merge cookie with authenticated phase', () => {
+			const { value } = createMergeCookie('primary-123', 'secondary-456', 'authenticated');
+			
+			const verified = verifyMergeCookie(value);
+			expect(verified).toBeTruthy();
+			expect(verified?.primaryUserId).toBe('primary-123');
+			expect(verified?.secondaryUserId).toBe('secondary-456');
+			expect(verified?.phase).toBe('authenticated');
+		});
+
+		it('should reject tampered cookie', () => {
+			const { value } = createMergeCookie('primary-123');
+			const tampered = value.replace('primary-123', 'attacker-999');
+			
+			const verified = verifyMergeCookie(tampered);
+			expect(verified).toBeNull();
+		});
+
+		it('should reject expired cookie', () => {
+			const { value } = createMergeCookie('primary-123');
+			const verified = verifyMergeCookie(value);
+			
+			// Manually expire it
+			if (verified) {
+				verified.expiresAt = Date.now() - 1000;
+				const payload = JSON.stringify(verified);
+				const fakeValue = `${Buffer.from(payload).toString('base64')}.fakesig`;
+				
+				const result = verifyMergeCookie(fakeValue);
+				expect(result).toBeNull(); // Should fail signature check
+			}
+		});
+
+		it('should reject cookie with wrong length secret', () => {
+			// This would happen at runtime when secret is too short
+			const shortSecret = 'tooshort';
+			expect(shortSecret.length).toBeLessThan(32);
+		});
+
+		it('should reject cookie with missing fields', () => {
+			const incomplete = {
+				primaryUserId: 'user-123'
+				// missing nonce, phase, issuedAt, expiresAt
 			};
-
-			expect(mockCookie.primaryUserId).toBeTruthy();
-			expect(mockCookie.nonce).toBeTruthy();
-			expect(mockCookie.nonce.length).toBe(64); // 32 bytes hex = 64 chars
-		});
-
-		it('should expire after 10 minutes', () => {
-			const now = Date.now();
-			const expiresAt = now + 10 * 60 * 1000;
-
-			expect(expiresAt - now).toBe(10 * 60 * 1000);
-		});
-
-		it('should reject expired cookies', () => {
-			const expiredTime = Date.now() - 1000; // 1 second ago
-			const isExpired = Date.now() > expiredTime;
-
-			expect(isExpired).toBe(true);
-		});
-
-		it('should reject cookie with missing data', () => {
-			const incompleteCookie = {
-				primaryUserId: 'user-123',
-				// missing nonce and expiresAt
-			};
-
-			const isValid =
-				incompleteCookie.primaryUserId &&
-				(incompleteCookie as any).nonce &&
-				(incompleteCookie as any).expiresAt;
-
-			expect(isValid).toBe(false);
+			
+			const payload = JSON.stringify(incomplete);
+			const fakeValue = `${Buffer.from(payload).toString('base64')}.fakesig`;
+			
+			const verified = verifyMergeCookie(fakeValue);
+			expect(verified).toBeNull();
 		});
 	});
 

@@ -2,14 +2,38 @@ import { fail, redirect } from '@sveltejs/kit';
 import { getAuthCallbackUrl } from '$lib/site-url';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const { session } = await locals.safeGetSession();
+	
+	// Check if this is a merge flow
+	const isMergeFlow = url.searchParams.get('merge') === '1';
+	
+	if (isMergeFlow) {
+		// Verify merge cookie exists
+		const { verifyMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+		const mergeCookie = verifyMergeCookie(cookies.get(MERGE_COOKIE_NAME));
+		
+		if (!mergeCookie) {
+			// Invalid or expired merge cookie - redirect to settings
+			redirect(303, '/settings?error=merge_expired');
+		}
+		
+		// If user is signed in, sign them out (but keep merge cookie)
+		if (session) {
+			await locals.supabase.auth.signOut();
+		}
+		
+		// Show sign-in page for secondary account
+		return { isMergeFlow: true };
+	}
+	
+	// Normal flow - redirect if already signed in
 	if (session) redirect(303, '/');
-	return {};
+	return { isMergeFlow: false };
 };
 
 export const actions: Actions = {
-	login: async ({ request, locals }) => {
+	login: async ({ request, locals, cookies }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;
@@ -22,6 +46,15 @@ export const actions: Actions = {
 		if (error) {
 			console.error('[auth] Login failed', error);
 			return fail(400, { error: 'Invalid email or password', email });
+		}
+
+		// Check if this is a merge flow
+		const { verifyMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+		const mergeCookie = verifyMergeCookie(cookies.get(MERGE_COOKIE_NAME));
+		
+		if (mergeCookie && mergeCookie.phase === 'initiated') {
+			// Redirect to merge confirmation
+			redirect(303, '/auth/merge/confirm');
 		}
 
 		redirect(303, '/');
@@ -72,7 +105,12 @@ export const actions: Actions = {
 		return { success: 'Check your email for a password reset link.' };
 	},
 
-	logout: async ({ locals }) => {
+	logout: async ({ locals, cookies }) => {
+		// Clear merge cookie if present
+		const { deleteMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+		const { value, options } = deleteMergeCookie();
+		cookies.set(MERGE_COOKIE_NAME, value, options);
+		
 		await locals.supabase.auth.signOut();
 		redirect(303, '/');
 	}

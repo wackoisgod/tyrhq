@@ -2,6 +2,22 @@
 -- Allows users to merge a secondary account into their primary account
 -- after proving ownership of both accounts via authentication
 
+-- Table for tracking used merge nonces (prevents replay attacks)
+CREATE TABLE IF NOT EXISTS public.merge_nonces (
+    nonce text PRIMARY KEY,
+    used_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Auto-cleanup old nonces after 1 hour
+CREATE INDEX IF NOT EXISTS idx_merge_nonces_used_at
+    ON public.merge_nonces (used_at);
+
+-- Only service_role can access this table
+ALTER TABLE public.merge_nonces ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.merge_nonces FROM public, anon, authenticated;
+GRANT SELECT, INSERT, DELETE ON public.merge_nonces TO service_role;
+
 -- Function to merge secondary account into primary account
 -- This moves all data ownership from secondary to primary and removes secondary
 CREATE OR REPLACE FUNCTION public.merge_accounts(
@@ -19,21 +35,31 @@ DECLARE
     v_build_stars_moved integer := 0;
     v_article_stars_moved integer := 0;
     v_map_rooms_moved integer := 0;
-    v_contributions_moved integer := 0;
+    v_article_submissions_moved integer := 0;
     v_tank_notes_moved integer := 0;
     v_api_creds_moved integer := 0;
+    v_api_logs_moved integer := 0;
+    v_articles_moved integer := 0;
+    v_article_revisions_moved integer := 0;
+    v_submission_events_moved integer := 0;
+    v_article_uploads_moved integer := 0;
     v_team_members_moved integer := 0;
     v_team_join_requests_moved integer := 0;
+    v_teams_recaptained integer := 0;
     v_tournament_registrations_moved integer := 0;
     v_tournament_free_agents_moved integer := 0;
     v_tournament_free_agent_requests_moved integer := 0;
     v_tournament_roster_members_moved integer := 0;
     v_tournament_build_submissions_moved integer := 0;
-    v_tournament_team_recruitment_moved integer := 0;
+    v_tournament_game_lineups_moved integer := 0;
     v_community_events_moved integer := 0;
+    v_tournaments_repointed integer := 0;
+    v_replay_uploads_moved integer := 0;
+    v_team_id uuid;
     v_secondary_steam_id text;
     v_secondary_steam_name text;
     v_secondary_steam_verified_at timestamptz;
+    v_primary_steam_id text;
     v_secondary_display_name text;
     v_primary_display_name text;
     v_keep_secondary_display_name boolean := false;
@@ -56,23 +82,27 @@ BEGIN
         RAISE EXCEPTION 'Secondary user does not exist';
     END IF;
     
-    -- Get Steam data from secondary profile (if any)
+    -- Get Steam data from both profiles
     SELECT verified_steam_id, steam_display_name, steam_verified_at, display_name
     INTO v_secondary_steam_id, v_secondary_steam_name, v_secondary_steam_verified_at, v_secondary_display_name
     FROM public.profiles
     WHERE id = p_secondary_user_id;
     
-    -- Get primary display name to check if it's an auto-generated fallback
-    SELECT display_name
-    INTO v_primary_display_name
+    SELECT verified_steam_id, display_name
+    INTO v_primary_steam_id, v_primary_display_name
     FROM public.profiles
     WHERE id = p_primary_user_id;
     
-    -- If primary has auto-generated Player_###### name and secondary has real name, use secondary's
-    IF v_primary_display_name ~ '^Player_\d{6}$' AND 
+    -- If both have different non-null Steam IDs, fail
+    IF v_primary_steam_id IS NOT NULL AND v_secondary_steam_id IS NOT NULL AND v_primary_steam_id != v_secondary_steam_id THEN
+        RAISE EXCEPTION 'Both accounts have different Steam IDs. Cannot merge accounts with conflicting Steam identities.';
+    END IF;
+    
+    -- If primary has empty or auto-generated Player_###### name and secondary has real name, use secondary's
+    IF (v_primary_display_name IS NULL OR v_primary_display_name = '' OR v_primary_display_name ~ '^Player_\d+$') AND 
        v_secondary_display_name IS NOT NULL AND 
        v_secondary_display_name != '' AND
-       NOT (v_secondary_display_name ~ '^Player_\d{6}$') THEN
+       NOT (v_secondary_display_name ~ '^Player_\d+$') THEN
         v_keep_secondary_display_name := true;
     END IF;
     
@@ -125,14 +155,27 @@ BEGIN
     
     GET DIAGNOSTICS v_map_rooms_moved = ROW_COUNT;
     
-    -- 5. Move contributions (article authorship set null on delete, keep as is)
+    -- 5. Move article submissions (contributions)
     UPDATE public.article_submissions
-    SET author_user_id = p_primary_user_id
-    WHERE author_user_id = p_secondary_user_id;
+    SET submitter_id = p_primary_user_id
+    WHERE submitter_id = p_secondary_user_id;
     
-    GET DIAGNOSTICS v_contributions_moved = ROW_COUNT;
+    GET DIAGNOSTICS v_article_submissions_moved = ROW_COUNT;
     
-    -- 6. Move tank and build notes
+    -- Also update reviewer_id references
+    UPDATE public.article_submissions
+    SET reviewer_id = p_primary_user_id
+    WHERE reviewer_id = p_secondary_user_id;
+    
+    -- 6. Move tank and build notes (handle composite PK duplicates)
+    DELETE FROM public.reviewer_notes rn
+    WHERE rn.user_id = p_secondary_user_id
+    AND EXISTS (
+        SELECT 1 FROM public.reviewer_notes
+        WHERE user_id = p_primary_user_id
+        AND vehicle_id = rn.vehicle_id
+    );
+    
     UPDATE public.reviewer_notes
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
@@ -152,7 +195,66 @@ BEGIN
         GET DIAGNOSTICS v_api_creds_moved = ROW_COUNT;
     END IF;
     
-    -- 8. Move team memberships (handle duplicates - can't be on same team twice)
+    -- 8. Move API request logs
+    UPDATE public.api_request_logs
+    SET credential_user_id = p_primary_user_id
+    WHERE credential_user_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_api_logs_moved = ROW_COUNT;
+    
+    -- 9. Move articles (authorship)
+    UPDATE public.articles
+    SET author_user_id = p_primary_user_id
+    WHERE author_user_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_articles_moved = ROW_COUNT;
+    
+    -- 10. Move article revisions
+    UPDATE public.article_revisions
+    SET created_by = p_primary_user_id
+    WHERE created_by = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_article_revisions_moved = ROW_COUNT;
+    
+    -- 11. Move submission events
+    UPDATE public.submission_events
+    SET actor_id = p_primary_user_id
+    WHERE actor_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_submission_events_moved = ROW_COUNT;
+    
+    -- 12. Move article uploads
+    UPDATE public.article_uploads
+    SET uploaded_by = p_primary_user_id
+    WHERE uploaded_by = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_article_uploads_moved = ROW_COUNT;
+    
+    -- 13. Move team memberships (handle duplicates and captain role)
+    -- If secondary was captain of a team, check if primary is also on that team
+    FOR v_team_id IN 
+        SELECT team_id FROM public.team_members 
+        WHERE user_id = p_secondary_user_id AND role = 'captain'
+    LOOP
+        IF EXISTS (SELECT 1 FROM public.team_members WHERE team_id = v_team_id AND user_id = p_primary_user_id) THEN
+            -- Primary already on team - promote primary to captain, delete secondary
+            UPDATE public.team_members
+            SET role = 'captain'
+            WHERE team_id = v_team_id AND user_id = p_primary_user_id;
+            
+            DELETE FROM public.team_members
+            WHERE team_id = v_team_id AND user_id = p_secondary_user_id;
+            
+            GET DIAGNOSTICS v_teams_recaptained = v_teams_recaptained + ROW_COUNT;
+        ELSE
+            -- Primary not on team - just move secondary's membership
+            UPDATE public.team_members
+            SET user_id = p_primary_user_id
+            WHERE team_id = v_team_id AND user_id = p_secondary_user_id;
+        END IF;
+    END LOOP;
+    
+    -- Delete duplicate non-captain memberships
     DELETE FROM public.team_members tm
     WHERE tm.user_id = p_secondary_user_id
     AND EXISTS (
@@ -161,13 +263,19 @@ BEGIN
         AND team_id = tm.team_id
     );
     
+    -- Move remaining memberships
     UPDATE public.team_members
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
     
     GET DIAGNOSTICS v_team_members_moved = ROW_COUNT;
     
-    -- 9. Move team join requests (handle duplicates)
+    -- 14. Update teams.captain_id references
+    UPDATE public.teams
+    SET captain_id = p_primary_user_id
+    WHERE captain_id = p_secondary_user_id;
+    
+    -- 15. Move team join requests (handle duplicates)
     DELETE FROM public.team_join_requests tjr
     WHERE tjr.user_id = p_secondary_user_id
     AND EXISTS (
@@ -182,22 +290,35 @@ BEGIN
     
     GET DIAGNOSTICS v_team_join_requests_moved = ROW_COUNT;
     
-    -- 10. Move tournament registrations (handle duplicates)
+    -- Also update reviewed_by references
+    UPDATE public.team_join_requests
+    SET reviewed_by = p_primary_user_id
+    WHERE reviewed_by = p_secondary_user_id;
+    
+    -- 16. Move tournament registrations (handle duplicates)
     DELETE FROM public.tournament_registrations tr
-    WHERE tr.user_id = p_secondary_user_id
+    WHERE tr.registered_by = p_secondary_user_id
     AND EXISTS (
         SELECT 1 FROM public.tournament_registrations
-        WHERE user_id = p_primary_user_id
+        WHERE registered_by = p_primary_user_id
         AND tournament_id = tr.tournament_id
+        AND team_id = tr.team_id
     );
     
     UPDATE public.tournament_registrations
-    SET user_id = p_primary_user_id
-    WHERE user_id = p_secondary_user_id;
+    SET registered_by = p_primary_user_id
+    WHERE registered_by = p_secondary_user_id;
     
     GET DIAGNOSTICS v_tournament_registrations_moved = ROW_COUNT;
     
-    -- 11. Move tournament free agent listings (handle duplicates)
+    -- 17. Update tournaments.organizer_id references
+    UPDATE public.tournaments
+    SET organizer_id = p_primary_user_id
+    WHERE organizer_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_tournaments_repointed = ROW_COUNT;
+    
+    -- 18. Move tournament free agent listings (handle duplicates - PK is tournament_id, user_id)
     DELETE FROM public.tournament_free_agents tfa
     WHERE tfa.user_id = p_secondary_user_id
     AND EXISTS (
@@ -212,13 +333,14 @@ BEGIN
     
     GET DIAGNOSTICS v_tournament_free_agents_moved = ROW_COUNT;
     
-    -- 12. Move free agent requests (handle duplicates)
+    -- 19. Move free agent requests (PK is tournament_id, team_id, user_id)
     DELETE FROM public.tournament_free_agent_requests tfar
     WHERE tfar.user_id = p_secondary_user_id
     AND EXISTS (
         SELECT 1 FROM public.tournament_free_agent_requests
         WHERE user_id = p_primary_user_id
-        AND tournament_free_agent_id = tfar.tournament_free_agent_id
+        AND tournament_id = tfar.tournament_id
+        AND team_id = tfar.team_id
     );
     
     UPDATE public.tournament_free_agent_requests
@@ -227,13 +349,18 @@ BEGIN
     
     GET DIAGNOSTICS v_tournament_free_agent_requests_moved = ROW_COUNT;
     
-    -- 13. Move tournament roster members (handle duplicates)
+    -- Also update reviewed_by references
+    UPDATE public.tournament_free_agent_requests
+    SET reviewed_by = p_primary_user_id
+    WHERE reviewed_by = p_secondary_user_id;
+    
+    -- 20. Move tournament roster members (unique constraint on tournament_id, user_id)
     DELETE FROM public.tournament_roster_members trm
     WHERE trm.user_id = p_secondary_user_id
     AND EXISTS (
         SELECT 1 FROM public.tournament_roster_members
         WHERE user_id = p_primary_user_id
-        AND tournament_registration_id = trm.tournament_registration_id
+        AND tournament_id = trm.tournament_id
     );
     
     UPDATE public.tournament_roster_members
@@ -242,13 +369,14 @@ BEGIN
     
     GET DIAGNOSTICS v_tournament_roster_members_moved = ROW_COUNT;
     
-    -- 14. Move tournament build submissions (handle duplicates)
+    -- 21. Move tournament build submissions (unique constraint on tournament_id, user_id, build_id)
     DELETE FROM public.tournament_build_submissions tbs
     WHERE tbs.user_id = p_secondary_user_id
     AND EXISTS (
         SELECT 1 FROM public.tournament_build_submissions
         WHERE user_id = p_primary_user_id
-        AND tournament_registration_id = tbs.tournament_registration_id
+        AND tournament_id = tbs.tournament_id
+        AND build_id = tbs.build_id
     );
     
     UPDATE public.tournament_build_submissions
@@ -257,36 +385,53 @@ BEGIN
     
     GET DIAGNOSTICS v_tournament_build_submissions_moved = ROW_COUNT;
     
-    -- 15. Move tournament team recruitment posts (handle duplicates)
-    DELETE FROM public.tournament_team_recruitment ttr
-    WHERE ttr.user_id = p_secondary_user_id
+    -- 22. Move tournament game lineups (PK is game_id, user_id)
+    DELETE FROM public.tournament_game_lineups tgl
+    WHERE tgl.user_id = p_secondary_user_id
     AND EXISTS (
-        SELECT 1 FROM public.tournament_team_recruitment
+        SELECT 1 FROM public.tournament_game_lineups
         WHERE user_id = p_primary_user_id
-        AND tournament_registration_id = ttr.tournament_registration_id
+        AND game_id = tgl.game_id
     );
     
-    UPDATE public.tournament_team_recruitment
+    UPDATE public.tournament_game_lineups
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
     
-    GET DIAGNOSTICS v_tournament_team_recruitment_moved = ROW_COUNT;
+    GET DIAGNOSTICS v_tournament_game_lineups_moved = ROW_COUNT;
     
-    -- 16. Move community events
+    -- Also update submitted_by references
+    UPDATE public.tournament_game_lineups
+    SET submitted_by = p_primary_user_id
+    WHERE submitted_by = p_secondary_user_id;
+    
+    -- 23. Update replay_uploaded_by references
+    UPDATE public.tournament_match_games
+    SET replay_uploaded_by = p_primary_user_id
+    WHERE replay_uploaded_by = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_replay_uploads_moved = ROW_COUNT;
+    
+    -- 24. Move community events
     UPDATE public.community_events
-    SET user_id = p_primary_user_id
-    WHERE user_id = p_secondary_user_id;
+    SET submitter_id = p_primary_user_id
+    WHERE submitter_id = p_secondary_user_id;
     
     GET DIAGNOSTICS v_community_events_moved = ROW_COUNT;
     
-    -- 17. Move Steam verification to primary (if secondary has it)
-    IF v_secondary_steam_id IS NOT NULL THEN
-        -- Clear Steam data from primary first (in case it has different Steam ID)
+    -- Also update decided_by references
+    UPDATE public.community_events
+    SET decided_by = p_primary_user_id
+    WHERE decided_by = p_secondary_user_id;
+    
+    -- 25. Move Steam verification to primary (if secondary has it and primary doesn't, or they match)
+    IF v_secondary_steam_id IS NOT NULL AND (v_primary_steam_id IS NULL OR v_primary_steam_id = v_secondary_steam_id) THEN
+        -- Clear secondary's Steam data first (handles unique constraint idx_profiles_verified_steam_id)
         UPDATE public.profiles
         SET verified_steam_id = NULL,
             steam_display_name = NULL,
             steam_verified_at = NULL
-        WHERE id = p_primary_user_id;
+        WHERE id = p_secondary_user_id;
         
         -- Move Steam data to primary
         UPDATE public.profiles
@@ -296,18 +441,18 @@ BEGIN
         WHERE id = p_primary_user_id;
     END IF;
     
-    -- 18. Update display name if keeping secondary's
+    -- 26. Update display name if keeping secondary's
     IF v_keep_secondary_display_name THEN
         UPDATE public.profiles
         SET display_name = v_secondary_display_name
         WHERE id = p_primary_user_id;
     END IF;
     
-    -- 19. Delete secondary profile (cascade will handle profile references)
+    -- 27. Delete secondary profile (cascade will handle profile references)
     DELETE FROM public.profiles
     WHERE id = p_secondary_user_id;
     
-    -- 20. Delete secondary auth user
+    -- 28. Delete secondary auth user
     -- Note: This must be done by application code using admin.deleteUser()
     -- as SQL functions cannot directly delete from auth.users
     
@@ -323,17 +468,25 @@ BEGIN
             'build_stars', v_build_stars_moved,
             'article_stars', v_article_stars_moved,
             'map_rooms', v_map_rooms_moved,
-            'contributions', v_contributions_moved,
+            'article_submissions', v_article_submissions_moved,
             'tank_notes', v_tank_notes_moved,
             'api_credentials', v_api_creds_moved,
+            'api_request_logs', v_api_logs_moved,
+            'articles', v_articles_moved,
+            'article_revisions', v_article_revisions_moved,
+            'submission_events', v_submission_events_moved,
+            'article_uploads', v_article_uploads_moved,
             'team_members', v_team_members_moved,
+            'teams_recaptained', v_teams_recaptained,
             'team_join_requests', v_team_join_requests_moved,
             'tournament_registrations', v_tournament_registrations_moved,
+            'tournaments_as_organizer', v_tournaments_repointed,
             'tournament_free_agents', v_tournament_free_agents_moved,
             'tournament_free_agent_requests', v_tournament_free_agent_requests_moved,
             'tournament_roster_members', v_tournament_roster_members_moved,
             'tournament_build_submissions', v_tournament_build_submissions_moved,
-            'tournament_team_recruitment', v_tournament_team_recruitment_moved,
+            'tournament_game_lineups', v_tournament_game_lineups_moved,
+            'replay_uploads', v_replay_uploads_moved,
             'community_events', v_community_events_moved
         )
     );
@@ -348,3 +501,4 @@ GRANT EXECUTE ON FUNCTION public.merge_accounts(uuid, uuid) TO service_role;
 
 -- Add documentation
 COMMENT ON FUNCTION public.merge_accounts IS 'Merges a secondary user account into a primary account. Moves all data ownership and deletes secondary profile. Must be called with service_role. Application must delete secondary auth user separately using admin.deleteUser().';
+COMMENT ON TABLE public.merge_nonces IS 'Tracks used merge nonces to prevent replay attacks. Nonces should be cleaned up after 1 hour.';
