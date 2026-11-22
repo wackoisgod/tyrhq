@@ -128,28 +128,11 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(400, 'Steam signature verification failed');
 	}
 
-	// Optional: Fetch Steam profile display name from Web API
-	// If STEAM_WEB_API_KEY is not set, we'll just use the SteamID64
-	let displayName: string | null = null;
-	const steamApiKey = process.env.STEAM_WEB_API_KEY;
-
-	if (steamApiKey) {
-		try {
-			const apiUrl = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${steamApiKey}&steamids=${steamId}`;
-			const apiResponse = await fetch(apiUrl);
-			const apiData = await apiResponse.json();
-
-			if (apiData.response?.players?.[0]?.personaname) {
-				displayName = apiData.response.players[0].personaname;
-			}
-		} catch {
-			// Ignore API errors - we can still link the account without the display name
-		}
-	}
-
-	// Store verified Steam ID in profile using admin client (service_role)
-	// This bypasses the trigger that blocks user modifications to Steam columns
+	// Fetch Steam persona name and update profile
+	const { fetchSteamPersonaName } = await import('$lib/server/steam-persona');
 	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	
+	const displayName = await fetchSteamPersonaName(steamId);
 	const supabaseAdmin = getSupabaseAdminClient();
 	
 	const { error: updateError } = await supabaseAdmin
