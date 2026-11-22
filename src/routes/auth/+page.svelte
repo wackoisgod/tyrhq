@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { env } from '$env/dynamic/public';
+	import { page } from '$app/stores';
 	import { getAuthCallbackUrl } from '$lib/site-url';
 	import { createBrowserClient } from '@supabase/ssr';
 	import { onMount } from 'svelte';
@@ -32,11 +33,28 @@
 		});
 	}
 
+	function handleSteamLogin() {
+		const next = $page.url.searchParams.get('next') || $page.url.searchParams.get('redirectTo');
+		const steamUrl = new URL('/auth/steam/login', window.location.origin);
+		if (next) {
+			steamUrl.searchParams.set('next', next);
+		}
+		window.location.href = steamUrl.toString();
+	}
+
 	const headings: Record<typeof mode, { eyebrow: string; title: string }> = {
 		login: { eyebrow: 'Authentication', title: 'Sign In' },
 		signup: { eyebrow: 'Authentication', title: 'Create Account' },
 		forgot: { eyebrow: 'Recovery', title: 'Reset Password' }
 	};
+
+	const urlError = $page.url.searchParams.get('error');
+	const errorMessages: Record<string, string> = {
+		steam_cancelled: 'Steam authentication was cancelled.',
+		auth_callback_failed: 'Authentication failed. Please try again.'
+	};
+
+	const displayError = form?.error || (urlError && errorMessages[urlError]);
 </script>
 
 <svelte:head>
@@ -72,11 +90,11 @@
 				{headings[mode].title}
 			</h1>
 
-			{#if form?.error}
+			{#if displayError}
 				<div
 					class="mt-4 border-l-2 border-[var(--hud-warning,#ffd166)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[#ffd166]"
 				>
-					{form.error}
+					{displayError}
 				</div>
 			{/if}
 
@@ -212,11 +230,10 @@
 
 					<button
 						type="button"
-						class="hud-cta-ghost w-full px-5 py-3 opacity-40 cursor-not-allowed"
-						disabled
-						title="Steam authentication coming soon"
+						class="hud-cta-ghost w-full px-5 py-3"
+						onclick={handleSteamLogin}
 					>
-						Continue with Steam (Soon)
+						Continue with Steam
 					</button>
 				</div>
 
