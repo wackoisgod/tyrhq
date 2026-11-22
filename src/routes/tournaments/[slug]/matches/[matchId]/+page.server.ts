@@ -8,12 +8,14 @@ import {
 	TournamentError
 } from '$lib/server/tournaments';
 import {
+	batchMatchGamesSchema,
 	getTournamentMatchDetail,
 	lineupSchema,
 	matchGameSchema,
 	matchSettingsSchema,
 	saveTournamentGameLineup,
 	saveTournamentMatchGame,
+	saveTournamentMatchGames,
 	updateTournamentMatchSettings
 } from '$lib/server/tournament-series';
 
@@ -138,6 +140,33 @@ export const actions: Actions = {
 		try {
 			await recordMatchResult(parsed.data, user.id, role);
 			return { success: 'Quick series result saved.' };
+		} catch (caught) {
+			return tournamentFailure(caught);
+		}
+	},
+	batchGames: async ({ request, locals }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		const form = await request.formData();
+		const matchId = String(form.get('matchId') ?? '');
+		const gamesJson = String(form.get('games') ?? '[]');
+		let games;
+		try {
+			games = JSON.parse(gamesJson);
+		} catch {
+			return fail(400, { error: 'Invalid games data format.' });
+		}
+		const parsed = batchMatchGamesSchema.safeParse({ matchId, games });
+		if (!parsed.success) {
+			return fail(400, { error: parsed.error.issues[0]?.message ?? 'Invalid game details.' });
+		}
+		try {
+			const state = await saveTournamentMatchGames(parsed.data, user.id, role);
+			return {
+				success: state.isComplete
+					? 'All games saved and series completed.'
+					: `All games saved. Series score is ${state.scoreA}-${state.scoreB}.`
+			};
 		} catch (caught) {
 			return tournamentFailure(caught);
 		}

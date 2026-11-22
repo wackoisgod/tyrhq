@@ -39,6 +39,22 @@ export const matchGameSchema = z
 	})
 	.strict();
 
+export const batchMatchGamesSchema = z
+	.object({
+		matchId: z.string().uuid(),
+		games: z.array(
+			z.object({
+				gameNumber: z.number().int().min(1).max(15),
+				mapId: z.string().trim().min(1).max(120).optional().or(z.literal('').transform(() => undefined)),
+				pickedByTeamId: z.string().uuid(),
+				winnerTeamId: z.string().uuid().optional().or(z.literal('').transform(() => undefined)),
+				vodUrl: optionalUrlSchema,
+				notes: z.string().trim().max(GAME_NOTES_MAX).optional()
+			})
+		)
+	})
+	.strict();
+
 export const tournamentBuildSchema = z
 	.object({
 		tournamentId: z.string().uuid(),
@@ -641,6 +657,118 @@ export async function saveTournamentMatchGame(
 			if (scoreError) throw new TournamentError('Could not update series score.', 500);
 		}
 	}
+	return state;
+}
+
+export async function saveTournamentMatchGames(
+	input: z.infer<typeof batchMatchGamesSchema>,
+	actorId: string,
+	role: string
+) {
+	const admin = requireAdminClient();
+	const { data: match } = await admin
+		.from('tournament_matches')
+		.select('*')
+		.eq('id', input.matchId)
+		.maybeSingle<MatchRow>();
+	if (!match) throw new TournamentError('Match not found.', 404);
+	await assertTournamentManager(match.tournament_id, actorId, role);
+	if (!match.team_a_id || !match.team_b_id) {
+		throw new TournamentError('Both teams must be known before recording games.', 409);
+	}
+
+	const teamIds = new Set([match.team_a_id, match.team_b_id]);
+	const releasedMaps = new Set(
+		getGameDataBundle()
+			.maps.filter((map) => map.status === 'released')
+			.map((map) => map.id)
+	);
+
+	const gamesToSave = input.games.filter((game) => game.mapId);
+	for (const game of gamesToSave) {
+		if (game.gameNumber > match.best_of) {
+			throw new TournamentError(`Game ${game.gameNumber} exceeds best-of-${match.best_of}.`, 400);
+		}
+		if (!teamIds.has(game.pickedByTeamId)) {
+			throw new TournamentError(`Invalid picker for game ${game.gameNumber}.`, 400);
+		}
+		if (game.winnerTeamId && !teamIds.has(game.winnerTeamId)) {
+			throw new TournamentError(`Invalid winner for game ${game.gameNumber}.`, 400);
+		}
+		if (game.mapId && !releasedMaps.has(game.mapId)) {
+			throw new TournamentError(`Invalid map for game ${game.gameNumber}.`, 400);
+		}
+	}
+
+	const { data: existingGamesData } = await admin
+		.from('tournament_match_games')
+		.select('*')
+		.eq('match_id', match.id);
+	const existingGames = (existingGamesData as GameRow[] | null) ?? [];
+	const existingByNumber = new Map(existingGames.map((game) => [game.game_number, game]));
+
+	if (match.status === 'completed') {
+		for (const game of gamesToSave) {
+			const existing = existingByNumber.get(game.gameNumber);
+			if (existing?.winner_team_id && existing.winner_team_id !== (game.winnerTeamId ?? null)) {
+				throw new TournamentError(
+					`Cannot change winner for game ${game.gameNumber} in a completed series.`,
+					409
+				);
+			}
+		}
+	}
+
+	const now = new Date().toISOString();
+	const records = gamesToSave.map((game) => ({
+		match_id: match.id,
+		game_number: game.gameNumber,
+		map_id: game.mapId!,
+		map_picked_by_team_id: game.pickedByTeamId,
+		winner_team_id: game.winnerTeamId || null,
+		vod_url: game.vodUrl || null,
+		notes: game.notes || null,
+		updated_at: now
+	}));
+
+	if (records.length > 0) {
+		const { error } = await admin
+			.from('tournament_match_games')
+			.upsert(records, { onConflict: 'match_id,game_number' });
+		if (error) throw new TournamentError('Could not save game details.', 500);
+	}
+
+	const { data: updatedGamesData } = await admin
+		.from('tournament_match_games')
+		.select('winner_team_id')
+		.eq('match_id', match.id)
+		.order('game_number', { ascending: true });
+	const allWinners = ((updatedGamesData as Pick<GameRow, 'winner_team_id'>[] | null) ?? []).map(
+		(g) => g.winner_team_id
+	);
+	const state = calculateSeriesState(match.best_of, allWinners, match.team_a_id, match.team_b_id);
+
+	if (match.status !== 'completed') {
+		if (state.winnerTeamId) {
+			await recordMatchResult(
+				{
+					matchId: match.id,
+					scoreA: state.scoreA,
+					scoreB: state.scoreB,
+					winnerTeamId: state.winnerTeamId
+				},
+				actorId,
+				role
+			);
+		} else {
+			const { error: scoreError } = await admin
+				.from('tournament_matches')
+				.update({ score_a: state.scoreA, score_b: state.scoreB })
+				.eq('id', match.id);
+			if (scoreError) throw new TournamentError('Could not update series score.', 500);
+		}
+	}
+
 	return state;
 }
 
