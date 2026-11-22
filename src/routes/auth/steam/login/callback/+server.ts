@@ -9,6 +9,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseAdminClient } from '$lib/server/supabase-admin';
 import { sanitizePostAuthRedirect } from '$lib/server/security';
+import { fetchSteamPersonaName, updateProfileWithPersona } from '$lib/server/steam-persona';
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
@@ -192,30 +193,6 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(500, 'Authentication service not configured');
 	}
 
-	// Fetch Steam profile display name from Web API
-	let steamDisplayName: string | null = null;
-	const steamApiKey = process.env.STEAM_WEB_API_KEY;
-
-	if (steamApiKey) {
-		try {
-			const apiUrl = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${steamApiKey}&steamids=${steamId}`;
-			const apiResponse = await fetch(apiUrl, {
-				signal: AbortSignal.timeout(STEAM_API_TIMEOUT_MS)
-			});
-			
-			if (!apiResponse.ok) {
-				console.warn('[steam-login] Steam API returned non-OK status:', apiResponse.status);
-			} else {
-				const apiData = await apiResponse.json();
-				if (apiData.response?.players?.[0]?.personaname) {
-					steamDisplayName = sanitizePersonaName(apiData.response.players[0].personaname);
-				}
-			}
-		} catch (err) {
-			console.warn('[steam-login] Failed to fetch Steam display name:', err);
-		}
-	}
-
 	// Look up existing account by verified_steam_id
 	let { data: profile, error: profileError } = await supabaseAdmin
 		.from('profiles')
@@ -229,6 +206,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	}
 
 	let userId: string;
+	let isReturningUser = false;
 
 	if (!profile) {
 		// No existing account - create new user server-side
@@ -282,9 +260,12 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 
 		if (!profile) {
 			// Need to initialize profile (either new user or stuck-account recovery)
-			
-			// Generate display name from Steam persona name
+			// Fetch persona name and generate fallback if needed
+			const steamDisplayName = await fetchSteamPersonaName(steamId);
 			const baseDisplayName = steamDisplayName || `Player_${steamId.slice(-6)}`;
+			
+			// Import helper functions for deduplication
+			const { escapeLikePattern, deduplicateDisplayName } = await import('$lib/server/steam-persona');
 			let displayName = baseDisplayName;
 			let attempt = 0;
 			const maxAttempts = 10;
@@ -337,6 +318,17 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		}
 	} else {
 		userId = profile.id;
+		isReturningUser = true;
+	}
+
+	// For returning users, refresh persona name (may have changed on Steam)
+	if (isReturningUser && profile) {
+		try {
+			await updateProfileWithPersona(userId, steamId, profile.display_name);
+		} catch (err) {
+			// Log but don't fail login if persona update fails
+			console.warn('[steam-login] Failed to update persona for returning user:', err);
+		}
 	}
 
 	// Get user email for session creation
