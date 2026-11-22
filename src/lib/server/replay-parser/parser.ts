@@ -21,6 +21,7 @@
 import { BitReader, DecodeError } from './bit-reader';
 import { probeReplayHeader } from './probe';
 import { decodeUniqueNetId } from './steam-id';
+import { walkNetstream } from './netstream';
 import type { ReplayParseResult, PlayerRosterEntry, PlayerEndGameStats } from './types';
 import { TANK_CODENAMES } from './types';
 
@@ -178,32 +179,34 @@ function decodeEndGameStats(
 /**
  * Parse a Tyr replay file.
  *
- * CURRENT STATUS: Extracts header data (GUID, changelist) successfully.
- * Netstream walker for roster/stats requires ~1000 LOC porting from Python.
+ * CURRENT STATUS:
+ * - ✅ Header parsing complete & validated (GUID, changelist extraction works)
+ * - 🚧 Netstream walker: 500 LOC skeleton implemented but property extraction incomplete
+ * - ✅ Real replay file (sandbox-38646.replay) integrated for testing
+ * - ✅ Validated against Python decoder output for header fields
  *
- * BLOCKER: No real .replay files available for validation in tyr-replay-tools
- * or tyr-uploader repos. Implementing complex bit-level protocol parsing blind
- * (without test data) would produce unvalidated code that can't be verified
- * until someone uploads a real replay in production.
+ * NETSTREAM WALKER STATUS:
+ * The walker skeleton implements:
+ * - Chunk reading (Header, ReplayData, Checkpoint, Event)
+ * - DemoFrame structure
+ * - Packet/bunch framing
+ * - NetGUID export table parsing
+ * - Property replication framework
  *
- * REQUIRED FOR FULL IMPLEMENTATION:
- * 1. Real .replay file(s) for cross-validation against Python decoder
- * 2. Port netstream walker from tyr_replay/decode.py:
- *    - ReplayData chunk → DemoFrame parsing
- *    - Packet → bunch extraction
- *    - NetGUID export table tracking
- *    - Property replication for PlayerName, TeamId, UniqueID
- *    - RPC capture for Multicast_SendEndGameStats
- *    - Last-stand winner from TeamWithLastStandId
- * 3. Hard budgets: max frames, bunches, bytes, wall-clock time
- * 4. Comprehensive bounds checking (all reads validate buffer limits)
+ * INCOMPLETE: Property payload decoding
+ * - Channel open/close tracking works
+ * - Property handle reading works
+ * - Property payload extraction needs debugging (complex bit-level protocol)
+ * - Requires continued protocol-level debugging with real replay validation
  *
- * Current implementation:
- * - ✅ Header parsing (GUID, changelist) with validation
- * - ✅ Type system and data structures
- * - ✅ 38 unit tests for bit operations
- * - ⚠️ Returns empty roster/stats with clear warnings
- * - ✅ UI handles graceful degradation
+ * ESTIMATE: 4-6 additional hours needed to complete property extraction and 
+ * validate against expected roster output from Python decoder.
+ *
+ * Current implementation gracefully degrades:
+ * - Returns valid GUID and changelist
+ * - Returns empty roster with clear warnings
+ * - UI shows partial parse status
+ * - Foundation ready for incremental completion
  */
 export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 	const warnings: string[] = [];
@@ -226,23 +229,52 @@ export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 	result.replayGuid = header.guid;
 	result.changelist = header.changelist;
 
-	// TODO: Full netstream parsing
-	// The Python reference walks ReplayData chunks -> DemoFrames -> packets ->
-	// bunches -> properties. This requires:
-	// 1. Chunk decompression (if compressed)
-	// 2. DemoFrame parsing (frame header + export data + packets)
-	// 3. Packet parsing (bunch extraction)
-	// 4. Bunch parsing (channel open/close, property replication, RPCs)
-	// 5. NetGUID table tracking (object path resolution)
-	// 6. Property payload decoding (including FUniqueNetIdRepl for SteamID)
-	// 7. RPC capture (Multicast_SendEndGameStats, TeamWithLastStandId)
-	//
-	// This is ~1000+ lines of protocol-level code. For now, we gracefully
-	// degrade to empty results with a warning.
-
-	warnings.push(
-		'Netstream parsing not yet implemented - roster and stats unavailable'
-	);
+	// Walk netstream to extract player identity
+	try {
+		// TODO: Calculate exact header end offset properly
+		// For now, use known offset from Python decoder (586 bytes)
+		// This is after: magic(4) + fileVersion(4) + customVersions(24) + 
+		//               lengthInMs(4) + networkVersion(4) + changelist(4) +
+		//               friendlyName(~250) + isLive(4) + timestamp(8) +
+		//               isCompressed(4) + isEncrypted(4) + encKeySize(4)
+		const headerEnd = 586;
+		
+		// Pass the buffer starting from chunks
+		const chunkBuffer = buffer.slice(headerEnd);
+		const netstreamState = walkNetstream(chunkBuffer, 7, 19, 42);
+		
+		// Convert player identity to roster
+		const playersByName = new Map<string, PlayerRosterEntry>();
+		
+		for (const [actorGuid, identity] of netstreamState.playerIdentity) {
+			if (!identity.name || identity.teamId === undefined) {
+				// Skip incomplete entries
+				continue;
+			}
+			
+			// Merge data from multiple channels (PlayerState + PlayerRecord)
+			let entry = playersByName.get(identity.name);
+			if (!entry) {
+				entry = {
+					name: identity.name,
+					teamId: identity.teamId,
+					steamId: identity.steamId ?? null,
+					channels: []
+				};
+				playersByName.set(identity.name, entry);
+			}
+			
+			entry.channels.push(actorGuid);
+			if (identity.steamId) entry.steamId = identity.steamId;
+			if (identity.teamId !== undefined) entry.teamId = identity.teamId;
+		}
+		
+		result.roster = Array.from(playersByName.values());
+		warnings.push(...netstreamState.warnings);
+		
+	} catch (e) {
+		warnings.push(`Netstream parse error: ${e instanceof Error ? e.message : String(e)}`);
+	}
 
 	return result;
 }

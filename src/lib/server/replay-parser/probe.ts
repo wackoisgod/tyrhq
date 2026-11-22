@@ -74,6 +74,7 @@ function readFString(buffer: Uint8Array, offset: number): [string, number] {
 
 /**
  * Parse minimal replay header to extract GUID and changelist.
+ * The GUID is in the embedded Header chunk (type 0), not the ReplayInfo.
  * Returns null if the file is not a valid Tyr replay.
  */
 export function probeReplayHeader(buffer: Uint8Array): ReplayHeader | null {
@@ -88,13 +89,24 @@ export function probeReplayHeader(buffer: Uint8Array): ReplayHeader | null {
 		const magic = readU32LE(buffer, offset);
 		offset += 4;
 		if (magic !== 0x1ca2e27f && magic !== 0x2cf5a13d) {
-			// Known Unreal replay magics
 			return null;
 		}
 
 		// File version (should be 7 for Tyr)
 		const fileVersion = readU32LE(buffer, offset);
 		offset += 4;
+
+		// Custom versions (file version >= 7)
+		if (fileVersion >= 7) {
+			if (offset + 4 > buffer.length) return null;
+			const customVersionCount = readU32LE(buffer, offset);
+			offset += 4;
+			
+			// Skip custom version entries (20 bytes each: GUID + version)
+			if (customVersionCount > 0 && customVersionCount < 1000) {
+				offset += customVersionCount * 20;
+			}
+		}
 
 		// LengthInMS
 		offset += 4;
@@ -113,38 +125,96 @@ export function probeReplayHeader(buffer: Uint8Array): ReplayHeader | null {
 		// IsLive
 		offset += 4;
 
-		// Timestamp (int64)
-		offset += 8;
+		// Timestamp (int64) - file version >= 3
+		if (fileVersion >= 3) {
+			offset += 8;
+		}
 
-		// IsCompressed
+		// IsCompressed - file version >= 2
+		if (fileVersion >= 2) {
+			offset += 4;
+		}
+
+		// IsEncrypted - file version >= 6
+		if (fileVersion >= 6) {
+			offset += 4;
+			
+			// EncryptionKey size
+			if (offset + 4 > buffer.length) return null;
+			const encKeySize = readU32LE(buffer, offset);
+			offset += 4;
+			
+			// Skip encryption key data if present
+			if (encKeySize > 0) {
+				offset += encKeySize;
+			}
+		}
+
+		// Now we're at the chunk list. First chunk should be Header (type 0)
+		if (offset + 8 > buffer.length) return null;
+		
+		const chunkType = readU32LE(buffer, offset);
 		offset += 4;
-
-		// IsEncrypted
+		
+		const chunkSize = readU32LE(buffer, offset);
 		offset += 4;
-
-		// EncryptionKey (array of bytes, int32 count + data)
-		if (offset + 4 > buffer.length) {
+		
+		if (chunkType !== 0) {
+			// First chunk should be Header
 			return null;
 		}
-		const encKeyCount = readU32LE(buffer, offset);
-		offset += 4 + encKeyCount;
-
-		// GUID (16 bytes)
-		if (offset + 16 > buffer.length) {
+		
+		if (chunkSize < 20 || offset + chunkSize > buffer.length) {
 			return null;
 		}
-		const guidBytes = buffer.slice(offset, offset + 16);
-		const guid = Array.from(guidBytes)
-			.map((b) => b.toString(16).padStart(2, '0'))
-			.join('');
-		offset += 16;
+		
+		// Parse Header chunk to get GUID
+		let chunkOffset = offset;
+		
+		// Header chunk magic
+		chunkOffset += 4;
+		
+		// Network version
+		const networkVersion = readU32LE(buffer, chunkOffset);
+		chunkOffset += 4;
+		
+		// Custom versions in header chunk (network version >= 19)
+		if (networkVersion >= 19) {
+			if (chunkOffset + 4 > offset + chunkSize) return null;
+			const headerCustomVersionCount = readU32LE(buffer, chunkOffset);
+			chunkOffset += 4;
+			
+			if (headerCustomVersionCount > 0 && headerCustomVersionCount < 1000) {
+				chunkOffset += headerCustomVersionCount * 20;
+			}
+		}
+		
+		// networkChecksum (uint32)
+		chunkOffset += 4;
+		
+		// engineNetworkVersion (uint32)
+		chunkOffset += 4;
+		
+		// gameNetworkProtocolVersion (uint32)
+		chunkOffset += 4;
+		
+		// GUID (network version >= 12)
+		if (networkVersion >= 12) {
+			if (chunkOffset + 16 > offset + chunkSize) return null;
+			const guidBytes = buffer.slice(chunkOffset, chunkOffset + 16);
+			const guid = Array.from(guidBytes)
+				.map((b) => b.toString(16).padStart(2, '0'))
+				.join('');
+			
+			return {
+				guid,
+				changelist,
+				chunks: []
+			};
+		}
 
-		// We have enough for our purposes
-		return {
-			guid,
-			changelist,
-			chunks: [] // We don't need to parse chunks for basic metadata
-		};
+		// No GUID in this version
+		return null;
 	} catch (e) {
 		return null;
 	}
