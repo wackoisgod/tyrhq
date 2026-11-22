@@ -34,7 +34,7 @@ interface TournamentRef {
 }
 
 interface MembershipRow {
-	role: 'captain' | 'member';
+	role: 'captain' | 'co-captain' | 'member' | 'substitute';
 	joined_at: string;
 	team?: TeamRef | TeamRef[] | null;
 }
