@@ -67,26 +67,19 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 	}
 
 	try {
-		// Check nonce - prevent replay
-		const { data: existingNonce } = await supabaseAdmin
-			.from('merge_nonces')
-			.select('nonce')
-			.eq('nonce', mergeCookie.nonce)
-			.maybeSingle();
-
-		if (existingNonce) {
-			// Nonce already used
-			const { value, options } = deleteMergeCookie();
-			cookies.set(MERGE_COOKIE_NAME, value, options);
-			throw httpError(400, 'This merge request has already been used.');
-		}
-
-		// Mark nonce as used
+		// Mark nonce as used - INSERT and treat unique violation as already used
 		const { error: nonceError } = await supabaseAdmin
 			.from('merge_nonces')
 			.insert({ nonce: mergeCookie.nonce });
 
 		if (nonceError) {
+			// Check if it's a unique violation (nonce already used)
+			if (nonceError.code === '23505' || nonceError.message?.includes('duplicate key')) {
+				const { value, options } = deleteMergeCookie();
+				cookies.set(MERGE_COOKIE_NAME, value, options);
+				throw httpError(400, 'This merge request has already been used.');
+			}
+			
 			console.error('[account-merge] Failed to record nonce:', nonceError);
 			throw httpError(500, 'Failed to validate merge request');
 		}

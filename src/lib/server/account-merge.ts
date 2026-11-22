@@ -4,6 +4,7 @@
  */
 
 import { dev } from '$app/environment';
+import { env as privateEnv } from '$env/dynamic/private';
 import crypto from 'crypto';
 
 const MERGE_COOKIE_NAME = 'tyrq_merge';
@@ -14,7 +15,7 @@ const MERGE_COOKIE_MAX_AGE = 10 * 60; // 10 minutes in seconds
  * @throws Error if secret is missing or too short
  */
 export function getMergeSecret(): string {
-	const secret = process.env.MERGE_SECRET;
+	const secret = privateEnv.MERGE_SECRET;
 	
 	if (!secret) {
 		throw new Error('MERGE_SECRET environment variable is required');
@@ -22,7 +23,7 @@ export function getMergeSecret(): string {
 	
 	// Require at least 32 bytes (64 hex chars or equivalent)
 	if (secret.length < 32) {
-		throw new Error('MERGE_SECRET must be at least 32 bytes (64 characters)');
+		throw new Error('MERGE_SECRET must be at least 32 bytes (32+ characters)');
 	}
 	
 	return secret;

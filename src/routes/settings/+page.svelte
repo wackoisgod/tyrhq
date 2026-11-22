@@ -299,7 +299,10 @@
 		auth_callback_failed: 'Authentication failed. Please try again.',
 		email_exists: 'This email is already in use by another account.',
 		invalid_credentials: 'Invalid email or password.',
-		email_change_failed: 'Failed to update email. Please try again.'
+		email_change_failed: 'Failed to update email. Please try again.',
+		merge_expired: 'Account merge session expired. Please try again.',
+		cannot_merge_self: 'Cannot merge an account into itself. Please sign in with the other account.',
+		steam_conflict: 'Both accounts have different Steam IDs. Cannot merge accounts with conflicting Steam identities.'
 	};
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));

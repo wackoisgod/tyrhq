@@ -33,7 +33,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 };
 
 export const actions: Actions = {
-	login: async ({ request, locals, cookies }) => {
+	login: async ({ request, locals, cookies, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;

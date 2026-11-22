@@ -2,11 +2,13 @@
  * Tests for account merge functionality
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock environment variables
 vi.mock('$env/dynamic/private', () => ({
-	MERGE_SECRET: 'a'.repeat(64) // 64-char secret for testing
+	env: {
+		MERGE_SECRET: 'a'.repeat(64) // 64-char secret for testing
+	}
 }));
 
 import { createMergeCookie, verifyMergeCookie } from '$lib/server/account-merge';
@@ -37,11 +39,17 @@ describe('Account Merge', () => {
 			expect(verified?.phase).toBe('authenticated');
 		});
 
-		it('should reject tampered cookie', () => {
+		it('should reject tampered cookie - base64 modification', () => {
 			const { value } = createMergeCookie('primary-123');
-			const tampered = value.replace('primary-123', 'attacker-999');
+			const [payloadB64, signature] = value.split('.');
 			
-			const verified = verifyMergeCookie(tampered);
+			// Decode, modify, re-encode but keep old signature
+			const payload = Buffer.from(payloadB64, 'base64').toString('utf8');
+			const tampered = payload.replace('primary-123', 'attacker-999');
+			const tamperedB64 = Buffer.from(tampered).toString('base64');
+			const tamperedValue = `${tamperedB64}.${signature}`;
+			
+			const verified = verifyMergeCookie(tamperedValue);
 			expect(verified).toBeNull();
 		});
 
@@ -99,7 +107,7 @@ describe('Account Merge', () => {
 			const primaryId = 'user-123';
 			const secondaryId = null;
 
-			const isValid = primaryId && secondaryId;
+			const isValid = !!(primaryId && secondaryId);
 
 			expect(isValid).toBe(false);
 		});

@@ -56,6 +56,7 @@ DECLARE
     v_tournaments_repointed integer := 0;
     v_replay_uploads_moved integer := 0;
     v_team_id uuid;
+    v_rc integer;
     v_secondary_steam_id text;
     v_secondary_steam_name text;
     v_secondary_steam_verified_at timestamptz;
@@ -168,15 +169,15 @@ BEGIN
     WHERE reviewer_id = p_secondary_user_id;
     
     -- 6. Move tank and build notes (handle composite PK duplicates)
-    DELETE FROM public.reviewer_notes rn
-    WHERE rn.user_id = p_secondary_user_id
+    DELETE FROM public.tank_notes tn
+    WHERE tn.user_id = p_secondary_user_id
     AND EXISTS (
-        SELECT 1 FROM public.reviewer_notes
+        SELECT 1 FROM public.tank_notes
         WHERE user_id = p_primary_user_id
-        AND vehicle_id = rn.vehicle_id
+        AND vehicle_id = tn.vehicle_id
     );
     
-    UPDATE public.reviewer_notes
+    UPDATE public.tank_notes
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
     
@@ -237,15 +238,16 @@ BEGIN
         WHERE user_id = p_secondary_user_id AND role = 'captain'
     LOOP
         IF EXISTS (SELECT 1 FROM public.team_members WHERE team_id = v_team_id AND user_id = p_primary_user_id) THEN
-            -- Primary already on team - promote primary to captain, delete secondary
-            UPDATE public.team_members
-            SET role = 'captain'
-            WHERE team_id = v_team_id AND user_id = p_primary_user_id;
-            
+            -- Primary already on team - delete secondary first to avoid unique constraint, then promote primary
             DELETE FROM public.team_members
             WHERE team_id = v_team_id AND user_id = p_secondary_user_id;
             
-            GET DIAGNOSTICS v_teams_recaptained = v_teams_recaptained + ROW_COUNT;
+            GET DIAGNOSTICS v_rc = ROW_COUNT;
+            v_teams_recaptained := v_teams_recaptained + v_rc;
+            
+            UPDATE public.team_members
+            SET role = 'captain'
+            WHERE team_id = v_team_id AND user_id = p_primary_user_id;
         ELSE
             -- Primary not on team - just move secondary's membership
             UPDATE public.team_members
@@ -295,16 +297,7 @@ BEGIN
     SET reviewed_by = p_primary_user_id
     WHERE reviewed_by = p_secondary_user_id;
     
-    -- 16. Move tournament registrations (handle duplicates)
-    DELETE FROM public.tournament_registrations tr
-    WHERE tr.registered_by = p_secondary_user_id
-    AND EXISTS (
-        SELECT 1 FROM public.tournament_registrations
-        WHERE registered_by = p_primary_user_id
-        AND tournament_id = tr.tournament_id
-        AND team_id = tr.team_id
-    );
-    
+    -- 16. Move tournament registrations (registered_by is nullable, just re-point)
     UPDATE public.tournament_registrations
     SET registered_by = p_primary_user_id
     WHERE registered_by = p_secondary_user_id;
@@ -318,22 +311,17 @@ BEGIN
     
     GET DIAGNOSTICS v_tournaments_repointed = ROW_COUNT;
     
-    -- 18. Move tournament free agent listings (handle duplicates - PK is tournament_id, user_id)
-    DELETE FROM public.tournament_free_agents tfa
+    -- 18. Move tournament free agent listings and requests (handle FK constraint)
+    -- FK: tournament_free_agent_requests(tournament_id, user_id) -> tournament_free_agents(tournament_id, user_id)
+    
+    -- First, insert primary parent rows for any secondary's requests that primary doesn't have
+    INSERT INTO public.tournament_free_agents (tournament_id, user_id, status, preferred_role, note, registered_at, updated_at)
+    SELECT DISTINCT tfa.tournament_id, p_primary_user_id, tfa.status, tfa.preferred_role, tfa.note, tfa.registered_at, tfa.updated_at
+    FROM public.tournament_free_agents tfa
     WHERE tfa.user_id = p_secondary_user_id
-    AND EXISTS (
-        SELECT 1 FROM public.tournament_free_agents
-        WHERE user_id = p_primary_user_id
-        AND tournament_id = tfa.tournament_id
-    );
+    ON CONFLICT (tournament_id, user_id) DO NOTHING;
     
-    UPDATE public.tournament_free_agents
-    SET user_id = p_primary_user_id
-    WHERE user_id = p_secondary_user_id;
-    
-    GET DIAGNOSTICS v_tournament_free_agents_moved = ROW_COUNT;
-    
-    -- 19. Move free agent requests (PK is tournament_id, team_id, user_id)
+    -- Delete duplicate requests (primary already has request for same tournament+team)
     DELETE FROM public.tournament_free_agent_requests tfar
     WHERE tfar.user_id = p_secondary_user_id
     AND EXISTS (
@@ -343,6 +331,7 @@ BEGIN
         AND team_id = tfar.team_id
     );
     
+    -- Re-point requests to primary
     UPDATE public.tournament_free_agent_requests
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
@@ -354,22 +343,59 @@ BEGIN
     SET reviewed_by = p_primary_user_id
     WHERE reviewed_by = p_secondary_user_id;
     
-    -- 20. Move tournament roster members (unique constraint on tournament_id, user_id)
+    -- Delete secondary's free agent parent rows that weren't needed
+    DELETE FROM public.tournament_free_agents tfa
+    WHERE tfa.user_id = p_secondary_user_id
+    AND EXISTS (
+        SELECT 1 FROM public.tournament_free_agents
+        WHERE user_id = p_primary_user_id
+        AND tournament_id = tfa.tournament_id
+    );
+    
+    -- Move remaining free agent listings
+    UPDATE public.tournament_free_agents
+    SET user_id = p_primary_user_id
+    WHERE user_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_tournament_free_agents_moved = ROW_COUNT;
+    
+    -- 20. Move tournament roster members and build submissions (handle FK constraint)
+    -- FK: tournament_build_submissions(tournament_id, user_id) -> tournament_roster_members(tournament_id, user_id)
+    -- Unique: tournament_roster_members(tournament_id, user_id)
+    
+    -- Handle cross-team roster conflicts: if secondary on different team than primary in same tournament,
+    -- drop secondary's roster + its submissions to maintain data integrity
+    DELETE FROM public.tournament_build_submissions tbs
+    WHERE tbs.user_id = p_secondary_user_id
+    AND EXISTS (
+        SELECT 1 FROM public.tournament_roster_members trm1
+        WHERE trm1.user_id = p_secondary_user_id
+        AND trm1.tournament_id = tbs.tournament_id
+        AND EXISTS (
+            SELECT 1 FROM public.tournament_roster_members trm2
+            WHERE trm2.user_id = p_primary_user_id
+            AND trm2.tournament_id = trm1.tournament_id
+            AND trm2.team_id != trm1.team_id  -- Different teams in same tournament
+        )
+    );
+    
     DELETE FROM public.tournament_roster_members trm
     WHERE trm.user_id = p_secondary_user_id
     AND EXISTS (
         SELECT 1 FROM public.tournament_roster_members
         WHERE user_id = p_primary_user_id
         AND tournament_id = trm.tournament_id
+        AND team_id != trm.team_id  -- Different teams
     );
     
-    UPDATE public.tournament_roster_members
-    SET user_id = p_primary_user_id
-    WHERE user_id = p_secondary_user_id;
+    -- Insert primary roster rows for secondary's submissions that primary doesn't have
+    INSERT INTO public.tournament_roster_members (tournament_id, team_id, user_id, source, joined_at)
+    SELECT DISTINCT trm.tournament_id, trm.team_id, p_primary_user_id, trm.source, trm.joined_at
+    FROM public.tournament_roster_members trm
+    WHERE trm.user_id = p_secondary_user_id
+    ON CONFLICT (tournament_id, user_id) DO NOTHING;
     
-    GET DIAGNOSTICS v_tournament_roster_members_moved = ROW_COUNT;
-    
-    -- 21. Move tournament build submissions (unique constraint on tournament_id, user_id, build_id)
+    -- Delete duplicate submissions (primary already has same build for tournament)
     DELETE FROM public.tournament_build_submissions tbs
     WHERE tbs.user_id = p_secondary_user_id
     AND EXISTS (
@@ -379,11 +405,28 @@ BEGIN
         AND build_id = tbs.build_id
     );
     
+    -- Re-point build submissions to primary
     UPDATE public.tournament_build_submissions
     SET user_id = p_primary_user_id
     WHERE user_id = p_secondary_user_id;
     
     GET DIAGNOSTICS v_tournament_build_submissions_moved = ROW_COUNT;
+    
+    -- Delete secondary's roster rows that weren't needed (same tournament as primary)
+    DELETE FROM public.tournament_roster_members trm
+    WHERE trm.user_id = p_secondary_user_id
+    AND EXISTS (
+        SELECT 1 FROM public.tournament_roster_members
+        WHERE user_id = p_primary_user_id
+        AND tournament_id = trm.tournament_id
+    );
+    
+    -- Move remaining roster members
+    UPDATE public.tournament_roster_members
+    SET user_id = p_primary_user_id
+    WHERE user_id = p_secondary_user_id;
+    
+    GET DIAGNOSTICS v_tournament_roster_members_moved = ROW_COUNT;
     
     -- 22. Move tournament game lineups (PK is game_id, user_id)
     DELETE FROM public.tournament_game_lineups tgl

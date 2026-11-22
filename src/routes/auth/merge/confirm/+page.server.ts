@@ -47,7 +47,9 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		const { data: primaryUser } = await supabaseAdmin.auth.admin.getUserById(
 			mergeCookie.primaryUserId
 		);
-		primaryEmail = primaryUser?.user?.email || 'Unknown';
+		const rawEmail = primaryUser?.user?.email || 'Unknown';
+		// Don't show placeholder emails for primary either
+		primaryEmail = rawEmail.endsWith('@users.tyrhq.invalid') ? 'Steam Account' : rawEmail;
 	}
 
 	// Don't show placeholder emails
