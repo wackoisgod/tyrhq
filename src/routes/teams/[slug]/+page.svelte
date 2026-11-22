@@ -53,10 +53,10 @@
 			<h1 class="team-name">
 				{data.team.name}
 			</h1>
-			<div class="team-captain">
-				<span class="hud-label">Squad leader</span>
-				<a href="/players/{data.team.captainId}">{data.team.captainName || 'Unknown'}</a>
-			</div>
+		<div class="team-captain">
+			<span class="hud-label">Captain</span>
+			<a href="/players/{data.team.captainId}">{data.team.captainName || 'Unknown'}</a>
+		</div>
 			<div class="team-record">
 				<div>
 					<span class="hud-label">Series record</span>
@@ -179,7 +179,7 @@
 								<strong>{member.displayName || 'Pilot'}</strong>
 								<small>View competitive profile</small>
 							</a>
-							<span class="team-role" class:team-role--captain={member.role === 'captain'}>{member.role}</span>
+							<span class="team-role" class:team-role--captain={member.role === 'captain' || member.role === 'co-captain'}>{member.role === 'co-captain' ? 'co-captain' : member.role}</span>
 						</div>
 					{/each}
 				</div>
