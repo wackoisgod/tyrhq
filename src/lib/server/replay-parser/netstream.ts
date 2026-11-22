@@ -71,6 +71,11 @@ export interface Channel {
 	actorGuid: number;
 	archetype: number | null;
 	class: string;
+	name?: string;
+	partialData?: Uint8Array;
+	partialBits?: number;
+	partialReliable?: boolean;
+	partialOpen?: boolean;
 }
 
 export interface PlayerIdentity {
@@ -246,6 +251,68 @@ function internalLoadObject(
  */
 
 /**
+ * Handle partial bunch merging (UChannel::ReceivedNextBunch).
+ * Port of Python handle_partial (decode.py:1451-1480)
+ */
+function handlePartial(
+	payload: BitReader,
+	ch: Channel,
+	state: NetstreamState,
+	bInitial: boolean,
+	bFinal: boolean,
+	bReliable: boolean,
+	bOpen: boolean,
+	bClose: boolean,
+	closeReason: number,
+	bHasMustBeMapped: boolean
+): void {
+	if (bInitial) {
+		// Start new partial bunch
+		const bitsLeft = payload.bitsLeft();
+		ch.partialData = bitsLeft > 0 ? payload.readBitsBytes(bitsLeft) : new Uint8Array(0);
+		ch.partialBits = ch.partialData.length * 8;
+		ch.partialReliable = bReliable;
+		ch.partialOpen = bOpen;
+		return;
+	}
+	
+	if (!ch.partialData) {
+		state.warnings.push('Partial merge without initial');
+		return;
+	}
+	
+	const n = payload.bitsLeft();
+	if (n > 0) {
+		if (ch.partialBits! % 8 !== 0) {
+			state.warnings.push('Partial append unaligned');
+			ch.partialData = undefined;
+			return;
+		}
+		
+		// Append fragment
+		const fragment = payload.readBitsBytes(n);
+		const merged = new Uint8Array(ch.partialData.length + fragment.length);
+		merged.set(ch.partialData);
+		merged.set(fragment, ch.partialData.length);
+		ch.partialData = merged;
+		ch.partialBits! += n;
+	}
+	
+	if (bFinal) {
+		// Merge complete - process the full bunch
+		const merged = new BitReader(ch.partialData, ch.partialBits!);
+		ch.partialData = undefined;
+		
+		processBunchPayload(merged, ch, ch.partialOpen!, state, bHasMustBeMapped);
+		
+		if (bClose) {
+			// Close channel after processing
+			state.channels.delete(ch.chIndex);
+		}
+	}
+}
+
+/**
  * Read a NetGUID export from a bunch (bit-level internal_load_object).
  * Simplified version that just skips the data.
  */
@@ -253,8 +320,8 @@ function readNetGuidExport(bits: BitReader, state: NetstreamState, isExporting: 
 	const startPos = bits.getPos();
 	const guid = bits.intPacked();
 	
-	if ((state.bunchCount === 56 || state.bunchCount === 71) && startPos < 400) {
-		console.log(`      readNetGuidExport (bunch ${state.bunchCount}) at pos ${startPos}: guid=${guid}, isExporting=${isExporting}`);
+	if ((state.bunchCount >= 8 && state.bunchCount <= 15) && startPos < 50) {
+		console.log(`      readNetGuidExport (bunch ${state.bunchCount}) at pos ${startPos}: guid=${guid}, isExporting=${isExporting}, bitsLeft=${bits.bitsLeft()}`);
 	}
 	
 	if (guid === 0) return guid;
@@ -291,32 +358,52 @@ function processBunchPayload(
 ): void {
 	// Port of Python process_bunch_payload (decode.py:1228)
 	
+	if (state.bunchCount >= 8 && state.bunchCount <= 15) {
+		console.log(`  processBunchPayload (bunch ${state.bunchCount}): ch=${ch.chIndex}, bOpen=${bOpen}, bHasMustBeMapped=${bHasMustBeMapped}, ch.actorGuid=${ch.actorGuid}, bitsLeft=${bits.bitsLeft()}`);
+	}
+	
 	// MustBeMapped guid list
 	if (bHasMustBeMapped) {
 		if (bits.bitsLeft() < 16) return;
+		
 		const n = bits.u16();
+		
+		const guids: number[] = [];
 		for (let i = 0; i < n; i++) {
 			if (bits.bitsLeft() < 8) break;
-			bits.intPacked(); // Skip guid
+			guids.push(bits.intPacked());
+		}
+		
+		if (state.bunchCount >= 8 && state.bunchCount <= 15) {
+			console.log(`    MustBeMapped (bunch ${state.bunchCount}): ch=${ch.chIndex}, n=${n}, guids=${JSON.stringify(guids)}`);
 		}
 	}
 	
 	// SerializeNewActor if channel not opened yet
 	if (ch.actorGuid === 0) {
 		if (!bOpen) {
+			if (state.bunchCount <= 15) {
+				console.log(`    Non-open bunch on actorless channel (bunch ${state.bunchCount}): ch=${ch.chIndex}`);
+			}
 			state.warnings.push(`Non-open bunch on actorless channel ${ch.chIndex}`);
 			return;
 		}
 		
 		// UPackageMapClient::SerializeNewActor
+		const bitsBeforeActor = bits.bitsLeft();
+		const posBeforeActor = bits.getPos();
 		const actorGuid = readNetGuidExport(bits, state, false);
 		ch.actorGuid = actorGuid;
 		
-		if (state.channels.size <= 35) {
-			console.log(`    SerializeNewActor (bunch ${state.bunchCount}): ch=${ch.chIndex}, actorGuid=${actorGuid}`);
+		if (state.channels.size <= 35 || (state.bunchCount >= 9 && state.bunchCount <= 12)) {
+			console.log(`    SerializeNewActor (bunch ${state.bunchCount}): ch=${ch.chIndex}, pos=${posBeforeActor}, actorGuid=${actorGuid}, bitsConsumed=${bitsBeforeActor - bits.bitsLeft()}`);
 		}
 		
 		const dynamic = actorGuid > 1 && (actorGuid & 1) === 0;
+		
+		if (ch.chIndex === 31 || state.channels.size <= 35) {
+			console.log(`      dynamic=${dynamic}, actorGuid=${actorGuid}, bitsLeft=${bits.bitsLeft()}`);
+		}
 		
 		if (bits.atEnd() && dynamic) {
 			return; // Early exit for dynamic actors with no more data
@@ -325,6 +412,10 @@ function processBunchPayload(
 		if (dynamic) {
 			ch.archetype = readNetGuidExport(bits, state, false);
 			readNetGuidExport(bits, state, false); // level guid
+			
+			if (state.channels.size <= 35) {
+				console.log(`      SerializeNewActor archetype: ch=${ch.chIndex}, actorGuid=${actorGuid}, archetype=${ch.archetype}`);
+			}
 			
 			// Skip location/rotation/scale/velocity for now
 			// (would need conditionally_quantized_vector implementation)
@@ -755,8 +846,16 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 			continue;
 		}
 		
-		// Process bunch payload to extract properties
-		if (!bPartial) {
+		// Process bunch payload
+		if (bPartial) {
+			// Handle partial bunch merging
+			try {
+				handlePartial(payload, ch, state, bPartialInitial, bPartialFinal, bReliable, bOpen, bClose, closeReason, bHasMustBeMapped);
+			} catch (e) {
+				state.warnings.push(`Partial bunch failed ch=${chIndex}: ${e}`);
+			}
+		} else {
+			// Process complete bunch immediately
 			try {
 				processBunchPayload(payload, ch, bOpen, state, bHasMustBeMapped);
 				
@@ -767,8 +866,12 @@ function processPacket(data: Uint8Array, state: NetstreamState): void {
 			} catch (e) {
 				state.warnings.push(`Bunch content failed ch=${chIndex}: ${e}`);
 			}
+			
+			if (bClose) {
+				// Close channel after processing
+				state.channels.delete(chIndex);
+			}
 		}
-		// TODO: Handle partial bunches if needed
 	}
 }
 
@@ -950,6 +1053,22 @@ export function walkNetstream(
 		chunkCount++;
 	}
 
+	console.log(`\nNetstream stats: ${state.frameCount} frames, ${state.packetCount} packets, ${state.bunchCount} bunches, ${state.channels.size} channels, ${state.playerIdentity.size} player identities, ${state.guidMap.size} GUIDs`);
+	
+	// Log channels with archetype=107
+	let archetype107Count = 0;
+	for (const [chIdx, ch] of state.channels) {
+		if (ch.archetype === 107) {
+			archetype107Count++;
+			console.log(`  Channel ${chIdx}: actorGuid=${ch.actorGuid}, class=${ch.class || 'NOT SET'}`);
+		}
+	}
+	console.log(`Total channels with archetype=107: ${archetype107Count}`);
+	
+	// Show GUID 107
+	const guid107 = state.guidMap.get(107);
+	console.log(`GUID 107: ${guid107 ? guid107.pathName : 'NOT FOUND'}`);
+	
 	return state;
 }
 
