@@ -74,6 +74,28 @@
 					<span class="player-unaffiliated">No active team</span>
 				{/if}
 			</div>
+			{#if player.discordHandle || player.steamProfile}
+				<div class="player-social-links">
+					{#if player.discordHandle}
+						<div class="player-social-link">
+							<span class="social-icon">💬</span>
+							<div>
+								<small>Discord</small>
+								<strong>{player.discordHandle}</strong>
+							</div>
+						</div>
+					{/if}
+					{#if player.steamProfile}
+						<div class="player-social-link">
+							<span class="social-icon">🎮</span>
+							<div>
+								<small>Steam</small>
+								<strong>{player.steamProfile}</strong>
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 		<div class="player-rank-mark" aria-hidden="true">
 			<span>{String(player.stats.tournamentsPlayed).padStart(2, '0')}</span>
@@ -323,6 +345,12 @@
 	.player-team-chip small { font-family: var(--font-mono); font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--hud-dim); }
 	.player-team-chip:hover { background: rgba(42, 51, 77, 0.9); }
 	.player-unaffiliated { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hud-muted); }
+	
+	.player-social-links { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+	.player-social-link { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(10, 15, 24, 0.5); box-shadow: inset 0 0 0 1px rgba(160, 170, 217, 0.1); }
+	.player-social-link .social-icon { font-size: 1.1rem; opacity: 0.8; }
+	.player-social-link small { display: block; font-family: var(--font-mono); font-size: 0.5rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hud-dim); }
+	.player-social-link strong { display: block; margin-top: 0.15rem; font-size: 0.75rem; color: var(--hud-text); }
 
 	.player-rank-mark { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-end; padding-right: 1rem; }
 	.player-rank-mark span { font-family: var(--font-display); font-size: clamp(3.5rem, 8vw, 7rem); font-weight: 900; line-height: 0.8; color: rgba(231, 231, 255, 0.09); }

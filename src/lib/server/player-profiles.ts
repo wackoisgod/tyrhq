@@ -12,6 +12,8 @@ type TournamentStatus = 'draft' | 'open' | 'in_progress' | 'completed' | 'cancel
 interface ProfileRow {
 	id: string;
 	display_name: string | null;
+	discord_handle: string | null;
+	steam_profile: string | null;
 }
 
 interface TeamRef {
@@ -237,7 +239,7 @@ export async function getPlayerCompetitionProfile(userId: string) {
 
 	const admin = requireAdminClient();
 	const [profileResult, membershipResult, rosterResult] = await Promise.all([
-		admin.from('profiles').select('id, display_name').eq('id', userId).maybeSingle<ProfileRow>(),
+		admin.from('profiles').select('id, display_name, discord_handle, steam_profile').eq('id', userId).maybeSingle<ProfileRow>(),
 		admin
 			.from('team_members')
 			.select('role, joined_at, team:teams(id, slug, name, logo_url, is_disabled)')
@@ -340,13 +342,14 @@ export async function getPlayerCompetitionProfile(userId: string) {
 		matchesByTournament.set(match.tournament_id, tournamentMatches);
 		tournamentByMatch.set(match.id, match.tournament_id);
 	}
-	const gamesByTournament = new Map<string, PlayerCompetitionGame[]>();
+	const gamesByTournamentAndTeam = new Map<string, PlayerCompetitionGame[]>();
 	for (const game of games) {
 		const tournamentId = tournamentByMatch.get(game.match_id);
 		if (!tournamentId) continue;
-		const tournamentGames = gamesByTournament.get(tournamentId) ?? [];
-		tournamentGames.push(game);
-		gamesByTournament.set(tournamentId, tournamentGames);
+		const key = `${tournamentId}:${game.team_id}`;
+		const tournamentTeamGames = gamesByTournamentAndTeam.get(key) ?? [];
+		tournamentTeamGames.push(game);
+		gamesByTournamentAndTeam.set(key, tournamentTeamGames);
 	}
 
 	const entries = publicRoster.flatMap<PlayerCompetitionEntryInput>((row) => {
@@ -379,7 +382,7 @@ export async function getPlayerCompetitionProfile(userId: string) {
 						? registration.status
 						: null,
 				matches: matchesByTournament.get(row.tournament_id) ?? [],
-				games: gamesByTournament.get(row.tournament_id) ?? []
+				games: gamesByTournamentAndTeam.get(`${row.tournament_id}:${row.team_id}`) ?? []
 			}
 		];
 	});
@@ -388,6 +391,8 @@ export async function getPlayerCompetitionProfile(userId: string) {
 	return {
 		id: profileResult.data.id,
 		displayName: profileResult.data.display_name?.trim() || 'Unknown player',
+		discordHandle: profileResult.data.discord_handle?.trim() || null,
+		steamProfile: profileResult.data.steam_profile?.trim() || null,
 		currentTeams,
 		...competition
 	};

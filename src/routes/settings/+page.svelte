@@ -104,6 +104,44 @@
 				</span>
 			</label>
 
+			<label class="flex flex-col gap-1.5">
+				<span
+					class="font-[var(--font-display)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--hud-muted)]"
+				>
+					Discord Handle
+				</span>
+				<input
+					type="text"
+					name="discord_handle"
+					maxlength={100}
+					value={(form && 'discordHandle' in form ? form.discordHandle : null) ?? data.profile?.discord_handle ?? ''}
+					class="hud-input w-full px-3 py-2.5 text-sm text-[var(--hud-text)]"
+					placeholder="e.g., username or @username"
+				/>
+				<span class="text-[11px] text-[var(--hud-dim)]">
+					Public Discord contact for team recruitment (optional).
+				</span>
+			</label>
+
+			<label class="flex flex-col gap-1.5">
+				<span
+					class="font-[var(--font-display)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--hud-muted)]"
+				>
+					Steam Profile
+				</span>
+				<input
+					type="text"
+					name="steam_profile"
+					maxlength={200}
+					value={(form && 'steamProfile' in form ? form.steamProfile : null) ?? data.profile?.steam_profile ?? ''}
+					class="hud-input w-full px-3 py-2.5 text-sm text-[var(--hud-text)]"
+					placeholder="e.g., Steam profile URL or username"
+				/>
+				<span class="text-[11px] text-[var(--hud-dim)]">
+					Public Steam contact for team recruitment (optional).
+				</span>
+			</label>
+
 			<div class="flex flex-wrap gap-3">
 				<button type="submit" class="hud-cta px-5 py-3" disabled={profileLoading}>
 					{#if profileLoading}
