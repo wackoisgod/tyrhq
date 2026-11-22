@@ -13,6 +13,8 @@ import type {
 import {
 	componentSupportsMaxStacks,
 	computeBuild,
+	computeBuildFirepower,
+	computeFirepowerSourceImpacts,
 	createPlannerCatalog,
 	formatStatValue,
 	isConditionalTalent,
@@ -707,7 +709,20 @@ describe('computeBuild aggregator math', () => {
 				[2],
 				'Increases Max Speed by 2 kph. Effect briefly quintuples on landing after being airborne.'
 			),
-			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne']
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.WhileAirborne'],
+			// Mirrors the export: the +2 kph GE is always on, the airborne tracker is situational.
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'Components_MaxSpeedFlat',
+					effectPath: maxSpeedEffect.path
+				},
+				{
+					eventTag: 'Gameplay.Event.WhileAirborne',
+					effectId: 'ge-components-frictioncapacitorairbornetracker',
+					effectPath: trackerEffect.path
+				}
+			]
 		};
 		const vehicle = makeVehicle('blink', { MaxSpeed: 57 }, 'standard', 'tree_blink');
 		const tree = makeTree('tree_blink', 'blink', []);
@@ -737,6 +752,13 @@ describe('computeBuild aggregator math', () => {
 		expect(maxStacks!.stats.MaxSpeed).toBeCloseTo(67, 4);
 		const entry = maxStacks!.breakdown.MaxSpeed?.find((e) => e.source.includes('FRICTION CAPACITOR'));
 		expect(entry?.delta).toBeCloseTo(10, 4);
+
+		// The landing burst is situational: without conditional effects only the passive +2 applies.
+		const passiveOnly = computeBuild(catalog, selection, {
+			includeConditionalEffects: false,
+			assumeMaxStacks: true
+		});
+		expect(passiveOnly!.stats.MaxSpeed).toBeCloseTo(59, 4);
 	});
 
 	it('duplicator\'s "Doubles the number of shells gained" is not a stat-effect multiplier', () => {
@@ -1154,5 +1176,136 @@ describe('exported effect bindings', () => {
 		expect(
 			computeBuild(catalog, selection, { includeConditionalEffects: false })?.stats.MaxHealth
 		).toBeCloseTo(1100, 4);
+	});
+});
+
+describe('computeBuildFirepower', () => {
+	it('separates guaranteed DPM from DPM with conditional effects', () => {
+		const highExplosive = makeAmmo('he', 'High Explosive', 1.2);
+		const passiveReload = makeEffect('passive-reload', 'ReloadTime', 'AddBase', -1);
+		const onHitDamage = makeEffect('onhit-damage', 'ShellDamage', 'AddBase', 50);
+		const component: ComponentRecord = {
+			...makeComponent(
+				'mixed-firepower',
+				'MIXED FIREPOWER',
+				['passive-reload', 'onhit-damage'],
+				[1],
+				'Reduces reload time, and increases shell damage after penetrating an enemy.'
+			),
+			eventTags: ['Gameplay.Event.LoadoutApplied', 'Gameplay.Event.OnPenetration'],
+			effectBindings: [
+				{
+					eventTag: 'Gameplay.Event.LoadoutApplied',
+					effectId: 'passive-reload',
+					effectPath: passiveReload.path
+				},
+				{
+					eventTag: 'Gameplay.Event.OnPenetration',
+					effectId: 'onhit-damage',
+					effectPath: onHitDamage.path
+				}
+			]
+		};
+		const vehicle = makeVehicle(
+			'gun',
+			{ ShellDamage: 100, ReloadTime: 10, ClipSize: 1, IntraClipReloadTime: 2.5 },
+			'he',
+			'tree_gun'
+		);
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [highExplosive],
+				components: [component],
+				talents: [],
+				effects: [passiveReload, onHitDamage],
+				trees: [makeTree('tree_gun', 'gun', [])]
+			})
+		);
+
+		const firepower = computeBuildFirepower(catalog, {
+			vehicleId: 'gun',
+			ammoIds: ['he'],
+			previewAmmoSlot: 0,
+			componentIds: ['mixed-firepower'],
+			talentPoints: {}
+		});
+
+		expect(firepower).not.toBeNull();
+		// Stock: 100 dmg / 10 s, no ammo multiplier.
+		expect(firepower!.base?.dpm).toBeCloseTo(600, 4);
+		// Guaranteed: HE ×1.2 damage, passive −1 s reload → 120 / 9 s.
+		expect(firepower!.guaranteed?.dpm).toBeCloseTo(800, 4);
+		// With conditional: (100 + 50) × 1.2 = 180 / 9 s.
+		expect(firepower!.withConditional?.dpm).toBeCloseTo(1200, 4);
+		expect(firepower!.withConditional?.burstDamage).toBeCloseTo(180, 4);
+	});
+
+	it('attributes DPM to each ammo, component and talent pick', () => {
+		const highExplosive = makeAmmo('he', 'High Explosive', 1.2);
+		const passiveReload = makeEffect('passive-reload', 'ReloadTime', 'AddBase', -2);
+		const onHitDamage = makeEffect('onhit-damage', 'ShellDamage', 'AddBase', 50);
+		const flatDamage = makeEffect('flat-damage', 'ShellDamage', 'AddBase', 10);
+		const reloadComponent = makeComponent('loader', 'LOADER', ['passive-reload'], [1]);
+		const onHitComponent: ComponentRecord = {
+			...makeComponent('charger', 'CHARGER', ['onhit-damage'], [1], 'Increases damage on penetration.'),
+			eventTags: ['Gameplay.Event.OnPenetration'],
+			effectBindings: [
+				{ eventTag: 'Gameplay.Event.OnPenetration', effectId: 'onhit-damage', effectPath: onHitDamage.path }
+			]
+		};
+		const damageTalent = makeTalent('dmg', 'Shell Damage', ['flat-damage'], [10]);
+		const vehicle = makeVehicle(
+			'gun',
+			{ ShellDamage: 100, ReloadTime: 10, ClipSize: 1, IntraClipReloadTime: 2.5 },
+			'he',
+			'tree_gun'
+		);
+		const catalog = createPlannerCatalog(
+			makeBundle({
+				vehicles: [vehicle],
+				ammo: [highExplosive],
+				components: [reloadComponent, onHitComponent],
+				talents: [damageTalent],
+				effects: [passiveReload, onHitDamage, flatDamage],
+				trees: [makeTree('tree_gun', 'gun', ['dmg'])]
+			})
+		);
+
+		const impacts = computeFirepowerSourceImpacts(catalog, {
+			vehicleId: 'gun',
+			ammoIds: ['he'],
+			previewAmmoSlot: 0,
+			componentIds: ['loader', 'charger', ''],
+			talentPoints: { dmg: 1 }
+		});
+		const bySource = new Map(impacts.map((impact) => [impact.source, impact]));
+
+		// Guaranteed build: (100 + 10) × 1.2 = 132 dmg / 8 s = 990 DPM.
+		// Without HE: 110 / 8 s = 825 → HE is worth 165.
+		expect(bySource.get('Ammo: High Explosive')?.guaranteed).toBeCloseTo(165, 4);
+		// Without the loader: 132 / 10 s = 792 → 198.
+		expect(bySource.get('Component: LOADER')?.guaranteed).toBeCloseTo(198, 4);
+		expect(bySource.get('Component: LOADER')?.conditional).toBe(false);
+		// Charger only fires on penetration: nothing guaranteed, (160 × 1.2 − 132) / 8 s × 60 = 450 best case.
+		expect(bySource.get('Component: CHARGER')).toMatchObject({ conditional: true, guaranteed: 0 });
+		expect(bySource.get('Component: CHARGER')?.withConditional).toBeCloseTo(450, 4);
+		// Talent: 10 × 1.2 / 8 s × 60 = 90.
+		expect(bySource.get('Talent: Shell Damage (1)')?.guaranteed).toBeCloseTo(90, 4);
+	});
+
+	it('returns null for an unknown vehicle', () => {
+		const catalog = createPlannerCatalog(
+			makeBundle({ vehicles: [], ammo: [], components: [], talents: [], effects: [], trees: [] })
+		);
+		expect(
+			computeBuildFirepower(catalog, {
+				vehicleId: 'missing',
+				ammoIds: [],
+				previewAmmoSlot: 0,
+				componentIds: [],
+				talentPoints: {}
+			})
+		).toBeNull();
 	});
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import FallbackImage from '$lib/components/FallbackImage.svelte';
 	import ArticleBody from '$lib/contribute/ArticleBody.svelte';
 	import Editor from '$lib/contribute/Editor.svelte';
@@ -8,6 +9,8 @@
 		canIncrementTalentPoint,
 		componentSupportsMaxStacks,
 		computeBuild,
+		computeBuildFirepower,
+		computeFirepowerSourceImpacts,
 		createPlannerCatalog,
 		descriptionIndicatesStacking,
 		formatStatValue,
@@ -29,10 +32,23 @@
 		formatComponentCategory,
 		plainComponentDescription
 	} from '$lib/game-engine/component-format';
+	import {
+		firepowerDefinitions,
+		type Firepower,
+		type FirepowerDefinition,
+		type FirepowerKey
+	} from '$lib/game-engine/firepower';
 
 	import { onMount } from 'svelte';
 
 	const DRAFT_KEY = 'tyr-planner-draft';
+
+	/** Ammo chip labels where a multiplier below 1 is the buff (faster reload, tighter spread, quieter). */
+	const LOWER_IS_BETTER_AMMO_CHIPS = new Set(['RLD', 'DSP', 'DET']);
+
+	function ammoChipIsBuff(label: string, multiplier: number) {
+		return LOWER_IS_BETTER_AMMO_CHIPS.has(label) ? multiplier < 1 : multiplier > 1;
+	}
 
 	let { data } = $props();
 
@@ -50,6 +66,12 @@
 	let exportCode = $state('');
 	let exportModalOpen = $state(false);
 	let copyExportCodeLabel = $state('Copy Export Code');
+	let importModalOpen = $state(false);
+	let importCode = $state('');
+	let importing = $state(false);
+	let importError = $state<string | null>(null);
+	/** Shown after an import that had to drop parts of the code (unknown or not allowed in that slot). */
+	let importNotice = $state<string | null>(null);
 
 	// Star state — overrides track optimistic updates, reset when underlying data changes
 	let starredOverride = $state<boolean | null>(null);
@@ -237,6 +259,72 @@
 		}
 	}
 
+	function openImportModal() {
+		importCode = '';
+		importError = null;
+		importModalOpen = true;
+	}
+
+	function closeImportModal() {
+		importModalOpen = false;
+		importError = null;
+	}
+
+	/** Decode an in-game share code into the planner. Works signed out — nothing is saved. */
+	async function importBuild() {
+		const shareCode = importCode.trim();
+		if (!shareCode || importing) return;
+
+		importing = true;
+		importError = null;
+
+		try {
+			const res = await fetch('/api/builds/import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ shareCode })
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ message: 'Import failed' }));
+				importError = body.message ?? 'Import failed';
+				return;
+			}
+
+			const body = (await res.json()) as {
+				selection: ReturnType<typeof getDefaultSelection>;
+				name: string;
+				warnings: string[];
+			};
+
+			// A loaded build or tank page locks the vehicle; the imported code may be for
+			// another one, so drop back to the plain planner first. The page component is
+			// reused, so the state set below survives the navigation.
+			if (data.loadedBuild || data.lockedVehicleId) {
+				await goto('/tools/builds', { noScroll: true });
+			}
+
+			editingBuild = null;
+			componentModalSlot = null;
+			ammoModalSlot = null;
+			selection = body.selection;
+			buildName = body.name;
+			buildNotes = '';
+			buildNotesOpen = false;
+			saveError = null;
+			saveSuccess = null;
+			exportError = null;
+			importNotice = body.warnings.length
+				? `Imported, but some parts were skipped: ${body.warnings.join('; ')}.`
+				: null;
+			importModalOpen = false;
+		} catch {
+			importError = 'Network error — could not import build.';
+		} finally {
+			importing = false;
+		}
+	}
+
 	function newBuild() {
 		editingBuild = null;
 		buildName = '';
@@ -248,6 +336,7 @@
 		exportError = null;
 		exportCode = '';
 		exportModalOpen = false;
+		importNotice = null;
 	}
 
 	// --- localStorage draft persistence ---
@@ -365,7 +454,7 @@
 
 	$effect(() => {
 		if (typeof document === 'undefined') return;
-		if (exportModalOpen) {
+		if (exportModalOpen || importModalOpen) {
 			const previousOverflow = document.body.style.overflow;
 			document.body.style.overflow = 'hidden';
 			return () => {
@@ -480,6 +569,77 @@
 			: null
 	);
 
+	// Independent of the "Include conditional effects" toggle: firepower always shows the
+	// guaranteed figure, plus the conditional best case when it differs.
+	const buildFirepower = $derived(
+		selection ? computeBuildFirepower(catalog, selection, { assumeMaxStacks }) : null
+	);
+
+	function formatFirepowerValue(definition: FirepowerDefinition, value: number) {
+		if (definition.unit) return formatStatValue(value, definition.unit);
+		return Math.round(value).toLocaleString('en-US');
+	}
+
+	function formatFirepowerDelta(definition: FirepowerDefinition, delta: number) {
+		const rounded = definition.unit ? delta : Math.round(delta);
+		return `${rounded > 0 ? '+' : ''}${formatFirepowerValue(definition, rounded)}`;
+	}
+
+	/** Damage can pick up fractions from ammo multipliers (110 × 1.2 = 132, 133.5 × 1.2 = 160.2). */
+	function formatDamage(value: number) {
+		return Number(value.toFixed(1)).toLocaleString('en-US');
+	}
+
+	function formatSignedDpm(value: number) {
+		const rounded = Math.round(value);
+		return `${rounded > 0 ? '+' : ''}${rounded.toLocaleString('en-US')}`;
+	}
+
+	/** One-line working shown under each firepower tile. */
+	function firepowerWorking(key: FirepowerKey, firepower: Firepower) {
+		const shots = `${firepower.clipSize} ${firepower.clipSize === 1 ? 'shot' : 'shots'}`;
+		if (key === 'burstDamage') return `${formatDamage(firepower.shellDamage)} dmg × ${shots}`;
+		if (key === 'cycleTime') {
+			const reload = `${formatStatValue(firepower.reloadTime, 's')} reload`;
+			if (firepower.clipSize === 1) return `${reload}, single shot`;
+			const gaps = firepower.clipSize - 1;
+			return `${reload} + ${gaps} × ${formatStatValue(firepower.intraClipReloadTime, 's')} ${gaps === 1 ? 'gap' : 'gaps'}`;
+		}
+		return `${formatDamage(firepower.burstDamage)} dmg per ${formatStatValue(firepower.cycleTime, 's')} cycle`;
+	}
+
+	let firepowerBreakdownOpen = $state(false);
+	// Leave-one-out costs two builds per pick, so only run it while the breakdown is open.
+	const firepowerSources = $derived(
+		firepowerBreakdownOpen && selection
+			? computeFirepowerSourceImpacts(catalog, selection, { assumeMaxStacks })
+			: []
+	);
+
+	type FirepowerInputRow = {
+		label: string;
+		pick: (firepower: Firepower) => number;
+		format: (value: number) => string;
+		lowerBetter?: boolean;
+	};
+
+	const firepowerInputRows: FirepowerInputRow[] = [
+		{ label: 'Shell Damage', pick: (f) => f.shellDamage, format: formatDamage },
+		{ label: 'Clip Size', pick: (f) => f.clipSize, format: (v) => String(v) },
+		{
+			label: 'Reload Time',
+			pick: (f) => f.reloadTime,
+			format: (v) => formatStatValue(v, 's'),
+			lowerBetter: true
+		},
+		{
+			label: 'Intra-clip Gap',
+			pick: (f) => f.intraClipReloadTime,
+			format: (v) => formatStatValue(v, 's'),
+			lowerBetter: true
+		}
+	];
+
 	const buildHasConditionals = $derived.by(() => {
 		if (!selection) return false;
 		for (const id of selection.componentIds) {
@@ -500,7 +660,7 @@
 		for (const id of selection.componentIds) {
 			if (!id) continue;
 			const c = catalog.componentById.get(id);
-			if (c && componentSupportsMaxStacks(c)) return true;
+			if (c && componentSupportsMaxStacks(c, catalog.effectById)) return true;
 		}
 		for (const [talentId, pts] of Object.entries(selection.talentPoints)) {
 			if (pts <= 0) continue;
@@ -782,6 +942,7 @@
 		if (event.key === 'Escape' && componentModalSlot !== null) closeComponentModal();
 		if (event.key === 'Escape' && ammoModalSlot !== null) closeAmmoModal();
 		if (event.key === 'Escape' && exportModalOpen) closeExportModal();
+		if (event.key === 'Escape' && importModalOpen) closeImportModal();
 	}}
 />
 
@@ -905,6 +1066,10 @@
 							{exporting ? 'Exporting…' : 'Export'}
 						</button>
 
+						<button class="hud-cta-outline px-4 py-2 text-sm" onclick={openImportModal}>
+							Import
+						</button>
+
 						<button
 							class="px-3 py-2 text-sm text-[var(--hud-muted)] transition hover:text-[var(--hud-teal)]"
 							onclick={newBuild}
@@ -942,6 +1107,13 @@
 						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
 					>
 						{exportError}
+					</div>
+				{/if}
+				{#if importNotice}
+					<div
+						class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+					>
+						{importNotice}
 					</div>
 				{/if}
 
@@ -1445,7 +1617,7 @@
 														{#if m.v !== 1}
 															<span
 																class={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-																	m.v > 1
+																	ammoChipIsBuff(m.label, m.v)
 																		? 'bg-emerald-400/12 text-emerald-300'
 																		: 'bg-rose-400/12 text-rose-300'
 																}`}
@@ -1520,6 +1692,230 @@
 				</div>
 
 				{#if computedBuild}
+					{#snippet situationalBolt()}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							class="h-3.5 w-3.5 shrink-0"
+							aria-hidden="true"
+						>
+							<path
+								d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.62 12 4c1.58 3.62 3.52 6.94 4.81 8.22.02.04.26.22.07.12-.19-.34-.2-.66.38-.66H13l1 7h-1v1h-2v-1z"
+							/>
+						</svg>
+					{/snippet}
+					{#if buildFirepower?.guaranteed}
+						{@const guaranteed = buildFirepower.guaranteed}
+						{@const stock = buildFirepower.base}
+						{@const best = buildFirepower.withConditional}
+						<div class="mt-4" aria-label="Firepower">
+							<div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+								{#each firepowerDefinitions as definition}
+									{@const value = guaranteed[definition.key]}
+									{@const base = buildFirepower.base?.[definition.key] ?? value}
+									{@const delta = value - base}
+									{@const deltaTone = getDeltaTone(definition, delta)}
+									{@const conditionalValue = buildFirepower.withConditional?.[definition.key]}
+									<div
+										class="rounded-sm bg-[var(--hud-inset)] px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(69,73,50,0.35)]"
+										title={definition.hint}
+									>
+										<div class="flex items-baseline justify-between gap-2">
+											<span
+												class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+											>
+												{definition.label}
+											</span>
+											<span class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+												Guaranteed
+											</span>
+										</div>
+										<div
+											class="mt-1 font-[var(--font-display)] text-2xl font-semibold tabular-nums text-[var(--hud-text)]"
+										>
+											{formatFirepowerValue(definition, value)}
+										</div>
+										<div class="mt-0.5 flex items-baseline gap-2 text-xs tabular-nums text-[var(--hud-dim)]">
+											<span>Base {formatFirepowerValue(definition, base)}</span>
+											<span
+												class={`font-semibold ${
+													deltaTone === 'positive'
+														? 'text-emerald-300'
+														: deltaTone === 'negative'
+															? 'text-rose-300'
+															: 'text-[var(--hud-dim)]'
+												}`}
+											>
+												{formatFirepowerDelta(definition, delta)}
+											</span>
+										</div>
+										<div class="mt-1 font-mono text-[11px] text-[var(--hud-muted)]">
+											{firepowerWorking(definition.key, guaranteed)}
+										</div>
+										{#if conditionalValue != null && Math.abs(conditionalValue - value) >= 0.005}
+											<div
+												class="mt-1.5 flex items-center gap-1.5 border-t border-[var(--hud-variant)]/60 pt-1.5 text-xs text-[var(--hud-teal)]"
+												title="Best case: also counts situational talents and components (on-hit, while unspotted, …){assumeMaxStacks ? ' at max stacks' : ''}."
+											>
+												{@render situationalBolt()}
+												<span>With conditional effects</span>
+												<span class="ml-auto font-semibold tabular-nums">
+													{formatFirepowerValue(definition, conditionalValue)}
+												</span>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+							<div class="mt-2 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+								<p class="max-w-3xl text-[11px] leading-4 text-[var(--hud-dim)]">
+									Theoretical output with the previewed ammo: every shot hits and penetrates, full
+									clip then full reload. Event-triggered reload speed-ups (active reload) aren't
+									counted.
+								</p>
+								<button
+									type="button"
+									class="shrink-0 cursor-pointer border-none bg-transparent p-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--hud-teal)] hover:text-[var(--hud-lime)]"
+									aria-expanded={firepowerBreakdownOpen}
+									aria-controls="firepower-breakdown"
+									onclick={() => (firepowerBreakdownOpen = !firepowerBreakdownOpen)}
+								>
+									{firepowerBreakdownOpen ? 'Hide' : 'Show'} firepower breakdown
+								</button>
+							</div>
+							{#if firepowerBreakdownOpen}
+								{@const showIntra = Math.max(stock?.clipSize ?? 1, guaranteed.clipSize, best?.clipSize ?? 1) > 1}
+								<div
+									id="firepower-breakdown"
+									class="mt-3 grid gap-3 lg:grid-cols-2"
+								>
+									<div
+										class="overflow-x-auto rounded-sm bg-[var(--hud-surface)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.15)]"
+									>
+										<table class="w-full min-w-[19rem] table-fixed text-left text-sm">
+											<colgroup>
+												<col style="width: 34%" />
+												<col style="width: 22%" />
+												<col style="width: 22%" />
+												<col style="width: 22%" />
+											</colgroup>
+											<thead class="bg-[var(--hud-inset)]">
+												<tr class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+													<th class="px-3 py-2 font-medium">Input</th>
+													<th class="px-2 py-2 text-right font-medium">Base</th>
+													<th class="px-2 py-2 text-right font-medium leading-tight">Guaran&shy;teed</th>
+													<th class="px-3 py-2 text-right font-medium leading-tight">Condi&shy;tional</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each firepowerInputRows as input}
+													{#if input.label !== 'Intra-clip Gap' || showIntra}
+														{@const baseValue = stock ? input.pick(stock) : null}
+														{@const nowValue = input.pick(guaranteed)}
+														{@const bestValue = best ? input.pick(best) : null}
+														{@const tone = baseValue === null ? 'neutral' : getDeltaTone(input, nowValue - baseValue)}
+														<tr class="border-t border-[var(--hud-variant)]/60">
+															<td class="px-3 py-2 font-medium text-[var(--hud-text)]">{input.label}</td>
+															<td class="px-2 py-2 text-right tabular-nums text-[var(--hud-dim)]">
+																{baseValue === null ? '-' : input.format(baseValue)}
+															</td>
+															<td
+																class={`px-2 py-2 text-right tabular-nums ${
+																	tone === 'positive'
+																		? 'text-emerald-300'
+																		: tone === 'negative'
+																			? 'text-rose-300'
+																			: 'text-[var(--hud-text)]'
+																}`}
+															>
+																{input.format(nowValue)}
+															</td>
+															<td
+																class={`px-3 py-2 text-right tabular-nums ${
+																	bestValue !== null && Math.abs(bestValue - nowValue) >= 0.005
+																		? 'text-[var(--hud-teal)]'
+																		: 'text-[var(--hud-dim)]'
+																}`}
+															>
+																{bestValue === null ? '-' : input.format(bestValue)}
+															</td>
+														</tr>
+													{/if}
+												{/each}
+											</tbody>
+										</table>
+									</div>
+
+									<div
+										class="overflow-x-auto rounded-sm bg-[var(--hud-surface)] shadow-[inset_0_0_0_1px_rgba(69,73,50,0.15)]"
+									>
+										<table class="w-full min-w-[19rem] table-fixed text-left text-sm">
+											<colgroup>
+												<col style="width: 54%" />
+												<col style="width: 23%" />
+												<col style="width: 23%" />
+											</colgroup>
+											<thead class="bg-[var(--hud-inset)]">
+												<tr class="text-[10px] uppercase tracking-wider text-[var(--hud-dim)]">
+													<th class="px-3 py-2 font-medium">DPM by source</th>
+													<th class="px-2 py-2 text-right font-medium leading-tight">Guaran&shy;teed</th>
+													<th class="px-3 py-2 text-right font-medium leading-tight">Condi&shy;tional</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each firepowerSources as impact}
+													<tr class="border-t border-[var(--hud-variant)]/60">
+														<td class="px-3 py-2 text-xs text-[var(--hud-muted)]">
+															<span class="flex min-w-0 items-center gap-1.5">
+																{#if impact.conditional}
+																	<span
+																		class="text-[var(--hud-teal)]"
+																		title="Situational pick: applies only under specific in-game conditions."
+																		role="img"
+																		aria-label="Situational effect"
+																	>
+																		{@render situationalBolt()}
+																	</span>
+																{/if}
+																<span class="min-w-0 break-words">{impact.source}</span>
+															</span>
+														</td>
+														{#each [impact.guaranteed, impact.withConditional] as dpmImpact, column}
+															<td
+																class={`${column === 0 ? 'px-2' : 'px-3'} py-2 text-right tabular-nums font-semibold ${
+																	Math.round(dpmImpact) > 0
+																		? 'text-emerald-300'
+																		: Math.round(dpmImpact) < 0
+																			? 'text-rose-300'
+																			: 'text-[var(--hud-dim)]'
+																}`}
+															>
+																{formatSignedDpm(dpmImpact)}
+															</td>
+														{/each}
+													</tr>
+												{:else}
+													<tr class="border-t border-[var(--hud-variant)]/60">
+														<td colspan="3" class="px-3 py-3 text-xs text-[var(--hud-dim)]">
+															Nothing in this build changes DPM yet. Damage, reload and clip talents,
+															components and alternate ammo show up here.
+														</td>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+										{#if firepowerSources.length}
+											<p class="border-t border-[var(--hud-variant)]/60 px-3 py-2 text-[11px] leading-4 text-[var(--hud-dim)]">
+												DPM lost if that pick were removed. Bonuses compound, so the rows needn't
+												add up exactly to the total change.
+											</p>
+										{/if}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/if}
 					<div
 						class="mt-4 flex flex-wrap gap-1.5 border-b border-[var(--hud-variant)] pb-3"
 					>
@@ -1919,7 +2315,7 @@
 												{#if mod.value !== 1}
 													<span
 														class={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-															mod.value > 1
+															ammoChipIsBuff(mod.label, mod.value)
 																? 'bg-emerald-400/12 text-emerald-300'
 																: 'bg-rose-400/12 text-rose-300'
 														}`}
@@ -2009,6 +2405,95 @@
 							</button>
 						</div>
 					</div>
+				</div>
+			</div>
+		{/if}
+
+		{#if importModalOpen}
+			<div
+				class="fixed inset-0 z-[210] flex items-end justify-center sm:items-center sm:p-6"
+				role="presentation"
+			>
+				<button
+					type="button"
+					class="absolute inset-0 bg-[#0a0e17]/85 backdrop-blur-[3px]"
+					aria-label="Close import dialog"
+					onclick={closeImportModal}
+				></button>
+
+				<div
+					class="relative z-10 flex w-full max-w-3xl flex-col overflow-hidden rounded-t-sm border border-[rgba(69,73,50,0.4)] bg-[var(--hud-panel)] shadow-[0_24px_80px_rgba(0,0,0,0.55),inset_0_0_0_1px_var(--hud-ghost)] sm:rounded-sm"
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="import-modal-title"
+				>
+					<header
+						class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-[var(--hud-variant)] bg-[var(--hud-panel-high)] px-4 py-4 shadow-[inset_0_2px_0_0_var(--hud-lime)] sm:px-6"
+					>
+						<div>
+							<p
+								class="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--hud-teal)]"
+							>
+								Loadout sharing
+							</p>
+							<h2
+								id="import-modal-title"
+								class="mt-1 font-[var(--font-display)] text-2xl font-bold uppercase tracking-[0.04em] text-[var(--hud-text)]"
+							>
+								Import Build
+							</h2>
+							<p class="mt-2 text-xs leading-5 text-[var(--hud-muted)]">
+								Paste a share code from Tyr's in-game export to view it in the planner. No sign-in
+								needed.
+							</p>
+						</div>
+						<button
+							type="button"
+							class="rounded-sm border-2 border-[var(--hud-teal)] bg-transparent px-4 py-2 text-sm font-semibold uppercase tracking-wide text-[var(--hud-teal)] transition hover:bg-[var(--hud-teal)]/10"
+							onclick={closeImportModal}
+						>
+							Close
+						</button>
+					</header>
+
+					<form
+						class="bg-[var(--hud-surface)] px-4 py-4 sm:px-6 sm:py-5"
+						onsubmit={(event) => {
+							event.preventDefault();
+							importBuild();
+						}}
+					>
+						<!-- svelte-ignore a11y_autofocus -->
+						<textarea
+							bind:value={importCode}
+							autofocus
+							spellcheck="false"
+							placeholder="TYR01_…"
+							aria-label="Share code"
+							class="min-h-[9rem] w-full resize-none rounded-sm border border-[var(--hud-variant)] bg-[var(--hud-inset)] px-3 py-3 font-mono text-xs leading-6 text-[var(--hud-text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--hud-teal)]/35"
+						></textarea>
+
+						{#if importError}
+							<div
+								class="mt-3 border-l-2 border-[#ffd166] bg-[var(--hud-inset)] px-4 py-2 text-sm text-[#ffd166]"
+							>
+								{importError}
+							</div>
+						{/if}
+
+						<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+							<p class="text-xs leading-5 text-[var(--hud-muted)]">
+								Replaces the planner's current loadout. Sign in if you want to save it.
+							</p>
+							<button
+								type="submit"
+								class="hud-cta-outline px-4 py-2 text-xs"
+								disabled={importing || !importCode.trim()}
+							>
+								{importing ? 'Importing…' : 'Import Build'}
+							</button>
+						</div>
+					</form>
 				</div>
 			</div>
 		{/if}

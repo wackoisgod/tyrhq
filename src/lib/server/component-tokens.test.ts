@@ -21,8 +21,9 @@ describe('exported component value tokens', () => {
 	});
 
 	it('renders Kinetic Absorber with absolute seconds like the game', () => {
-		const description = componentById.get('kineticabsorber')?.description ?? '';
-		expect(description).toContain('by 1 seconds');
+		const component = componentById.get('kineticabsorber')!;
+		const description = component.description;
+		expect(description).toContain(`by ${Math.abs(component.pointValues[0])} seconds`);
 		expect(description).not.toContain('-1');
 	});
 

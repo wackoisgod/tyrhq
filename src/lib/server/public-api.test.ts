@@ -54,6 +54,15 @@ describe('exported runtime fields', () => {
 		expect(Array.isArray(result?.effectBindings)).toBe(true);
 	});
 
+	it('publishes derived vehicle firepower', () => {
+		// Tempest: 125 dmg × 5-shot clip, 20 s reload + 4 × 1 s intra-clip gaps.
+		const tempest = getPublicApiResourceById('vehicles', 'recall') as
+			| { firepower?: { dpm: number; burstDamage: number; cycleTime: number; clipSize: number } }
+			| null;
+		expect(tempest?.firepower).toMatchObject({ burstDamage: 625, cycleTime: 24, clipSize: 5 });
+		expect(tempest?.firepower?.dpm).toBeCloseTo(1562.5, 4);
+	});
+
 	it('publishes rich effect records', () => {
 		const result = listPublicApiResource(
 			'effects',

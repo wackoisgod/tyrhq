@@ -27,15 +27,25 @@ describe('Ark stat breakdown reports', () => {
 	}
 
 	it('applies traverse and dispersion talents at the tooltip percentages', () => {
+		const baseline = computeWith({});
 		const build = computeWith({
 			'bush-talent001': 3, // Turret Traverse Speed 3/3 → +24%
 			'bush-talent007': 2, // Hull Traverse Speed 2/5 → +5.6%
 			'bush-talent010': 5 // Base Aiming Dispersion 5/5 → −15%
 		});
 
-		expect(build.stats.TurretTraverseSpeed).toBeCloseTo(28 * 1.24, 3);
-		expect(build.stats.HullTraverseSpeed).toBeCloseTo(35 * 1.056, 3);
-		expect(build.stats.BaseDispersionPenalty).toBeCloseTo(0.14 * 0.85, 4);
+		expect(build.stats.TurretTraverseSpeed).toBeCloseTo(
+			baseline.stats.TurretTraverseSpeed * 1.24,
+			3
+		);
+		expect(build.stats.HullTraverseSpeed).toBeCloseTo(
+			baseline.stats.HullTraverseSpeed * 1.056,
+			3
+		);
+		expect(build.stats.BaseDispersionPenalty).toBeCloseTo(
+			baseline.stats.BaseDispersionPenalty * 0.85,
+			4
+		);
 	});
 
 	it('shows the full base dispersion reduction instead of rounding it away', () => {
