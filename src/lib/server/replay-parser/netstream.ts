@@ -349,6 +349,10 @@ function processBunchPayload(
 		const bHasRepLayout = bits.readBit();
 		const bIsActor = bits.readBit();
 		
+		if (state.bunchCount < 100 && (ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C')) {
+			console.log(`    Content block (bunch ${state.bunchCount}): bHasRepLayout=${bHasRepLayout}, bIsActor=${bIsActor}, bitsLeft=${bits.bitsLeft()}`);
+		}
+		
 		let repObj: number;
 		if (bIsActor) {
 			repObj = ch.archetype || ch.actorGuid;
@@ -374,13 +378,38 @@ function processBunchPayload(
 		
 		const payload = bits.readBitsBytes(payloadBits);
 		
-		// Extract properties for player identity classes
-		const isPlayerIdentityClass = ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C';
-		if (isPlayerIdentityClass && bHasRepLayout) {
-			if (state.playerIdentity.size < 5) {
-				console.log(`  Extracting property: ch=${ch.chIndex}, class=${ch.class}, bIsActor=${bIsActor}, payloadBits=${payloadBits}`);
+		if (repObj === undefined || payloadBits === 0) {
+			continue;
+		}
+		
+		// Get group for this repObj guid (Python: state.group_for_guid)
+		const guidExport = state.guidMap.get(repObj);
+		if (!guidExport) {
+			if (state.bunchCount < 100 && (ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C')) {
+				console.log(`    No GUID export for repObj=${repObj}`);
 			}
-			extractPlayerProperty(ch, 0, payload, payloadBits, state);
+			continue;
+		}
+		
+		const path = guidExport.pathName;
+		const className = path.split('.').pop() || path;
+		const cleanClassName = className.replace(/^Default__/, '');
+		const group = state.groupsByPath.get(cleanClassName);
+		
+		if (state.bunchCount < 100 && (ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C')) {
+			console.log(`    repObj=${repObj}, path=${path}, className=${cleanClassName}, group=${group ? 'FOUND' : 'NOT_FOUND'}, bHasRepLayout=${bHasRepLayout}`);
+		}
+		
+		if (group && bHasRepLayout) {
+			// Extract properties for player identity classes
+			const isPlayerIdentityClass = cleanClassName === 'BP_TyrPlayerState_C' || cleanClassName === 'BP_PlayerRecord_C';
+			if (state.bunchCount < 100 && (ch.class === 'BP_TyrPlayerState_C' || ch.class === 'BP_PlayerRecord_C')) {
+				console.log(`    isPlayerIdentityClass: ${isPlayerIdentityClass}, cleanClassName: ${cleanClassName}`);
+			}
+			if (isPlayerIdentityClass) {
+				console.log(`  Extracting property (bunch ${state.bunchCount}): ch=${ch.chIndex}, class=${cleanClassName}, repObj=${repObj}, payloadBits=${payloadBits}, playerIdentitySize=${state.playerIdentity.size}`);
+				extractPlayerProperty(ch, 0, payload, payloadBits, state);
+			}
 		}
 	}
 }
