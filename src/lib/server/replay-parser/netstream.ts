@@ -250,7 +250,13 @@ function internalLoadObject(
  * Simplified version that just skips the data.
  */
 function readNetGuidExport(bits: BitReader, state: NetstreamState, isExporting: boolean): number {
+	const startPos = bits.getPos();
 	const guid = bits.intPacked();
+	
+	if ((state.bunchCount === 56 || state.bunchCount === 71) && startPos < 400) {
+		console.log(`      readNetGuidExport (bunch ${state.bunchCount}) at pos ${startPos}: guid=${guid}, isExporting=${isExporting}`);
+	}
+	
 	if (guid === 0) return guid;
 	
 	if (guid === 1 || isExporting) {
@@ -305,6 +311,10 @@ function processBunchPayload(
 		// UPackageMapClient::SerializeNewActor
 		const actorGuid = readNetGuidExport(bits, state, false);
 		ch.actorGuid = actorGuid;
+		
+		if (state.channels.size <= 35) {
+			console.log(`    SerializeNewActor (bunch ${state.bunchCount}): ch=${ch.chIndex}, actorGuid=${actorGuid}`);
+		}
 		
 		const dynamic = actorGuid > 1 && (actorGuid & 1) === 0;
 		
