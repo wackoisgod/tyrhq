@@ -217,6 +217,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	}
 
 	// Look up existing account by verified_steam_id
+	// This works even if user changed email from placeholder to real email
 	let { data: profile, error: profileError } = await supabaseAdmin
 		.from('profiles')
 		.select('id, display_name')

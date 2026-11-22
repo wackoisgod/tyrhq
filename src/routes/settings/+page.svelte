@@ -1,15 +1,154 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { env } from '$env/dynamic/public';
+	import { getAuthCallbackUrl } from '$lib/site-url';
+	import { createBrowserClient } from '@supabase/ssr';
+	import { onMount } from 'svelte';
 	import SettingsNav from '$lib/components/settings/SettingsNav.svelte';
 	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
 
 	let { data, form } = $props();
 
 	let profileLoading = $state(false);
+	let supabase = $state<ReturnType<typeof createBrowserClient> | null>(null);
+	let showEmailForm = $state(false);
+	let emailFormData = $state({ email: '', password: '', confirmPassword: '' });
+	let emailFormError = $state('');
+	let emailFormLoading = $state(false);
+	let pendingEmailChange = $state<string | null>(null);
 
 	const profileError = $derived(form && 'profileError' in form ? form.profileError : null);
 	const profileSuccess = $derived(form && 'profileSuccess' in form ? form.profileSuccess : null);
+	
+	// Check for success messages from URL
+	const urlSuccess = $page.url.searchParams.get('success');
+	const successMessages: Record<string, string> = {
+		email_confirmed: 'Email confirmed successfully!'
+	};
+	
+	// Check for error messages from URL
+	const urlError = $page.url.searchParams.get('error');
+	const errorMessages: Record<string, string> = {
+		email_exists: 'This email is already in use by another account.',
+		invalid_credentials: 'Invalid email or password.',
+		email_change_failed: 'Failed to update email. Please try again.'
+	};
+	
+	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
+	const displayError = profileError || (urlError && errorMessages[urlError]);
+	
+	onMount(() => {
+		if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+		supabase = createBrowserClient(env.PUBLIC_SUPABASE_URL, env.PUBLIC_SUPABASE_ANON_KEY, {
+			global: { fetch }
+		});
+		
+		// Check for pending email change
+		checkPendingEmailChange();
+	});
+	
+	async function checkPendingEmailChange() {
+		if (!supabase) return;
+		
+		const { data: { user } } = await supabase.auth.getUser();
+		if (user && user.new_email) {
+			pendingEmailChange = user.new_email;
+		}
+	}
+	
+	function validateEmail(email: string): boolean {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	}
+	
+	function validatePassword(password: string): boolean {
+		return password.length >= 8;
+	}
+	
+	async function handleAddEmail() {
+		if (!supabase) return;
+		
+		emailFormError = '';
+		
+		// Validation
+		if (!emailFormData.email || !validateEmail(emailFormData.email)) {
+			emailFormError = 'Please enter a valid email address.';
+			return;
+		}
+		
+		if (!emailFormData.password || !validatePassword(emailFormData.password)) {
+			emailFormError = 'Password must be at least 8 characters long.';
+			return;
+		}
+		
+		if (emailFormData.password !== emailFormData.confirmPassword) {
+			emailFormError = 'Passwords do not match.';
+			return;
+		}
+		
+		emailFormLoading = true;
+		
+		try {
+			// Build callback URL with link marker
+			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
+			const callbackWithMarker = `${callbackUrl}&link=email`;
+			
+			// Update email (Supabase will send confirmation email)
+			const { error: emailError } = await supabase.auth.updateUser(
+				{ email: emailFormData.email },
+				{
+					emailRedirectTo: callbackWithMarker
+				}
+			);
+			
+			if (emailError) {
+				console.error('[settings] Failed to update email:', emailError);
+				
+				// Map known error messages
+				if (emailError.message?.toLowerCase().includes('already') || 
+				    emailError.message?.toLowerCase().includes('exists')) {
+					emailFormError = 'This email is already in use by another account.';
+				} else {
+					emailFormError = 'Failed to update email. Please try again.';
+				}
+				emailFormLoading = false;
+				return;
+			}
+			
+			// Set password
+			const { error: passwordError } = await supabase.auth.updateUser({
+				password: emailFormData.password
+			});
+			
+			if (passwordError) {
+				console.error('[settings] Failed to set password:', passwordError);
+				emailFormError = 'Email change initiated, but password update failed. Please try again.';
+				emailFormLoading = false;
+				return;
+			}
+			
+			// Success - show pending state
+			pendingEmailChange = emailFormData.email;
+			showEmailForm = false;
+			emailFormData = { email: '', password: '', confirmPassword: '' };
+			emailFormLoading = false;
+			
+			// Reload to show updated state
+			await invalidateAll();
+		} catch (err) {
+			console.error('[settings] Exception adding email:', err);
+			emailFormError = 'An unexpected error occurred. Please try again.';
+			emailFormLoading = false;
+		}
+	}
+	
+	function cancelEmailForm() {
+		showEmailForm = false;
+		emailFormData = { email: '', password: '', confirmPassword: '' };
+		emailFormError = '';
+	}
 </script>
 
 <svelte:head>
@@ -47,19 +186,19 @@
 			</p>
 		{/if}
 
-		{#if profileError}
+		{#if displayError}
 			<div
 				class="mt-4 border-l-2 border-[var(--hud-warning,#ffd166)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[#ffd166]"
 			>
-				{profileError}
+				{displayError}
 			</div>
 		{/if}
 
-		{#if profileSuccess}
+		{#if displaySuccess}
 			<div
 				class="mt-4 border-l-2 border-[var(--hud-teal)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[var(--hud-teal)]"
 			>
-				{profileSuccess}
+				{displaySuccess}
 			</div>
 		{/if}
 
@@ -173,6 +312,93 @@
 								</div>
 							</div>
 						</div>
+					{:else if pendingEmailChange}
+						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password (Pending)</p>
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">Check <span class="text-[var(--hud-text)]">{pendingEmailChange}</span> to confirm your email address.</p>
+								</div>
+							</div>
+						</div>
+					{:else if showEmailForm}
+						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+							<div class="space-y-3">
+								<div>
+									<p class="text-sm font-semibold text-[var(--hud-text)]">Add Email & Password</p>
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">Set up email and password to enable password recovery and email sign-in.</p>
+								</div>
+								
+								{#if emailFormError}
+									<div class="rounded-sm bg-red-900/20 border border-red-700/50 p-3 text-xs text-red-200">
+										{emailFormError}
+									</div>
+								{/if}
+								
+								<div class="space-y-2">
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-semibold text-[var(--hud-muted)]">Email Address</span>
+										<input
+											type="email"
+											bind:value={emailFormData.email}
+											class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
+											placeholder="your@email.com"
+											disabled={emailFormLoading}
+											required
+										/>
+									</label>
+									
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-semibold text-[var(--hud-muted)]">Password</span>
+										<input
+											type="password"
+											bind:value={emailFormData.password}
+											class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
+											placeholder="Minimum 8 characters"
+											disabled={emailFormLoading}
+											required
+											minlength={8}
+										/>
+									</label>
+									
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-semibold text-[var(--hud-muted)]">Confirm Password</span>
+										<input
+											type="password"
+											bind:value={emailFormData.confirmPassword}
+											class="hud-input w-full px-3 py-2 text-sm text-[var(--hud-text)]"
+											placeholder="Re-enter password"
+											disabled={emailFormLoading}
+											required
+											minlength={8}
+										/>
+									</label>
+								</div>
+								
+								<div class="flex gap-2">
+									<button 
+										type="button" 
+										class="hud-cta px-3 py-2 text-xs" 
+										onclick={handleAddEmail}
+										disabled={emailFormLoading}
+									>
+										{#if emailFormLoading}
+											Saving...
+										{:else}
+											Add Email
+										{/if}
+									</button>
+									<button 
+										type="button" 
+										class="hud-cta-outline px-3 py-2 text-xs" 
+										onclick={cancelEmailForm}
+										disabled={emailFormLoading}
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+						</div>
 					{:else}
 						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
 							<div class="flex items-center justify-between gap-4">
@@ -180,7 +406,11 @@
 									<p class="text-sm font-semibold text-[var(--hud-muted)]">Email & Password</p>
 									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Add an email to enable password recovery.</p>
 								</div>
-								<button class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed" disabled title="Coming soon">
+								<button 
+									type="button"
+									class="hud-cta-outline px-3 py-2 text-xs"
+									onclick={() => showEmailForm = true}
+								>
 									Add Email
 								</button>
 							</div>
