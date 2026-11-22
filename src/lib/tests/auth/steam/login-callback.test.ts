@@ -403,7 +403,95 @@ describe('Steam Login Callback', () => {
 		);
 	});
 
-	it('should recover from stuck-account bug', async () => {
+	it('should recover from stuck-account bug (user exists, no Steam ID in profile)', async () => {
+		const testNonce = 'test-nonce-stuck-no-steam';
+		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
+		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);
+
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/steam/login/callback' +
+				'?state=' + testNonce +
+				'&openid.ns=http://specs.openid.net/auth/2.0' +
+				'&openid.mode=id_res' +
+				'&openid.op_endpoint=https://steamcommunity.com/openid/login' +
+				'&openid.return_to=http://localhost:5173/auth/steam/login/callback?state=' + testNonce +
+				'&openid.claimed_id=https://steamcommunity.com/openid/id/76561198012345678' +
+				'&openid.identity=https://steamcommunity.com/openid/id/76561198012345678'
+		);
+
+		mockFetch.mockResolvedValueOnce({
+			ok: true,
+			text: async () => 'is_valid:true\n'
+		});
+
+		// First lookup: no profile with this Steam ID
+		mockSupabaseAdmin.from().select().eq().maybeSingle.mockResolvedValueOnce({
+			data: null,
+			error: null
+		});
+
+		// Create user fails (already exists)
+		mockSupabaseAdmin.auth.admin.createUser.mockResolvedValueOnce({
+			data: null,
+			error: { message: 'User already registered', status: 422 }
+		});
+
+		// generateLink returns existing user
+		mockSupabaseAdmin.auth.admin.generateLink.mockResolvedValueOnce({
+			data: {
+				user: { id: 'existing-user-id', email: 'steam_76561198012345678@users.tyrhq.invalid' },
+				properties: { hashed_token: 'token' }
+			},
+			error: null
+		});
+
+		// Retry profile lookup still finds no Steam ID (stuck account scenario)
+		mockSupabaseAdmin.from().select().eq().maybeSingle.mockResolvedValueOnce({
+			data: null,
+			error: null
+		});
+
+		// Mock display name check
+		mockSupabaseAdmin.from().select().ilike = vi.fn(() => ({
+			limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+		}));
+
+		// Upsert should complete initialization
+		mockSupabaseAdmin.from().upsert = vi.fn(() =>
+			Promise.resolve({ data: {}, error: null, count: 1 })
+		);
+
+		// Second getUserById for session creation
+		mockSupabaseAdmin.auth.admin.getUserById.mockResolvedValueOnce({
+			data: {
+				user: { id: 'existing-user-id', email: 'steam_76561198012345678@users.tyrhq.invalid' }
+			},
+			error: null
+		});
+
+		// Second generateLink for session
+		mockSupabaseAdmin.auth.admin.generateLink.mockResolvedValueOnce({
+			data: { properties: { hashed_token: 'session-token' } },
+			error: null
+		});
+
+		vi.mocked(mockEvent.locals!.supabase.auth.verifyOtp).mockResolvedValueOnce({
+			data: { user: {}, session: {} },
+			error: null
+		});
+
+		await expect(GET(mockEvent as RequestEvent)).rejects.toThrow();
+		// Should have called upsert to complete initialization
+		expect(mockSupabaseAdmin.from().upsert).toHaveBeenCalledWith(
+			expect.objectContaining({
+				id: 'existing-user-id',
+				verified_steam_id: '76561198012345678'
+			}),
+			expect.any(Object)
+		);
+	});
+
+	it('should recover from stuck-account bug (createUser fails)', async () => {
 		const testNonce = 'test-nonce-stuck';
 		const state = JSON.stringify({ mode: 'login', next: '/', nonce: testNonce });
 		vi.mocked(mockEvent.cookies!.get).mockReturnValue(state);

@@ -9,7 +9,6 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSupabaseAdminClient } from '$lib/server/supabase-admin';
 import { sanitizePostAuthRedirect } from '$lib/server/security';
-import { timingSafeEqual } from 'crypto';
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
@@ -17,18 +16,19 @@ const STEAM_API_TIMEOUT_MS = 3000;
 
 /**
  * Constant-time string comparison to prevent timing attacks
+ * Manual implementation safe for edge/serverless environments
  */
 function constantTimeCompare(a: string, b: string): boolean {
 	if (a.length !== b.length) {
 		return false;
 	}
-	try {
-		const bufA = Buffer.from(a, 'utf8');
-		const bufB = Buffer.from(b, 'utf8');
-		return timingSafeEqual(bufA, bufB);
-	} catch {
-		return false;
+	
+	let result = 0;
+	for (let i = 0; i < a.length; i++) {
+		result |= a.charCodeAt(i) ^ b.charCodeAt(i);
 	}
+	
+	return result === 0;
 }
 
 /**
@@ -246,20 +246,16 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 
 		if (createError) {
 			// IDEMPOTENT: Check if user already exists (stuck-account recovery)
-			// Look up by placeholder email instead of relying on error message
-			const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-				page: 1,
-				perPage: 1
+			// Use generateLink to lookup by email - returns user data if exists
+			const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+				type: 'magiclink',
+				email: placeholderEmail
 			});
 
 			let existingUserId: string | null = null;
-
-			// Search for user with placeholder email
-			if (!listError && users?.users) {
-				const existingUser = users.users.find((u) => u.email === placeholderEmail);
-				if (existingUser) {
-					existingUserId = existingUser.id;
-				}
+			if (!linkError && linkData?.user?.id) {
+				// User exists - generateLink returns the user object
+				existingUserId = linkData.user.id;
 			}
 
 			// Also try to find profile by Steam ID (may exist from race condition)
@@ -302,11 +298,18 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 					.ilike('display_name', escapedPattern)
 					.limit(10);
 
-				// Handle multiple matches or no matches
-				if (checkError || !existingProfiles || existingProfiles.length === 0) {
+				// Fail closed: if dedupe query errors, throw instead of proceeding
+				if (checkError) {
+					console.error('[steam-login] Display name deduplication failed:', checkError);
+					throw error(500, 'Failed to check display name availability');
+				}
+
+				// No matches found - name is available
+				if (!existingProfiles || existingProfiles.length === 0) {
 					break;
 				}
 
+				// Name taken, try next
 				attempt++;
 				displayName = `${baseDisplayName}${attempt}`;
 			}

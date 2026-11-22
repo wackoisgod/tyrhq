@@ -187,19 +187,19 @@
 						</div>
 					{/if}
 
-					<!-- Google -->
-					{#if data.linkedIdentities.some((i) => i.provider === 'google')}
-						<div class="rounded-sm bg-[var(--hud-inset)] p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div>
-									<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Google</p>
-									{@const googleIdentity = data.linkedIdentities.find((i) => i.provider === 'google')}
-									{#if googleIdentity?.email}
-										<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
-									{/if}
-								</div>
+				<!-- Google -->
+				{#if data.linkedIdentities.some((i) => i.provider === 'google')}
+					{@const googleIdentity = data.linkedIdentities.find((i) => i.provider === 'google')}
+					<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+						<div class="flex items-center justify-between gap-4">
+							<div>
+								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Google</p>
+								{#if googleIdentity?.email}
+									<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
+								{/if}
 							</div>
 						</div>
+					</div>
 					{:else}
 						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
 							<div class="flex items-center justify-between gap-4">
