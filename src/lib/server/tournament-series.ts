@@ -223,6 +223,45 @@ async function getReleasedSubmissionIds(submissions: BuildSubmissionRow[], tourn
 	return released;
 }
 
+function calculateTeamPlacements(matches: {
+	round: number;
+	team_a_id: string | null;
+	team_b_id: string | null;
+	winner_team_id: string | null;
+	status: string;
+}[]): Map<string, number> {
+	const placements = new Map<string, number>();
+	if (matches.length === 0) return placements;
+
+	const maxRound = Math.max(...matches.map((m) => m.round));
+	const finalMatch = matches.find((m) => m.round === maxRound && m.status === 'completed');
+	
+	if (finalMatch?.winner_team_id) {
+		placements.set(finalMatch.winner_team_id, 1);
+		const loser = finalMatch.team_a_id === finalMatch.winner_team_id 
+			? finalMatch.team_b_id 
+			: finalMatch.team_a_id;
+		if (loser) placements.set(loser, 2);
+	}
+
+	if (maxRound > 1) {
+		const semifinalMatches = matches.filter(
+			(m) => m.round === maxRound - 1 && m.status === 'completed'
+		);
+		for (const match of semifinalMatches) {
+			if (!match.winner_team_id) continue;
+			const loser = match.team_a_id === match.winner_team_id 
+				? match.team_b_id 
+				: match.team_a_id;
+			if (loser && !placements.has(loser)) {
+				placements.set(loser, 3);
+			}
+		}
+	}
+
+	return placements;
+}
+
 export async function getTournamentBuildContext(
 	tournamentId: string,
 	viewerId: string | null,
@@ -231,7 +270,7 @@ export async function getTournamentBuildContext(
 	const admin = requireAdminClient();
 	const tournament = await getTournament(tournamentId);
 	const canManage = canManageTournament(tournament, viewerId, role);
-	const [{ data: submissionsData }, { data: rosterData }] = await Promise.all([
+	const [{ data: submissionsData }, { data: rosterData }, { data: matchesData }] = await Promise.all([
 		admin
 			.from('tournament_build_submissions')
 			.select('*')
@@ -240,10 +279,24 @@ export async function getTournamentBuildContext(
 		admin
 			.from('tournament_roster_members')
 			.select('tournament_id, team_id, user_id, source')
+			.eq('tournament_id', tournamentId),
+		admin
+			.from('tournament_matches')
+			.select('round, team_a_id, team_b_id, winner_team_id, status')
 			.eq('tournament_id', tournamentId)
 	]);
 	const submissions = (submissionsData as BuildSubmissionRow[] | null) ?? [];
 	const roster = (rosterData as RosterRow[] | null) ?? [];
+	const matches = (matchesData as {
+		round: number;
+		team_a_id: string | null;
+		team_b_id: string | null;
+		winner_team_id: string | null;
+		status: string;
+	}[] | null) ?? [];
+	
+	const teamPlacements = calculateTeamPlacements(matches);
+	const teamByUserId = new Map(roster.map((r) => [r.user_id, r.team_id]));
 	const releasedIds = await getReleasedSubmissionIds(submissions, tournament.status);
 	const profileIds = [...new Set(submissions.map((submission) => submission.user_id))];
 	const { data: profilesData } = profileIds.length
@@ -292,21 +345,26 @@ export async function getTournamentBuildContext(
 			vehicleName: vehicleNames.get(build.vehicle_id) ?? build.vehicle_id,
 			updatedAt: build.updated_at
 		})),
-		submissions: visibleSubmissions.map((submission) => ({
-			id: submission.id,
-			userId: submission.user_id,
-			displayName: profileNames.get(submission.user_id) ?? 'Unknown player',
-			buildId: submission.build_id,
-			buildSlug: submission.build_slug_snapshot,
-			buildTitle: submission.build_title_snapshot,
-			vehicleId: submission.vehicle_id,
-			vehicleName: vehicleNames.get(submission.vehicle_id) ?? submission.vehicle_id,
-			visibility: submission.visibility,
-			submittedAt: submission.submitted_at,
-			isOwner: submission.user_id === viewerId,
-			isPubliclyVisible: releasedIds.has(submission.id),
-			canOpen: Boolean(submission.build_id)
-		}))
+		submissions: visibleSubmissions.map((submission) => {
+			const userTeamId = teamByUserId.get(submission.user_id);
+			const placement = userTeamId ? teamPlacements.get(userTeamId) : undefined;
+			return {
+				id: submission.id,
+				userId: submission.user_id,
+				displayName: profileNames.get(submission.user_id) ?? 'Unknown player',
+				buildId: submission.build_id,
+				buildSlug: submission.build_slug_snapshot,
+				buildTitle: submission.build_title_snapshot,
+				vehicleId: submission.vehicle_id,
+				vehicleName: vehicleNames.get(submission.vehicle_id) ?? submission.vehicle_id,
+				visibility: submission.visibility,
+				submittedAt: submission.submitted_at,
+				isOwner: submission.user_id === viewerId,
+				isPubliclyVisible: releasedIds.has(submission.id),
+				canOpen: Boolean(submission.build_id),
+				placement: placement && placement <= 4 ? placement : null
+			};
+		})
 	};
 }
 
