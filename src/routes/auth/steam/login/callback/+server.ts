@@ -362,6 +362,15 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(500, 'Failed to establish session');
 	}
 
+	// Check if this is a merge flow
+	const { verifyMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+	const mergeCookie = verifyMergeCookie(cookies.get(MERGE_COOKIE_NAME));
+	
+	if (mergeCookie && mergeCookie.phase === 'initiated') {
+		// Redirect to merge confirmation
+		throw redirect(303, '/auth/merge/confirm');
+	}
+
 	// Success - redirect to next or home (defense in depth: re-sanitize)
 	const redirectTarget = sanitizePostAuthRedirect(state.next);
 	throw redirect(303, redirectTarget);

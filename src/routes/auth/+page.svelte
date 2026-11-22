@@ -55,6 +55,9 @@
 	};
 
 	const displayError = form?.error || (urlError && errorMessages[urlError]);
+	
+	// Check if this is a merge flow
+	const isMergeFlow = $page.url.searchParams.get('merge') === '1';
 </script>
 
 <svelte:head>
@@ -83,6 +86,19 @@
 		</div>
 	{:else}
 		<div class="hud-panel p-8">
+			{#if isMergeFlow}
+				<div class="mb-6 rounded-sm bg-[var(--hud-teal)]/10 border border-[var(--hud-teal)] p-4">
+					<p class="text-sm font-semibold text-[var(--hud-teal)]">📋 Account Merge in Progress</p>
+					<p class="mt-2 text-xs text-[var(--hud-text)]">
+						Sign in with the account you want to <strong>merge into your primary account</strong>.
+						After signing in, you'll be prompted to confirm the merge.
+					</p>
+					<p class="mt-2 text-xs text-[var(--hud-muted)]">
+						The account you sign in with here will be permanently deleted after the merge.
+					</p>
+				</div>
+			{/if}
+			
 			<p class="hud-eyebrow tracking-[0.35em]">{headings[mode].eyebrow}</p>
 			<h1
 				class="mt-4 font-[var(--font-display)] text-4xl font-bold uppercase text-[var(--hud-text)]"
