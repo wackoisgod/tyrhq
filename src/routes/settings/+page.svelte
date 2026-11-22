@@ -1,15 +1,107 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { env } from '$env/dynamic/public';
+	import { getAuthCallbackUrl } from '$lib/site-url';
+	import { createBrowserClient } from '@supabase/ssr';
+	import { onMount } from 'svelte';
 	import SettingsNav from '$lib/components/settings/SettingsNav.svelte';
 	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
 
 	let { data, form } = $props();
 
 	let profileLoading = $state(false);
+	let supabase = $state<ReturnType<typeof createBrowserClient> | null>(null);
 
 	const profileError = $derived(form && 'profileError' in form ? form.profileError : null);
 	const profileSuccess = $derived(form && 'profileSuccess' in form ? form.profileSuccess : null);
+	
+	// Check for success messages
+	const urlSuccess = $page.url.searchParams.get('success');
+	const successMessages: Record<string, string> = {
+		google_linked: 'Google account linked successfully!'
+	};
+	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
+
+	onMount(() => {
+		if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+		supabase = createBrowserClient(env.PUBLIC_SUPABASE_URL, env.PUBLIC_SUPABASE_ANON_KEY, {
+			global: { fetch }
+		});
+	});
+
+	async function handleLinkGoogle() {
+		if (!supabase) return;
+		
+		try {
+			// Build callback URL with link marker to distinguish from normal sign-in
+			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
+			const callbackWithMarker = `${callbackUrl}&link=google`;
+			
+			const { data: linkData, error } = await supabase.auth.linkIdentity({
+				provider: 'google',
+				options: {
+					redirectTo: callbackWithMarker
+				}
+			});
+
+			if (error) {
+				console.error('[settings] Failed to link Google:', error);
+				
+				// Check for specific error types
+				if (error.message?.includes('Manual linking') || error.message?.includes('disabled')) {
+					goto('/settings?error=manual_linking_disabled');
+				} else if (error.message?.includes('already') || error.message?.includes('linked')) {
+					goto('/settings?error=identity_already_exists');
+				} else {
+					goto('/settings?error=link_failed');
+				}
+			}
+			// If successful, linkIdentity will redirect to Google OAuth
+		} catch (err) {
+			console.error('[settings] Exception linking Google:', err);
+			goto('/settings?error=link_failed');
+		}
+	}
+
+	async function handleUnlinkGoogle() {
+		if (!supabase) return;
+		
+		// Get current user to find Google identity
+		const { data: { user } } = await supabase.auth.getUser();
+		if (!user) return;
+
+		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
+		if (!googleIdentity) return;
+
+		const { error } = await supabase.auth.unlinkIdentity(googleIdentity);
+		
+		if (error) {
+			console.error('[settings] Failed to unlink Google:', error);
+			goto('/settings?error=unlink_failed');
+		} else {
+			await invalidateAll();
+		}
+	}
+
+	// Check for linking errors from URL params
+	const urlError = $page.url.searchParams.get('error');
+	const errorMessages: Record<string, string> = {
+		link_failed: 'Failed to link Google account. Please try again.',
+		identity_already_exists: 'This Google account is already linked to another user.',
+		manual_linking_disabled: 'Manual linking is not enabled. Contact your administrator.',
+		unlink_failed: 'Failed to unlink Google account. You must have at least one sign-in method.',
+		auth_callback_failed: 'Authentication failed. Please try again.'
+	};
+
+	const displayError = profileError || (urlError && errorMessages[urlError]);
+
+	// Check if user can unlink (must have at least 2 identities)
+	const canUnlinkGoogle = $derived(
+		data.linkedIdentities.length >= 2 && 
+		data.linkedIdentities.some((i) => i.provider === 'google')
+	);
 </script>
 
 <svelte:head>
@@ -47,19 +139,19 @@
 			</p>
 		{/if}
 
-		{#if profileError}
+		{#if displayError}
 			<div
 				class="mt-4 border-l-2 border-[var(--hud-warning,#ffd166)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[#ffd166]"
 			>
-				{profileError}
+				{displayError}
 			</div>
 		{/if}
 
-		{#if profileSuccess}
+		{#if displaySuccess}
 			<div
 				class="mt-4 border-l-2 border-[var(--hud-teal)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[var(--hud-teal)]"
 			>
-				{profileSuccess}
+				{displaySuccess}
 			</div>
 		{/if}
 
@@ -198,21 +290,34 @@
 									<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
 								{/if}
 							</div>
+							{#if canUnlinkGoogle}
+								<button 
+									type="button" 
+									class="hud-cta-outline px-3 py-2 text-xs"
+									onclick={handleUnlinkGoogle}
+								>
+									Unlink
+								</button>
+							{/if}
 						</div>
 					</div>
-					{:else}
-						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div>
-									<p class="text-sm font-semibold text-[var(--hud-muted)]">Google</p>
-									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked</p>
-								</div>
-								<button class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed" disabled title="Requires Manual Linking to be enabled in Supabase">
-									Link Google
-								</button>
+				{:else}
+					<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+						<div class="flex items-center justify-between gap-4">
+							<div>
+								<p class="text-sm font-semibold text-[var(--hud-muted)]">Google</p>
+								<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked</p>
 							</div>
+							<button 
+								type="button"
+								class="hud-cta-outline px-3 py-2 text-xs"
+								onclick={handleLinkGoogle}
+							>
+								Link Google
+							</button>
 						</div>
-					{/if}
+					</div>
+				{/if}
 
 					<!-- Steam -->
 					{#if data.profile?.verified_steam_id}
@@ -248,10 +353,6 @@
 							</div>
 						</div>
 					{/if}
-				</div>
-
-				<div class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] p-3 text-xs text-[var(--hud-dim)]">
-					<strong class="text-[var(--hud-muted)]">Note:</strong> To link Google to an existing account, Manual Linking must be enabled in Supabase Auth settings. Contact your administrator if the Link Google button is disabled.
 				</div>
 			</div>
 
