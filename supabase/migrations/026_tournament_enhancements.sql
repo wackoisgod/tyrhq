@@ -101,17 +101,28 @@ begin
     from public.tournament_roster_members
     where tournament_id = p_tournament_id and team_id = p_team_id;
 
-    if v_roster_count < v_tournament.team_size 
-       or v_roster_count > v_tournament.team_size + v_tournament.substitute_count then
-        raise exception 'Tournament roster size must match team_size + substitutes (got % for team_size %).',
-                        v_roster_count, v_tournament.team_size;
+    if not p_force and (
+        v_roster_count < v_tournament.team_size
+        or v_roster_count > v_tournament.team_size + v_tournament.substitute_count
+    ) then
+        raise exception 'Tournament roster size is invalid.';
     end if;
 
-    insert into public.tournament_registrations (tournament_id, team_id, registered_by, status)
-    values (p_tournament_id, p_team_id, p_registered_by, 'registered')
-    on conflict (tournament_id, team_id)
-    do update set status = 'registered', registered_at = now(), seed = null;
+    insert into public.tournament_registrations (
+        tournament_id, team_id, status, seed, registered_by
+    ) values (
+        p_tournament_id, p_team_id, 'registered', null, p_registered_by
+    )
+    on conflict (tournament_id, team_id) do update
+    set status = 'registered', seed = null, registered_by = excluded.registered_by;
+
+    insert into public.tournament_team_recruitment (tournament_id, team_id, is_recruiting)
+    values (p_tournament_id, p_team_id, false)
+    on conflict (tournament_id, team_id) do nothing;
 
     return v_roster_count;
 end;
 $$;
+
+revoke all on function public.register_tournament_team(uuid, uuid, uuid, boolean) from public;
+grant execute on function public.register_tournament_team(uuid, uuid, uuid, boolean) to service_role;
