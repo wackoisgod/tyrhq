@@ -911,3 +911,45 @@ export async function saveTournamentGameLineup(
 	);
 	if (error) throw new TournamentError('Could not save game loadout.', 500);
 }
+
+export async function deleteTournamentGameLineup(
+	input: z.infer<typeof lineupSchema>,
+	actorId: string,
+	role: string
+) {
+	const admin = requireAdminClient();
+	const { data: game } = await admin
+		.from('tournament_match_games')
+		.select('id, match_id')
+		.eq('id', input.gameId)
+		.maybeSingle<{ id: string; match_id: string }>();
+	if (!game) throw new TournamentError('Game not found.', 404);
+	const { data: match } = await admin
+		.from('tournament_matches')
+		.select('id, tournament_id')
+		.eq('id', game.match_id)
+		.maybeSingle<Pick<MatchRow, 'id' | 'tournament_id'>>();
+	if (!match) throw new TournamentError('Match not found.', 404);
+	await assertTournamentManager(match.tournament_id, actorId, role);
+	const { error } = await admin
+		.from('tournament_game_lineups')
+		.delete()
+		.eq('game_id', input.gameId)
+		.eq('user_id', input.userId);
+	if (error) throw new TournamentError('Could not delete lineup entry.', 500);
+}
+
+// NOTE: Replay upload auto-fill feature removed pending full netstream walker implementation
+// Porting the endgame stats extraction requires ~1000+ LOC of bit-packed netstream parsing
+// (ReplayData chunks, demo frames, packets, bunches, NetGUID exports, RPC capture)
+// plus the endgame stats decoder. This is deferred to a future enhancement.
+// 
+// Current migration 029 provides:
+// - Steam account verification (verified_steam_id on profiles)
+// - Replay GUID tracking (replay_guid on tournament_match_games for version/duplicate checks)
+//
+// Future enhancement would add:
+// - Full netstream walker
+// - Endgame stats extraction (kills/damage/assists/blocked per player)
+// - Winner determination from last-stand events
+// - tournament_game_replay_stats table for extracted player stats

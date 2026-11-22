@@ -104,5 +104,30 @@ export const actions: Actions = {
 		}
 
 		return { profileSuccess: 'Profile updated.' };
+	},
+
+	unlinkSteam: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Use admin client to bypass the Steam column protection trigger
+		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+		const supabaseAdmin = getSupabaseAdminClient();
+
+		const { error: updateError } = await supabaseAdmin
+			.from('profiles')
+			.update({
+				verified_steam_id: null,
+				steam_display_name: null,
+				steam_verified_at: null
+			})
+			.eq('id', user.id);
+
+		if (updateError) {
+			console.error('Error unlinking Steam:', updateError);
+			return fail(500, { profileError: 'Failed to unlink Steam account' });
+		}
+
+		return { profileSuccess: 'Steam account unlinked' };
 	}
 };

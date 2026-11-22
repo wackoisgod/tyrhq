@@ -156,6 +156,44 @@
 		</form>
 
 		{#if !data.isOnboarding}
+			<div class="mt-8 border-t border-[var(--hud-variant)] pt-6">
+				<h2 class="text-xl font-semibold text-[var(--hud-text)]">Steam Account</h2>
+				<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+					Link your Steam account to auto-match your profile when organizers upload replay files for tournament matches.
+				</p>
+
+				{#if data.profile?.verified_steam_id}
+					<div class="mt-4 rounded-sm bg-[var(--hud-inset)] p-4">
+						<div class="flex items-start justify-between gap-4">
+							<div>
+								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Steam Account Linked</p>
+								{#if data.profile.steam_display_name}
+									<p class="mt-1 text-sm text-[var(--hud-muted)]">Steam Name: <strong class="text-[var(--hud-text)]">{data.profile.steam_display_name}</strong></p>
+								{/if}
+								<p class="mt-1 text-xs text-[var(--hud-muted)]">SteamID64: {data.profile.verified_steam_id}</p>
+								{#if data.profile.steam_verified_at}
+									<p class="mt-1 text-xs text-[var(--hud-muted)]">
+										Verified {new Date(data.profile.steam_verified_at).toLocaleDateString()}
+									</p>
+								{/if}
+							</div>
+							<form method="POST" action="?/unlinkSteam">
+								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">Unlink</button>
+							</form>
+						</div>
+					</div>
+				{:else}
+					<div class="mt-4">
+						<a href="/auth/steam" class="hud-cta inline-block px-4 py-3 text-sm">
+							Sign in through Steam to Link Account
+						</a>
+						<p class="mt-2 text-xs text-[var(--hud-muted)]">
+							You'll be redirected to Steam to verify ownership. We only store your SteamID64 for player matching.
+						</p>
+					</div>
+				{/if}
+			</div>
+
 			<div class="mt-8 hud-panel-muted p-4">
 				<p class="hud-eyebrow tracking-[0.3em]">Session</p>
 				<p class="mt-3 text-sm leading-6 text-[var(--hud-muted)]">
