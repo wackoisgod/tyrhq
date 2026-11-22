@@ -118,6 +118,22 @@
 		return 'After completed match';
 	}
 
+	function placementLabel(placement: number | null) {
+		if (!placement) return null;
+		if (placement === 1) return '1st';
+		if (placement === 2) return '2nd';
+		if (placement === 3) return '3rd';
+		return '4th';
+	}
+
+	function placementColor(placement: number | null) {
+		if (!placement) return '';
+		if (placement === 1) return 'bg-[#FFD700] text-black';
+		if (placement === 2) return 'bg-[#C0C0C0] text-black';
+		if (placement === 3) return 'bg-[#CD7F32] text-white';
+		return 'bg-[#4A5568] text-white';
+	}
+
 	function initialSeedOrder() {
 		return data.tournament.registrations.flatMap((registration) =>
 			registration.team ? [{ team: registration.team, savedSeed: registration.seed }] : []
@@ -706,34 +722,41 @@
 						</div>
 					{/if}
 
-					<div class="mt-6 grid gap-3 md:grid-cols-2">
-						{#each data.buildContext.submissions as submission}
-							<article class="hud-panel p-5">
-								<div class="flex items-start justify-between gap-3">
-									<div class="min-w-0">
+				<div class="mt-6 grid gap-3 md:grid-cols-2">
+					{#each data.buildContext.submissions as submission}
+						<article class="hud-panel p-5">
+							<div class="flex items-start justify-between gap-3">
+								<div class="min-w-0">
+									<div class="flex items-center gap-2">
 										<a href="/players/{submission.userId}" class="hud-eyebrow hover:text-[var(--hud-teal)]">{submission.displayName}</a>
-										<h3 class="mt-2 truncate text-lg font-semibold text-[var(--hud-text)]">{submission.buildTitle}</h3>
-										<p class="mt-1 text-sm text-[var(--hud-muted)]">{submission.vehicleName}</p>
+										{#if submission.placement}
+											<span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-bold {placementColor(submission.placement)}">
+												{placementLabel(submission.placement)}
+											</span>
+										{/if}
 									</div>
-									<span class="tournament-pill">{visibilityLabel(submission.visibility)}</span>
+									<h3 class="mt-2 truncate text-lg font-semibold text-[var(--hud-text)]">{submission.buildTitle}</h3>
+									<p class="mt-1 text-sm text-[var(--hud-muted)]">{submission.vehicleName}</p>
 								</div>
-								<div class="mt-4 flex flex-wrap gap-2">
-									{#if submission.canOpen && (submission.isPubliclyVisible || submission.isOwner || data.tournament.canManage)}
-										<a href="/builds/{submission.buildSlug}" class="hud-cta-outline px-3 py-2 text-xs">View Build</a>
-									{/if}
-									{#if submission.isOwner}
-										<form method="POST" action="?/removeBuild">
-											<input type="hidden" name="tournamentId" value={data.tournament.id} />
-											<input type="hidden" name="submissionId" value={submission.id} />
-											<button class="hud-cta-outline px-3 py-2 text-xs">Remove</button>
-										</form>
-									{/if}
-								</div>
-							</article>
-						{:else}
-							<div class="hud-panel p-6 text-sm text-[var(--hud-muted)] md:col-span-2">No tournament builds are visible yet.</div>
-						{/each}
-					</div>
+								<span class="tournament-pill">{visibilityLabel(submission.visibility)}</span>
+							</div>
+							<div class="mt-4 flex flex-wrap gap-2">
+								{#if submission.canOpen && (submission.isPubliclyVisible || submission.isOwner || data.tournament.canManage)}
+									<a href="/builds/{submission.buildSlug}" class="hud-cta-outline px-3 py-2 text-xs">View Build</a>
+								{/if}
+								{#if submission.isOwner}
+									<form method="POST" action="?/removeBuild">
+										<input type="hidden" name="tournamentId" value={data.tournament.id} />
+										<input type="hidden" name="submissionId" value={submission.id} />
+										<button class="hud-cta-outline px-3 py-2 text-xs">Remove</button>
+									</form>
+								{/if}
+							</div>
+						</article>
+					{:else}
+						<div class="hud-panel p-6 text-sm text-[var(--hud-muted)] md:col-span-2">No tournament builds are visible yet.</div>
+					{/each}
+				</div>
 				</section>
 			{/if}
 
