@@ -10,6 +10,20 @@
 			: data.detail.games.map((game) => game.gameNumber)
 	);
 
+	let gameFormData = $state(
+		gameNumbers.map((gameNumber) => {
+			const game = data.detail.games.find((g) => g.gameNumber === gameNumber);
+			return {
+				gameNumber,
+				mapId: game?.mapId ?? '',
+				pickedByTeamId: game?.pickedByTeamId ?? (data.detail.match.teamA?.id ?? ''),
+				winnerTeamId: game?.winnerTeamId ?? '',
+				vodUrl: game?.vodUrl ?? '',
+				notes: game?.notes ?? ''
+			};
+		})
+	);
+
 	function formatDate(iso: string | null) {
 		if (!iso) return '';
 		return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -162,120 +176,201 @@
 		{/if}
 	</div>
 
-	<div class="mt-4 grid gap-5">
-		{#each gameNumbers as gameNumber}
-			{@const game = gameFor(gameNumber)}
-			{@const map = game ? mapsById.get(game.mapId) : null}
-			<article class="game-card">
-				<div class="game-card__summary">
-					{#if map}
-						<img src="/images/maps/lobby/{map.id}.png" alt="" class="game-card__map" />
-					{/if}
-					<div class="game-card__scrim"></div>
-					<div class="game-card__content">
-						<p class="hud-eyebrow">Game {gameNumber}</p>
-						<h3 class="mt-2 text-2xl font-semibold text-[var(--hud-text)]">{map?.name ?? 'Not recorded'}</h3>
-						{#if game}
-							<p class="mt-2 text-sm text-[var(--hud-muted)]">Picked by <strong class="text-[var(--hud-text)]">{teamName(game.pickedByTeamId)}</strong></p>
-							<p class="mt-1 text-sm text-[var(--hud-muted)]">Winner <strong class="text-[var(--hud-teal)]">{teamName(game.winnerTeamId)}</strong></p>
-							<div class="mt-3 flex flex-wrap gap-2">
-								{#if map}<a href="/maps/{map.slug}" class="hud-cta-outline px-3 py-2 text-xs">View Map</a>{/if}
-								{#if game.vodUrl}<a href={game.vodUrl} target="_blank" rel="noreferrer" class="hud-cta-outline px-3 py-2 text-xs">Watch Game</a>{/if}
-							</div>
-							{#if game.notes}<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--hud-muted)]">{game.notes}</p>{/if}
-						{:else}
-							<p class="mt-2 text-sm text-[var(--hud-muted)]">The organizer has not entered this game.</p>
-						{/if}
-					</div>
-				</div>
-
-				{#if data.detail.canManage && data.detail.match.teamA && data.detail.match.teamB}
-					<form method="POST" action="?/game" class="grid gap-3 border-t border-[var(--hud-variant)] p-4 md:grid-cols-2 xl:grid-cols-4">
-						<input type="hidden" name="matchId" value={data.detail.match.id} />
-						<input type="hidden" name="gameNumber" value={gameNumber} />
-						<label class="grid gap-1.5">
-							<span class="hud-label">Map</span>
-							<select name="mapId" class="hud-input px-3 py-2" required value={game?.mapId ?? ''}>
-								<option value="" disabled>Select map</option>
-								{#each data.detail.maps as option}<option value={option.id}>{option.name}</option>{/each}
-							</select>
-						</label>
-						<label class="grid gap-1.5">
-							<span class="hud-label">Picked by</span>
-							<select name="pickedByTeamId" class="hud-input px-3 py-2" value={game?.pickedByTeamId ?? data.detail.match.teamA.id}>
-								<option value={data.detail.match.teamA.id}>{data.detail.match.teamA.name}</option>
-								<option value={data.detail.match.teamB.id}>{data.detail.match.teamB.name}</option>
-							</select>
-						</label>
-						<label class="grid gap-1.5">
-							<span class="hud-label">Winner</span>
-							<select name="winnerTeamId" class="hud-input px-3 py-2" value={game?.winnerTeamId ?? ''}>
-								<option value="">Not decided</option>
-								<option value={data.detail.match.teamA.id}>{data.detail.match.teamA.name}</option>
-								<option value={data.detail.match.teamB.id}>{data.detail.match.teamB.name}</option>
-							</select>
-						</label>
-						<label class="grid gap-1.5">
-							<span class="hud-label">Game VOD</span>
-							<input name="vodUrl" type="url" maxlength="500" value={game?.vodUrl ?? ''} class="hud-input px-3 py-2" />
-						</label>
-						<label class="grid gap-1.5 md:col-span-2 xl:col-span-3">
-							<span class="hud-label">Game notes</span>
-							<input name="notes" maxlength="500" value={game?.notes ?? ''} class="hud-input px-3 py-2" />
-						</label>
-						<button class="hud-cta self-end px-4 py-3">Save Game</button>
-					</form>
-				{/if}
-
-				{#if game}
-					<details class="border-t border-[var(--hud-variant)] p-4">
-						<summary class="cursor-pointer text-sm font-semibold uppercase tracking-[0.14em] text-[var(--hud-text)]">Vehicles &amp; Builds</summary>
-						<div class="mt-4 grid gap-5 xl:grid-cols-2">
-							{#each data.detail.rosters as roster}
-								<section>
-									<h4 class="font-semibold uppercase text-[var(--hud-text)]">{roster.teamName}</h4>
-									<div class="mt-3 grid gap-2">
-										{#each roster.members as member}
-											{@const lineup = lineupFor(game.id, member.userId)}
-											{@const build = buildFor(lineup?.buildSubmissionId ?? null)}
-											{#if lineup || canEditPlayer(member.userId)}
-												<div class="rounded-sm bg-[var(--hud-inset)] p-3">
-													<div class="flex flex-wrap items-center justify-between gap-2">
-														<a href="/players/{member.userId}" class="font-semibold text-[var(--hud-text)] hover:text-[var(--hud-teal)]">{member.displayName}</a>
-														{#if lineup}<span class="text-xs text-[var(--hud-muted)]">{vehiclesById.get(lineup.vehicleId)?.name ?? lineup.vehicleId}</span>{/if}
-													</div>
-													{#if build && build.canOpen}
-														<a href="/builds/{build.buildSlug}" class="mt-2 inline-block text-xs font-semibold text-[var(--hud-teal)]">{build.buildTitle} →</a>
-													{/if}
-													{#if canEditPlayer(member.userId)}
-														<form method="POST" action="?/lineup" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-															<input type="hidden" name="gameId" value={game.id} />
-															<input type="hidden" name="userId" value={member.userId} />
-															<select name="vehicleId" aria-label="Vehicle for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.vehicleId ?? ''}>
-																<option value="">Not recorded</option>
-																{#each data.detail.vehicles as vehicle}<option value={vehicle.id}>{vehicle.name}</option>{/each}
-															</select>
-															<select name="buildSubmissionId" aria-label="Build for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.buildSubmissionId ?? ''}>
-																<option value="">No build</option>
-																{#each submittedBuildsFor(member.userId) as option}<option value={option.id}>{option.buildTitle} · {option.vehicleName}</option>{/each}
-															</select>
-															<button class="hud-cta-outline px-3 py-1 text-xs">Save</button>
-														</form>
-													{/if}
-												</div>
-											{/if}
-										{/each}
+	{#if data.detail.canManage && data.detail.match.teamA && data.detail.match.teamB}
+		<div class="mt-4">
+			<form method="POST" action="?/batchGames" id="batch-games-form">
+				<input type="hidden" name="matchId" value={data.detail.match.id} />
+				<input type="hidden" name="games" value={JSON.stringify(gameFormData)} />
+			</form>
+			<div class="grid gap-5">
+				{#each gameNumbers as gameNumber, index}
+					{@const game = gameFor(gameNumber)}
+					{@const map = game ? mapsById.get(game.mapId) : gameFormData[index]?.mapId ? mapsById.get(gameFormData[index].mapId) : null}
+					<article class="game-card">
+						<div class="game-card__summary">
+							{#if map}
+								<img src="/images/maps/lobby/{map.id}.png" alt="" class="game-card__map" />
+							{/if}
+							<div class="game-card__scrim"></div>
+							<div class="game-card__content">
+								<p class="hud-eyebrow">Game {gameNumber}</p>
+								<h3 class="mt-2 text-2xl font-semibold text-[var(--hud-text)]">{map?.name ?? 'Not recorded'}</h3>
+								{#if game}
+									<p class="mt-2 text-sm text-[var(--hud-muted)]">Picked by <strong class="text-[var(--hud-text)]">{teamName(game.pickedByTeamId)}</strong></p>
+									<p class="mt-1 text-sm text-[var(--hud-muted)]">Winner <strong class="text-[var(--hud-teal)]">{teamName(game.winnerTeamId)}</strong></p>
+									<div class="mt-3 flex flex-wrap gap-2">
+										{#if map}<a href="/maps/{map.slug}" class="hud-cta-outline px-3 py-2 text-xs">View Map</a>{/if}
+										{#if game.vodUrl}<a href={game.vodUrl} target="_blank" rel="noreferrer" class="hud-cta-outline px-3 py-2 text-xs">Watch Game</a>{/if}
 									</div>
-								</section>
-							{/each}
+									{#if game.notes}<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--hud-muted)]">{game.notes}</p>{/if}
+								{:else}
+									<p class="mt-2 text-sm text-[var(--hud-muted)]">The organizer has not entered this game.</p>
+								{/if}
+							</div>
 						</div>
-					</details>
-				{/if}
-			</article>
-		{:else}
-			<div class="hud-panel p-6 text-sm text-[var(--hud-muted)]">No game details have been recorded yet.</div>
-		{/each}
-	</div>
+
+						<div class="grid gap-3 border-t border-[var(--hud-variant)] p-4 md:grid-cols-2 xl:grid-cols-4">
+							<label class="grid gap-1.5">
+								<span class="hud-label">Map</span>
+								<select bind:value={gameFormData[index].mapId} class="hud-input px-3 py-2" form="batch-games-form">
+									<option value="">Select map</option>
+									{#each data.detail.maps as option}<option value={option.id}>{option.name}</option>{/each}
+								</select>
+							</label>
+							<label class="grid gap-1.5">
+								<span class="hud-label">Picked by</span>
+								<select bind:value={gameFormData[index].pickedByTeamId} class="hud-input px-3 py-2" form="batch-games-form">
+									<option value={data.detail.match.teamA.id}>{data.detail.match.teamA.name}</option>
+									<option value={data.detail.match.teamB.id}>{data.detail.match.teamB.name}</option>
+								</select>
+							</label>
+							<label class="grid gap-1.5">
+								<span class="hud-label">Winner</span>
+								<select bind:value={gameFormData[index].winnerTeamId} class="hud-input px-3 py-2" form="batch-games-form">
+									<option value="">Not decided</option>
+									<option value={data.detail.match.teamA.id}>{data.detail.match.teamA.name}</option>
+									<option value={data.detail.match.teamB.id}>{data.detail.match.teamB.name}</option>
+								</select>
+							</label>
+							<label class="grid gap-1.5">
+								<span class="hud-label">Game VOD</span>
+								<input bind:value={gameFormData[index].vodUrl} type="url" maxlength="500" class="hud-input px-3 py-2" form="batch-games-form" />
+							</label>
+							<label class="grid gap-1.5 md:col-span-2 xl:col-span-4">
+								<span class="hud-label">Game notes</span>
+								<input bind:value={gameFormData[index].notes} maxlength="500" class="hud-input px-3 py-2" form="batch-games-form" />
+							</label>
+						</div>
+
+						{#if game}
+							<details class="border-t border-[var(--hud-variant)] p-4">
+								<summary class="cursor-pointer text-sm font-semibold uppercase tracking-[0.14em] text-[var(--hud-text)]">Vehicles &amp; Builds</summary>
+								<div class="mt-4 grid gap-5 xl:grid-cols-2">
+									{#each data.detail.rosters as roster}
+										<section>
+											<h4 class="font-semibold uppercase text-[var(--hud-text)]">{roster.teamName}</h4>
+											<div class="mt-3 grid gap-2">
+												{#each roster.members as member}
+													{@const lineup = lineupFor(game.id, member.userId)}
+													{@const build = buildFor(lineup?.buildSubmissionId ?? null)}
+													{#if lineup || canEditPlayer(member.userId)}
+														<div class="rounded-sm bg-[var(--hud-inset)] p-3">
+															<div class="flex flex-wrap items-center justify-between gap-2">
+																<a href="/players/{member.userId}" class="font-semibold text-[var(--hud-text)] hover:text-[var(--hud-teal)]">{member.displayName}</a>
+																{#if lineup}<span class="text-xs text-[var(--hud-muted)]">{vehiclesById.get(lineup.vehicleId)?.name ?? lineup.vehicleId}</span>{/if}
+															</div>
+															{#if build && build.canOpen}
+																<a href="/builds/{build.buildSlug}" class="mt-2 inline-block text-xs font-semibold text-[var(--hud-teal)]">{build.buildTitle} →</a>
+															{/if}
+															{#if canEditPlayer(member.userId)}
+																<form method="POST" action="?/lineup" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+																	<input type="hidden" name="gameId" value={game.id} />
+																	<input type="hidden" name="userId" value={member.userId} />
+																	<select name="vehicleId" aria-label="Vehicle for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.vehicleId ?? ''}>
+																		<option value="">Not recorded</option>
+																		{#each data.detail.vehicles as vehicle}<option value={vehicle.id}>{vehicle.name}</option>{/each}
+																	</select>
+																	<select name="buildSubmissionId" aria-label="Build for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.buildSubmissionId ?? ''}>
+																		<option value="">No build</option>
+																		{#each submittedBuildsFor(member.userId) as option}<option value={option.id}>{option.buildTitle} · {option.vehicleName}</option>{/each}
+																	</select>
+																	<button class="hud-cta-outline px-3 py-1 text-xs">Save</button>
+																</form>
+															{/if}
+														</div>
+													{/if}
+												{/each}
+											</div>
+										</section>
+									{/each}
+								</div>
+							</details>
+						{/if}
+					</article>
+				{/each}
+			</div>
+			<div class="mt-6 flex justify-center">
+				<button form="batch-games-form" class="hud-cta px-6 py-3 text-base">Save All Games</button>
+			</div>
+		</div>
+	{:else}
+		<div class="mt-4 grid gap-5">
+			{#each gameNumbers as gameNumber}
+				{@const game = gameFor(gameNumber)}
+				{@const map = game ? mapsById.get(game.mapId) : null}
+				<article class="game-card">
+					<div class="game-card__summary">
+						{#if map}
+							<img src="/images/maps/lobby/{map.id}.png" alt="" class="game-card__map" />
+						{/if}
+						<div class="game-card__scrim"></div>
+						<div class="game-card__content">
+							<p class="hud-eyebrow">Game {gameNumber}</p>
+							<h3 class="mt-2 text-2xl font-semibold text-[var(--hud-text)]">{map?.name ?? 'Not recorded'}</h3>
+							{#if game}
+								<p class="mt-2 text-sm text-[var(--hud-muted)]">Picked by <strong class="text-[var(--hud-text)]">{teamName(game.pickedByTeamId)}</strong></p>
+								<p class="mt-1 text-sm text-[var(--hud-muted)]">Winner <strong class="text-[var(--hud-teal)]">{teamName(game.winnerTeamId)}</strong></p>
+								<div class="mt-3 flex flex-wrap gap-2">
+									{#if map}<a href="/maps/{map.slug}" class="hud-cta-outline px-3 py-2 text-xs">View Map</a>{/if}
+									{#if game.vodUrl}<a href={game.vodUrl} target="_blank" rel="noreferrer" class="hud-cta-outline px-3 py-2 text-xs">Watch Game</a>{/if}
+								</div>
+								{#if game.notes}<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--hud-muted)]">{game.notes}</p>{/if}
+							{:else}
+								<p class="mt-2 text-sm text-[var(--hud-muted)]">The organizer has not entered this game.</p>
+							{/if}
+						</div>
+					</div>
+
+					{#if game}
+						<details class="border-t border-[var(--hud-variant)] p-4">
+							<summary class="cursor-pointer text-sm font-semibold uppercase tracking-[0.14em] text-[var(--hud-text)]">Vehicles &amp; Builds</summary>
+							<div class="mt-4 grid gap-5 xl:grid-cols-2">
+								{#each data.detail.rosters as roster}
+									<section>
+										<h4 class="font-semibold uppercase text-[var(--hud-text)]">{roster.teamName}</h4>
+										<div class="mt-3 grid gap-2">
+											{#each roster.members as member}
+												{@const lineup = lineupFor(game.id, member.userId)}
+												{@const build = buildFor(lineup?.buildSubmissionId ?? null)}
+												{#if lineup || canEditPlayer(member.userId)}
+													<div class="rounded-sm bg-[var(--hud-inset)] p-3">
+														<div class="flex flex-wrap items-center justify-between gap-2">
+															<a href="/players/{member.userId}" class="font-semibold text-[var(--hud-text)] hover:text-[var(--hud-teal)]">{member.displayName}</a>
+															{#if lineup}<span class="text-xs text-[var(--hud-muted)]">{vehiclesById.get(lineup.vehicleId)?.name ?? lineup.vehicleId}</span>{/if}
+														</div>
+														{#if build && build.canOpen}
+															<a href="/builds/{build.buildSlug}" class="mt-2 inline-block text-xs font-semibold text-[var(--hud-teal)]">{build.buildTitle} →</a>
+														{/if}
+														{#if canEditPlayer(member.userId)}
+															<form method="POST" action="?/lineup" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+																<input type="hidden" name="gameId" value={game.id} />
+																<input type="hidden" name="userId" value={member.userId} />
+																<select name="vehicleId" aria-label="Vehicle for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.vehicleId ?? ''}>
+																	<option value="">Not recorded</option>
+																	{#each data.detail.vehicles as vehicle}<option value={vehicle.id}>{vehicle.name}</option>{/each}
+																</select>
+																<select name="buildSubmissionId" aria-label="Build for {member.displayName}" class="hud-input px-2 py-1 text-xs" value={lineup?.buildSubmissionId ?? ''}>
+																	<option value="">No build</option>
+																	{#each submittedBuildsFor(member.userId) as option}<option value={option.id}>{option.buildTitle} · {option.vehicleName}</option>{/each}
+																</select>
+																<button class="hud-cta-outline px-3 py-1 text-xs">Save</button>
+															</form>
+														{/if}
+													</div>
+												{/if}
+											{/each}
+										</div>
+									</section>
+								{/each}
+							</div>
+						</details>
+					{/if}
+				</article>
+			{:else}
+				<div class="hud-panel p-6 text-sm text-[var(--hud-muted)]">No game details have been recorded yet.</div>
+			{/each}
+		</div>
+	{/if}
 </section>
 
 <style>
