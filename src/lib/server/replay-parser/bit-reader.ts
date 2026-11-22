@@ -85,22 +85,39 @@ export class BitReader {
 	}
 
 	readBitsBytes(n: number): Uint8Array {
-		const byteCount = (n + 7) >> 3;
-		const bytes = new Uint8Array(byteCount);
+		if (n === 0) return new Uint8Array(0);
 		
-		// Read in chunks to handle n > 32
-		let bitsRead = 0;
-		let byteIndex = 0;
-		while (bitsRead < n) {
-			const chunkSize = Math.min(32, n - bitsRead);
-			const val = this.readBitsInt(chunkSize);
-			
-			// Store bytes little-endian
-			for (let i = 0; i < Math.ceil(chunkSize / 8) && byteIndex < bytes.length; i++) {
-				bytes[byteIndex++] = (val >> (i * 8)) & 0xff;
-			}
-			bitsRead += chunkSize;
+		const byteCount = (n + 7) >> 3;
+		
+		// Python approach: read_bits_int(n) then convert to bytes
+		// But readBitsInt only handles up to 32 bits, so we need to read the raw bytes directly
+		const start = this.pos;
+		this.pos += n;
+		
+		const sb = start >> 3; // start byte
+		const off = start & 7; // bit offset within start byte
+		const eb = (start + n + 7) >> 3; // end byte (ceil)
+		
+		// Extract bytes sb:eb
+		const sourceBytes = this.data.slice(sb, eb);
+		
+		// Read as little-endian int (using BigInt to handle > 32 bits), shift right by offset, mask to n bits
+		let val = 0n;
+		for (let i = 0; i < sourceBytes.length; i++) {
+			val |= BigInt(sourceBytes[i]) << BigInt(i * 8);
 		}
+		val = val >> BigInt(off);
+		
+		// Mask to n bits
+		const mask = (1n << BigInt(n)) - 1n;
+		val = val & mask;
+		
+		// Convert to bytes (little-endian)
+		const bytes = new Uint8Array(byteCount);
+		for (let i = 0; i < byteCount; i++) {
+			bytes[i] = Number((val >> BigInt(i * 8)) & 0xffn);
+		}
+		
 		return bytes;
 	}
 

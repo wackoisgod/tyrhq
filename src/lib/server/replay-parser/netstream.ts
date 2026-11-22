@@ -556,11 +556,8 @@ function extractPlayerProperty(
 		return;
 	}
 	
-	if (state.playerIdentity.size <= 3) {
-		console.log(`      Using group for ${ch.class}, ${group.fields.size} fields`);
-		// Show first 16 bytes of payload
-		const hexDump = Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-		console.log(`      Payload hex: ${hexDump}`);
+	if (state.bunchCount <= 50) {
+		console.log(`      Using group for ${ch.class}, ${group.fields.size} fields, ch=${ch.chIndex}`);
 	}
 	
 	const bits = new BitReader(payload, numBits);
@@ -1080,9 +1077,17 @@ export function walkNetstream(
 	}
 	console.log(`Total channels with archetype=107: ${archetype107Count}`);
 	
+	// Show player identity records
+	console.log(`\nPlayer identities:`);
+	for (const [chIdx, identity] of state.playerIdentity) {
+		if (identity.name || identity.steamId) {
+			console.log(`  Channel ${chIdx}: name=${identity.name || 'NO_NAME'}, steamId=${identity.steamId || 'NO_STEAMID'}, teamId=${identity.teamId}, class=${identity.class}`);
+		}
+	}
+	
 	// Show GUID 107
 	const guid107 = state.guidMap.get(107);
-	console.log(`GUID 107: ${guid107 ? guid107.pathName : 'NOT FOUND'}`);
+	console.log(`\nGUID 107: ${guid107 ? guid107.pathName : 'NOT FOUND'}`);
 	
 	return state;
 }
