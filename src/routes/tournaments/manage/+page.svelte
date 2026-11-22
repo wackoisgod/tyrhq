@@ -13,6 +13,10 @@
 		return Number.isFinite(time) ? new Date(time).toISOString() : '';
 	}
 
+	function getUserTimeZone() {
+		return Intl.DateTimeFormat().resolvedOptions().timeZone;
+	}
+
 </script>
 
 <svelte:head>
@@ -61,12 +65,12 @@
 
 				<div class="grid gap-3 sm:grid-cols-2">
 					<label class="flex flex-col gap-1.5">
-						<span class="hud-label">Start Time</span>
+						<span class="hud-label">Start Time ({getUserTimeZone()})</span>
 						<input type="hidden" name="startsAt" value={isoFromLocal(startsAtLocal)} />
 						<input bind:value={startsAtLocal} type="datetime-local" required class="hud-input px-3 py-2" />
 					</label>
 					<label class="flex flex-col gap-1.5">
-						<span class="hud-label">Registration Closes</span>
+						<span class="hud-label">Registration Closes ({getUserTimeZone()})</span>
 						<input type="hidden" name="registrationClosesAt" value={isoFromLocal(registrationClosesAtLocal)} />
 						<input bind:value={registrationClosesAtLocal} type="datetime-local" class="hud-input px-3 py-2" />
 					</label>
@@ -91,13 +95,27 @@
 				</div>
 
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Rules URL</span>
-					<input name="rulesUrl" type="url" maxlength="500" class="hud-input px-3 py-2" />
+					<span class="hud-label">Max Teams</span>
+					<input name="maxTeams" type="number" min="2" max="256" value="16" class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">Maximum number of teams allowed to register (2-256)</span>
 				</label>
 
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Discord URL</span>
-					<input name="discordUrl" type="url" maxlength="500" class="hud-input px-3 py-2" />
+					<span class="hud-label">Prize Info (Optional)</span>
+					<textarea name="prizeInfo" maxlength="500" rows="2" class="hud-input px-3 py-2" placeholder="e.g., $1000 prize pool, or 'Prize tournament'"></textarea>
+					<span class="text-xs text-[var(--hud-muted)]">Prize pool description or note shown on the overview</span>
+				</label>
+
+				<label class="flex flex-col gap-1.5">
+					<span class="hud-label">Rules URL (Optional)</span>
+					<input name="rulesUrl" type="url" maxlength="500" class="hud-input px-3 py-2" placeholder="https://..." />
+					<span class="text-xs text-[var(--hud-muted)]">Must be a valid HTTPS URL (Google Docs, etc.)</span>
+				</label>
+
+				<label class="flex flex-col gap-1.5">
+					<span class="hud-label">Discord URL (Optional)</span>
+					<input name="discordUrl" type="url" maxlength="500" class="hud-input px-3 py-2" placeholder="https://discord.gg/code" />
+					<span class="text-xs text-[var(--hud-muted)]">Discord invite link (discord.gg/code or discord.com/invite/code)</span>
 				</label>
 
 				<button class="hud-cta px-5 py-3">Create Tournament</button>

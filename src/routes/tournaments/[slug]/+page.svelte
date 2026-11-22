@@ -98,7 +98,7 @@
 	}
 
 	function formatDate(iso: string) {
-		return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+		return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short' });
 	}
 
 	function getTeamColor(teamId: string) {
@@ -133,6 +133,10 @@
 		if (!value) return '';
 		const time = new Date(value).getTime();
 		return Number.isFinite(time) ? new Date(time).toISOString() : '';
+	}
+
+	function getUserTimeZone() {
+		return Intl.DateTimeFormat().resolvedOptions().timeZone;
 	}
 
 	function visibilityLabel(visibility: string) {
@@ -327,6 +331,9 @@
 				<div class="mt-3 flex flex-wrap gap-2">
 					<span class="tournament-pill">{matchStatusLabel(data.tournament.status)}</span>
 					<span class="tournament-pill">Team Size {teamSizeLabel()}</span>
+					{#if data.tournament.prizeInfo}
+						<span class="tournament-pill bg-[var(--hud-teal)] text-[var(--hud-bg)]">🏆 {data.tournament.prizeInfo}</span>
+					{/if}
 				</div>
 				<div class="mt-5 flex flex-wrap gap-2">
 					{#if data.tournament.rulesUrl}
@@ -420,12 +427,12 @@
 					<textarea name="summary" maxlength="500" rows="3" class="hud-input px-3 py-2">{data.tournament.summary ?? ''}</textarea>
 				</label>
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Start Time</span>
+					<span class="hud-label">Start Time ({getUserTimeZone()})</span>
 					<input type="hidden" name="startsAt" value={isoFromLocal(startsAtLocal)} />
 					<input bind:value={startsAtLocal} type="datetime-local" required class="hud-input px-3 py-2" />
 				</label>
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Registration Closes</span>
+					<span class="hud-label">Registration Closes ({getUserTimeZone()})</span>
 					<input type="hidden" name="registrationClosesAt" value={isoFromLocal(registrationClosesAtLocal)} />
 					<input bind:value={registrationClosesAtLocal} type="datetime-local" class="hud-input px-3 py-2" />
 				</label>
@@ -457,12 +464,24 @@
 					</label>
 				</div>
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Rules URL</span>
-					<input name="rulesUrl" type="url" maxlength="500" value={data.tournament.rulesUrl ?? ''} class="hud-input px-3 py-2" />
+					<span class="hud-label">Max Teams</span>
+					<input name="maxTeams" type="number" min="2" max="256" value={data.tournament.maxTeams} class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">Maximum number of teams allowed to register (2-256)</span>
+				</label>
+				<label class="flex flex-col gap-1.5 lg:col-span-2">
+					<span class="hud-label">Prize Info (Optional)</span>
+					<textarea name="prizeInfo" maxlength="500" rows="2" class="hud-input px-3 py-2">{data.tournament.prizeInfo ?? ''}</textarea>
+					<span class="text-xs text-[var(--hud-muted)]">Prize pool description or note shown on the overview</span>
 				</label>
 				<label class="flex flex-col gap-1.5">
-					<span class="hud-label">Discord URL</span>
+					<span class="hud-label">Rules URL (Optional)</span>
+					<input name="rulesUrl" type="url" maxlength="500" value={data.tournament.rulesUrl ?? ''} class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">Must be a valid HTTPS URL</span>
+				</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="hud-label">Discord URL (Optional)</span>
 					<input name="discordUrl" type="url" maxlength="500" value={data.tournament.discordUrl ?? ''} class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">Discord invite link (discord.gg/code or discord.com/invite/code)</span>
 				</label>
 				<div class="flex flex-wrap gap-3 lg:col-span-2">
 					<button class="hud-cta px-4 py-3">Save Tournament</button>
@@ -473,6 +492,10 @@
 				<label class="flex flex-col gap-1.5">
 					<span class="hud-label">Tournament Logo</span>
 					<input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">
+						Recommended: Square aspect ratio (1:1), max 2000x2000px, max 10MB. 
+						Formats: PNG, JPEG, WebP, GIF.
+					</span>
 				</label>
 				<button class="hud-cta-outline px-4 py-2 text-xs">Upload Logo</button>
 			</form>

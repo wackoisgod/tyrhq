@@ -61,6 +61,7 @@ export const actions: Actions = {
 		const parsed = matchSettingsSchema.safeParse({
 			matchId: String(form.get('matchId') ?? ''),
 			bestOf: Number(form.get('bestOf') ?? 5),
+			targetScore: form.get('targetScore') ? Number(form.get('targetScore')) : '',
 			scheduledAt: datetimeLocalToIso(form.get('scheduledAt')),
 			streamUrl: String(form.get('streamUrl') ?? ''),
 			notes: String(form.get('notes') ?? '')

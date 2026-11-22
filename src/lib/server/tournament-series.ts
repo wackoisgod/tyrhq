@@ -21,6 +21,7 @@ export const matchSettingsSchema = z
 	.object({
 		matchId: z.string().uuid(),
 		bestOf: z.number().int().min(1).max(15).refine((value) => value % 2 === 1, 'Best-of must be an odd number'),
+		targetScore: z.number().int().min(1).max(100).optional().or(z.literal('').transform(() => undefined)),
 		scheduledAt: z.string().datetime({ offset: true }).optional().or(z.literal('')),
 		streamUrl: optionalUrlSchema,
 		notes: z.string().trim().max(NOTES_MAX).optional()
@@ -80,6 +81,7 @@ interface MatchRow {
 	status: 'pending' | 'completed';
 	completed_at: string | null;
 	best_of: number;
+	target_score: number | null;
 	scheduled_at: string | null;
 	stream_url: string | null;
 	notes: string | null;
@@ -519,6 +521,7 @@ export async function getTournamentMatchDetail(
 			status: match.status,
 			completedAt: match.completed_at,
 			bestOf: match.best_of,
+			targetScore: match.target_score,
 			scheduledAt: match.scheduled_at,
 			streamUrl: match.stream_url,
 			notes: match.notes,
@@ -603,6 +606,7 @@ export async function updateTournamentMatchSettings(
 		.from('tournament_matches')
 		.update({
 			best_of: input.bestOf,
+			target_score: input.targetScore || null,
 			scheduled_at: input.scheduledAt || null,
 			stream_url: input.streamUrl || null,
 			notes: input.notes || null

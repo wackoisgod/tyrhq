@@ -68,6 +68,9 @@
 			</h1>
 			<div class="mt-4 flex flex-wrap gap-2">
 				<span class="series-pill">Best of {data.detail.match.bestOf}</span>
+				{#if data.detail.match.targetScore}
+					<span class="series-pill">First to {data.detail.match.targetScore}</span>
+				{/if}
 				<span class="series-pill">{data.detail.match.status}</span>
 				{#if data.detail.match.scheduledAt}<span class="series-pill">{formatDate(data.detail.match.scheduledAt)}</span>{/if}
 			</div>
@@ -113,6 +116,11 @@
 						<option value="7">Best of 7</option>
 						<option value="9">Best of 9</option>
 					</select>
+				</label>
+				<label class="grid gap-1.5">
+					<span class="hud-label">Target Score (Optional)</span>
+					<input name="targetScore" type="number" min="1" max="100" value={data.detail.match.targetScore ?? ''} placeholder="e.g., 3" class="hud-input px-3 py-2" />
+					<span class="text-xs text-[var(--hud-muted)]">First team to reach this score per round</span>
 				</label>
 				<label class="grid gap-1.5">
 					<span class="hud-label">Scheduled time</span>
