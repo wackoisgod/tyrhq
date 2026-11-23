@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import { STEAM_PROVIDER } from './steam-oidc-provider';
 
 export interface SignInMethodsResult {
 	/**
@@ -76,8 +77,10 @@ export function computeSignInMethods(
 	const hasEmailIdentity = identities.some((i) => i.provider === 'email');
 	const hasEmailPassword = hasRealEmail && hasEmailIdentity;
 
-	// Verified Steam from profile
-	const hasSteam = !!verifiedSteamId;
+	// Steam from identity (new OIDC provider) OR legacy verified_steam_id
+	// Once migration is complete, this simplifies to just checking identities
+	const hasSteamIdentity = identities.some((i) => i.provider === STEAM_PROVIDER);
+	const hasSteam = hasSteamIdentity || !!verifiedSteamId;
 
 	// Count distinct methods
 	let count = 0;
@@ -86,9 +89,9 @@ export function computeSignInMethods(
 	if (hasSteam) count += 1;
 
 	// Can unlink/remove if at least 2 methods exist and user has that method
-	const canUnlinkGoogle = !!(count >= 2 && hasGoogle);
-	const canUnlinkSteam = !!(count >= 2 && hasSteam);
-	const canRemovePassword = !!(count >= 2 && hasEmailPassword);
+	const canUnlinkGoogle: boolean = count >= 2 && hasGoogle;
+	const canUnlinkSteam: boolean = count >= 2 && hasSteam;
+	const canRemovePassword: boolean = count >= 2 && hasEmailPassword;
 
 	return {
 		count,

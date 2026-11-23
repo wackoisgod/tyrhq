@@ -262,6 +262,37 @@
 	// Google unlink is now handled by server action (see unlinkGoogle form below)
 	// No client-side handler needed
 
+	async function handleLinkSteam() {
+		if (!supabase) return;
+		
+		try {
+			// Build callback URL with link marker
+			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
+			const callbackWithMarker = `${callbackUrl}&link=custom:steam`;
+			
+			const { data: linkData, error } = await supabase.auth.linkIdentity({
+				provider: 'custom:steam' as any,
+				options: {
+					redirectTo: callbackWithMarker
+				}
+			});
+
+			if (error) {
+				console.error('[settings] Failed to link Steam:', error);
+				
+				if (error.message?.includes('Manual linking') || error.message?.includes('disabled')) {
+					goto('/settings?error=manual_linking_disabled');
+				} else {
+					goto('/settings?error=link_failed');
+				}
+			}
+			// If successful, linkIdentity will redirect to Steam OAuth
+		} catch (err) {
+			console.error('[settings] Exception linking Steam:', err);
+			goto('/settings?error=link_failed');
+		}
+	}
+
 	async function handleSplitSignInMethod(provider: 'google' | 'email' | 'steam') {
 		splitLoading = true;
 		splitError = '';
@@ -848,9 +879,13 @@
 								<p class="text-sm font-semibold text-[var(--hud-muted)]">Steam</p>
 								<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Link Steam for tournament match auto-matching.</p>
 							</div>
-							<a href="/auth/steam" class="hud-cta-outline px-3 py-2 text-xs">
+							<button 
+								type="button"
+								onclick={handleLinkSteam}
+								class="hud-cta-outline px-3 py-2 text-xs"
+							>
 								Link Steam
-							</a>
+							</button>
 						</div>
 					</div>
 				{/if}

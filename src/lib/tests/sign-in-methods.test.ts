@@ -4,15 +4,32 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeSignInMethods } from '$lib/server/sign-in-methods';
+import { STEAM_PROVIDER } from '$lib/server/steam-oidc-provider';
 import type { User } from '@supabase/supabase-js';
 
 describe('Sign-in Method Computation', () => {
-	describe('Steam-only user', () => {
-		it('should count 1 method: Steam only', () => {
+	describe('Steam-only user (legacy)', () => {
+		it('should count 1 method: Steam only (legacy verified_steam_id)', () => {
 			const user = {
 				id: 'user-1',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
 				identities: [{ provider: 'email', id: 'identity-1' }]
+			} as User;
+
+			const result = computeSignInMethods(user, '76561198012345678');
+
+			expect(result.count).toBe(1);
+			expect(result.hasGoogle).toBe(false);
+			expect(result.hasEmailPassword).toBe(false);
+			expect(result.hasSteam).toBe(true);
+			expect(result.canUnlinkSteam).toBe(false); // Cannot unlink: only method
+		});
+
+		it('should count 1 method: Steam only (new OIDC identity)', () => {
+			const user = {
+				id: 'user-1b',
+				email: 'steam_76561198012345678@users.tyrhq.invalid',
+				identities: [{ provider: STEAM_PROVIDER, id: 'identity-steam' }]
 			} as User;
 
 			const result = computeSignInMethods(user, '76561198012345678');
@@ -70,12 +87,32 @@ describe('Sign-in Method Computation', () => {
 	});
 
 	describe('Steam + Google user', () => {
-		it('should count 2 methods: Steam + Google', () => {
+		it('should count 2 methods: Steam + Google (legacy)', () => {
 			const user = {
 				id: 'user-3',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
 				identities: [
 					{ provider: 'email', id: 'identity-1' },
+					{ provider: 'google', id: 'identity-2' }
+				]
+			} as User;
+
+			const result = computeSignInMethods(user, '76561198012345678');
+
+			expect(result.count).toBe(2);
+			expect(result.hasGoogle).toBe(true);
+			expect(result.hasEmailPassword).toBe(false); // Placeholder email
+			expect(result.hasSteam).toBe(true);
+			expect(result.canUnlinkGoogle).toBe(true);
+			expect(result.canUnlinkSteam).toBe(true);
+		});
+
+		it('should count 2 methods: Steam + Google (new OIDC)', () => {
+			const user = {
+				id: 'user-3b',
+				email: 'steam_76561198012345678@users.tyrhq.invalid',
+				identities: [
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' },
 					{ provider: 'google', id: 'identity-2' }
 				]
 			} as User;
@@ -130,7 +167,7 @@ describe('Sign-in Method Computation', () => {
 	});
 
 	describe('All three methods', () => {
-		it('should count 3 methods: Google + Email+password + Steam', () => {
+		it('should count 3 methods: Google + Email+password + Steam (legacy)', () => {
 			const user = {
 				id: 'user-5',
 				email: 'user@example.com',
@@ -149,6 +186,43 @@ describe('Sign-in Method Computation', () => {
 			expect(result.canUnlinkGoogle).toBe(true);
 			expect(result.canUnlinkSteam).toBe(true);
 			expect(result.canRemovePassword).toBe(true);
+		});
+
+		it('should count 3 methods: Google + Email+password + Steam (new OIDC)', () => {
+			const user = {
+				id: 'user-5b',
+				email: 'user@example.com',
+				identities: [
+					{ provider: 'google', id: 'identity-2' },
+					{ provider: 'email', id: 'identity-1' },
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
+				]
+			} as User;
+
+			const result = computeSignInMethods(user, '76561198012345678');
+
+			expect(result.count).toBe(3);
+			expect(result.hasGoogle).toBe(true);
+			expect(result.hasEmailPassword).toBe(true);
+			expect(result.hasSteam).toBe(true);
+			expect(result.canUnlinkGoogle).toBe(true);
+			expect(result.canUnlinkSteam).toBe(true);
+			expect(result.canRemovePassword).toBe(true);
+		});
+
+		it('should not double-count Steam when both identity and verified_steam_id exist', () => {
+			const user = {
+				id: 'user-5c',
+				email: 'user@example.com',
+				identities: [
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
+				]
+			} as User;
+
+			const result = computeSignInMethods(user, '76561198012345678');
+
+			expect(result.count).toBe(1); // Only Steam, not 2
+			expect(result.hasSteam).toBe(true);
 		});
 	});
 

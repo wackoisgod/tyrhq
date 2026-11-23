@@ -5,7 +5,7 @@ import { sanitizePostAuthRedirect } from '$lib/server/security';
 /**
  * Map Supabase error codes to user-friendly error keys
  */
-function mapErrorCode(errorCode: string | undefined, linkType: 'google' | 'email' | null): string {
+function mapErrorCode(errorCode: string | undefined, linkType: 'google' | 'email' | 'steam' | null): string {
 	const errorMap: Record<string, string> = {
 		// Google linking errors
 		'identity_already_exists': 'identity_already_exists',
@@ -35,7 +35,8 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 	const linkMarker = url.searchParams.get('link');
 	const isGoogleLinkFlow = linkMarker === 'google';
 	const isEmailLinkFlow = linkMarker === 'email';
-	const isLinkFlow = isGoogleLinkFlow || isEmailLinkFlow;
+	const isSteamLinkFlow = linkMarker === 'custom:steam';
+	const isLinkFlow = isGoogleLinkFlow || isEmailLinkFlow || isSteamLinkFlow;
 	
 	// Check if this is a merge flow
 	const { verifyMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
@@ -86,6 +87,43 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 			// Email linking-specific error
 			const settingsUrl = new URL('/settings', url.origin);
 			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'email'));
+			redirect(303, settingsUrl.toString());
+		}
+		
+		if (isSteamLinkFlow) {
+			// Steam linking error
+			// Check if Steam identity already exists on another account
+			const isIdentityExists = 
+				errorCode === 'identity_already_exists' ||
+				errorDescription?.toLowerCase().includes('already linked') ||
+				errorDescription?.toLowerCase().includes('already exists');
+			
+			if (isIdentityExists) {
+				// Get current user to initiate merge
+				const { data: { user } } = await locals.supabase.auth.getUser();
+				
+				if (!user) {
+					// No session - shouldn't happen but handle gracefully
+					const settingsUrl = new URL('/settings', url.origin);
+					settingsUrl.searchParams.set('error', 'link_failed');
+					redirect(303, settingsUrl.toString());
+				}
+				
+				// Initiate merge flow
+				const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+				const { value, options } = createMergeCookie(user.id);
+				cookies.set(MERGE_COOKIE_NAME, value, options);
+				
+				// Sign out current user
+				await locals.supabase.auth.signOut();
+				
+				// Redirect to auth page with merge marker
+				redirect(303, '/auth?merge=1&provider=steam');
+			}
+			
+			// Other Steam link errors - show generic error
+			const settingsUrl = new URL('/settings', url.origin);
+			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'steam'));
 			redirect(303, settingsUrl.toString());
 		}
 		
@@ -159,6 +197,41 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 					const settingsUrl = new URL('/settings', url.origin);
 					settingsUrl.searchParams.set('success', 'email_confirmed');
 					redirect(303, settingsUrl.toString());
+				}
+			}
+			
+			if (isSteamLinkFlow) {
+				// Verify user actually has Steam identity now
+				const { data: { user } } = await locals.supabase.auth.getUser();
+				const { STEAM_PROVIDER } = await import('$lib/server/steam-oidc-provider');
+				const hasSteamIdentity = user?.identities?.some((i) => i.provider === STEAM_PROVIDER);
+				
+				if (hasSteamIdentity) {
+					// Successfully linked
+					const settingsUrl = new URL('/settings', url.origin);
+					settingsUrl.searchParams.set('success', 'steam_linked');
+					redirect(303, settingsUrl.toString());
+				} else {
+					// OAuth succeeded but Steam identity NOT linked - already exists on another account
+					// Initiate merge flow
+					const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+					
+					if (!user) {
+						// Should not happen but guard against it
+						const settingsUrl = new URL('/settings', url.origin);
+						settingsUrl.searchParams.set('error', 'link_failed');
+						redirect(303, settingsUrl.toString());
+					}
+					
+					// Set merge cookie with current user as primary
+					const { value, options } = createMergeCookie(user.id);
+					cookies.set(MERGE_COOKIE_NAME, value, options);
+					
+					// Sign out current user
+					await locals.supabase.auth.signOut();
+					
+					// Redirect to auth page with merge marker to sign in with Steam again
+					redirect(303, '/auth?merge=1&provider=steam');
 				}
 			}
 			
