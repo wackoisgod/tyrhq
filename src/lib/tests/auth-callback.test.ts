@@ -221,18 +221,19 @@ describe('Auth Callback Handler', () => {
 			}
 		});
 
-		it('should default to /auth when next is not provided', async () => {
-			mockEvent.url = new URL('http://localhost:5173/auth/callback');
+	it('should default to / when next is not provided (sanitizes to root)', async () => {
+		mockEvent.url = new URL('http://localhost:5173/auth/callback');
 
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				expect(err.status).toBe(303);
-				const location = new URL(err.location);
-				expect(location.pathname).toBe('/auth');
-				expect(err.location).toContain('error=auth_callback_failed');
-			}
-		});
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			expect(err.status).toBe(303);
+			const location = new URL(err.location);
+			// sanitizePostAuthRedirect returns '/' when next is missing
+			expect(location.pathname).toBe('/');
+			expect(err.location).toContain('error=auth_callback_failed');
+		}
+	});
 	});
 
 	describe('Exchange errors', () => {
