@@ -170,6 +170,9 @@ export const actions: Actions = {
 		// Use admin client to bypass the Steam column protection trigger
 		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 		const supabaseAdmin = getSupabaseAdminClient();
+		if (!supabaseAdmin) {
+			return fail(500, { profileError: 'Admin client not configured' });
+		}
 
 		const { error: updateError } = await supabaseAdmin
 			.from('profiles')
@@ -207,6 +210,10 @@ export const actions: Actions = {
 		// Find Google identity
 		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 		const supabaseAdmin = getSupabaseAdminClient();
+		if (!supabaseAdmin) {
+			return fail(500, { profileError: 'Admin client not configured' });
+		}
+
 		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
 		const googleIdentity = authUser?.user?.identities?.find((i: any) => i.provider === 'google');
 
@@ -215,13 +222,9 @@ export const actions: Actions = {
 		}
 
 		// Unlink via admin API
-		const { error: unlinkError } = await supabaseAdmin.auth.admin.unlinkIdentity({
-			user_id: user.id,
-			identity: {
-				provider: 'google',
-				identity_id: googleIdentity.id
-			}
-		});
+		const { error: unlinkError } = await supabaseAdmin.auth.admin.deleteIdentity(
+			googleIdentity.id
+		);
 
 		if (unlinkError) {
 			console.error('Error unlinking Google:', unlinkError);
@@ -250,6 +253,10 @@ export const actions: Actions = {
 		// Get admin client to unlink email identity
 		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 		const supabaseAdmin = getSupabaseAdminClient();
+		if (!supabaseAdmin) {
+			return fail(500, { profileError: 'Admin client not configured' });
+		}
+
 		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
 		const emailIdentity = authUser?.user?.identities?.find((i: any) => i.provider === 'email');
 
@@ -258,13 +265,9 @@ export const actions: Actions = {
 		}
 
 		// Unlink email identity (removes password)
-		const { error: unlinkError } = await supabaseAdmin.auth.admin.unlinkIdentity({
-			user_id: user.id,
-			identity: {
-				provider: 'email',
-				identity_id: emailIdentity.id
-			}
-		});
+		const { error: unlinkError } = await supabaseAdmin.auth.admin.deleteIdentity(
+			emailIdentity.id
+		);
 
 		if (unlinkError) {
 			console.error('Error removing password:', unlinkError);

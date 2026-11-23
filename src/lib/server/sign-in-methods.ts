@@ -86,9 +86,9 @@ export function computeSignInMethods(
 	if (hasSteam) count += 1;
 
 	// Can unlink/remove if at least 2 methods exist and user has that method
-	const canUnlinkGoogle = count >= 2 && hasGoogle;
-	const canUnlinkSteam = count >= 2 && hasSteam;
-	const canRemovePassword = count >= 2 && hasEmailPassword;
+	const canUnlinkGoogle = !!(count >= 2 && hasGoogle);
+	const canUnlinkSteam = !!(count >= 2 && hasSteam);
+	const canRemovePassword = !!(count >= 2 && hasEmailPassword);
 
 	return {
 		count,
