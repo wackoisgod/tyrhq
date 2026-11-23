@@ -1,0 +1,170 @@
+{
+  "winnerTeam": 0,
+  "endgameStats": [
+    {
+      "name": "callmekitty",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 2,
+      "kills": 1,
+      "damage": 1661,
+      "blocked": 0,
+      "assist": 535,
+      "partyId": null
+    },
+    {
+      "name": "FibroFog",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 29,
+      "kills": 0,
+      "damage": 1572,
+      "blocked": 0,
+      "assist": 0,
+      "partyId": null
+    },
+    {
+      "name": "Refrigerator",
+      "team": 0,
+      "tank": "Bush",
+      "tankIdx": 7,
+      "kills": 0,
+      "damage": 1130,
+      "blocked": 0,
+      "assist": 0,
+      "partyId": "7c211ce4-c004-4b2b-be1b-9b488af82386"
+    },
+    {
+      "name": "CagedCaptainRex",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 26,
+      "kills": 0,
+      "damage": 540,
+      "blocked": 284,
+      "assist": 547,
+      "partyId": null
+    },
+    {
+      "name": "Srceam :P",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 2,
+      "kills": 1,
+      "damage": 1540,
+      "blocked": 0,
+      "assist": 100,
+      "partyId": "7c211ce4-c004-4b2b-be1b-9b488af82386"
+    },
+    {
+      "name": "wacko",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 3,
+      "kills": 2,
+      "damage": 377,
+      "blocked": 0,
+      "assist": 421,
+      "partyId": null
+    },
+    {
+      "name": "Shitter Mage",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 27,
+      "kills": 0,
+      "damage": 1492,
+      "blocked": 1160,
+      "assist": 307,
+      "partyId": null
+    },
+    {
+      "name": "131_Leo_131",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 28,
+      "kills": 0,
+      "damage": 587,
+      "blocked": 0,
+      "assist": 0,
+      "partyId": "a63784fc-8565-4360-aba2-d233d3f9b401"
+    },
+    {
+      "name": "Computer (Easy)",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 2,
+      "kills": 1,
+      "damage": 1471,
+      "blocked": 147,
+      "assist": 100,
+      "partyId": null
+    },
+    {
+      "name": "FourGreenFields",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 31,
+      "kills": 0,
+      "damage": 1492,
+      "blocked": 189,
+      "assist": 713,
+      "partyId": null
+    },
+    {
+      "name": "TOFAŞK",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 27,
+      "kills": 0,
+      "damage": 345,
+      "blocked": 338,
+      "assist": 100,
+      "partyId": null
+    },
+    {
+      "name": "Archer",
+      "team": 1,
+      "tank": null,
+      "tankIdx": 26,
+      "kills": 0,
+      "damage": 213,
+      "blocked": 0,
+      "assist": 347,
+      "partyId": "a63784fc-8565-4360-aba2-d233d3f9b401"
+    },
+    {
+      "name": "Vlad0379",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 31,
+      "kills": 1,
+      "damage": 1944,
+      "blocked": 0,
+      "assist": 200,
+      "partyId": null
+    },
+    {
+      "name": "vuln breaker enjoyer",
+      "team": 0,
+      "tank": null,
+      "tankIdx": 3,
+      "kills": 2,
+      "damage": 2902,
+      "blocked": 175,
+      "assist": 681,
+      "partyId": null
+    },
+    {
+      "name": "Gibus not gibus",
+      "team": 0,
+      "tank": "Deadeye",
+      "tankIdx": 9,
+      "kills": 0,
+      "damage": 53,
+      "blocked": 0,
+      "assist": 300,
+      "partyId": null
+    }
+  ]
+}

@@ -9,19 +9,12 @@
  * - Replay GUID and changelist (from header)
  * - Player roster with SteamID64 (requires netstream walk)
  * - Endgame stats (from Multicast_SendEndGameStats RPC)
- * - Last-stand winner (from BP_TyrGameState_C.TeamWithLastStandId)
- *
- * The full netstream walker is ~1000+ lines and would require extensive
- * porting. For the initial implementation, we:
- * 1. Parse header for GUID/changelist (simple, works now)
- * 2. Provide hooks for netstream parsing (to be completed)
- * 3. Add comprehensive bounds checks and graceful degradation
+ * - Winner from team health pools, else the other side of the last stand
  */
 
 import { BitReader, DecodeError } from './bit-reader';
 import { probeReplayHeader } from './probe';
-import { decodeUniqueNetId } from './steam-id';
-import { walkNetstream } from './netstream';
+import { walkNetstream, type NetstreamState } from './netstream';
 import type { ReplayParseResult, PlayerRosterEntry, PlayerEndGameStats } from './types';
 import { TANK_CODENAMES } from './types';
 
@@ -39,16 +32,37 @@ const UUID_REGEX =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Try to read an FString starting at the given bit position.
- * Returns [text, endBit] on success, null on failure.
+ * Port of _egs_try_fstring. Requires a plausible length and a NUL terminator.
+ * Restores the reader position.
  */
-function tryReadFString(reader: BitReader, startBit: number): [string, number] | null {
+function egsTryFString(reader: BitReader, pos: number): [string, number] | null {
+	const nbits = reader.getPos() + reader.bitsLeft();
+	if (pos + 32 > nbits) return null;
+	const save = reader.getPos();
 	try {
-		reader.setPos(startBit);
-		const text = reader.fstring();
-		return [text, reader.getPos()];
+		reader.setPos(pos);
+		const ln = reader.i32();
+		if (ln === 0) return ['', reader.getPos()];
+		if (ln > 0 && ln <= 256) {
+			if (pos + 32 + ln * 8 > nbits) return null;
+			const raw = reader.readBitsBytes(ln * 8);
+			if (raw[ln - 1] !== 0) return null;
+			const text = new TextDecoder('utf-8').decode(raw.subarray(0, ln - 1));
+			return [text, reader.getPos()];
+		}
+		if (ln < 0 && ln >= -256) {
+			const cnt = -ln;
+			if (pos + 32 + cnt * 16 > nbits) return null;
+			const raw = reader.readBitsBytes(cnt * 16);
+			if (raw[cnt * 2 - 2] !== 0 || raw[cnt * 2 - 1] !== 0) return null;
+			const text = new TextDecoder('utf-16le').decode(raw.subarray(0, cnt * 2 - 2));
+			return [text, reader.getPos()];
+		}
+		return null;
 	} catch {
 		return null;
+	} finally {
+		reader.setPos(save);
 	}
 }
 
@@ -79,7 +93,7 @@ function decodeEndGameStats(
 
 	let pos = 0;
 	while (pos < nbits - 32) {
-		const result = tryReadFString(reader, pos);
+		const result = egsTryFString(reader, pos);
 		if (result) {
 			const [text, end] = result;
 			if (teamByName.has(text)) {
@@ -177,36 +191,7 @@ function decodeEndGameStats(
 }
 
 /**
- * Parse a Tyr replay file.
- *
- * CURRENT STATUS:
- * - ✅ Header parsing complete & validated (GUID, changelist extraction works)
- * - 🚧 Netstream walker: 500 LOC skeleton implemented but property extraction incomplete
- * - ✅ Real replay file (sandbox-38646.replay) integrated for testing
- * - ✅ Validated against Python decoder output for header fields
- *
- * NETSTREAM WALKER STATUS:
- * The walker skeleton implements:
- * - Chunk reading (Header, ReplayData, Checkpoint, Event)
- * - DemoFrame structure
- * - Packet/bunch framing
- * - NetGUID export table parsing
- * - Property replication framework
- *
- * INCOMPLETE: Property payload decoding
- * - Channel open/close tracking works
- * - Property handle reading works
- * - Property payload extraction needs debugging (complex bit-level protocol)
- * - Requires continued protocol-level debugging with real replay validation
- *
- * ESTIMATE: 4-6 additional hours needed to complete property extraction and 
- * validate against expected roster output from Python decoder.
- *
- * Current implementation gracefully degrades:
- * - Returns valid GUID and changelist
- * - Returns empty roster with clear warnings
- * - UI shows partial parse status
- * - Foundation ready for incremental completion
+ * Parse a Tyr replay file: header, roster, end-game scoreboard, and winner.
  */
 export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 	const warnings: string[] = [];
@@ -264,6 +249,11 @@ export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 		}
 		
 		result.roster = Array.from(playersByName.values());
+		const block = largestRpcBlock(netstreamState, 'BP_TyrGameState_C');
+		if (block) {
+			result.endgameStats = decodeEndGameStats(block.raw, block.nbits, result.roster);
+		}
+		result.winnerTeam = deriveWinnerTeam(netstreamState);
 		warnings.push(...netstreamState.warnings);
 		
 	} catch (e) {
@@ -271,6 +261,34 @@ export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 	}
 
 	return result;
+}
+
+function largestRpcBlock(
+	state: NetstreamState,
+	cls: string
+): { nbits: number; raw: Uint8Array } | null {
+	const blocks = state.rpcRawBlocks.get(cls);
+	if (!blocks || blocks.length === 0) return null;
+	return blocks.reduce((best, block) => (block.nbits > best.nbits ? block : best));
+}
+
+/** Port of derive_match_result, then derive_last_stand_winner when that is inconclusive. */
+function deriveWinnerTeam(state: NetstreamState): number | null {
+	const finals = new Map<number, number>();
+	for (const rec of state.teamInfo.values()) {
+		if (rec.teamId === undefined || rec.health.length === 0) continue;
+		finals.set(rec.teamId, rec.health[rec.health.length - 1]);
+	}
+	if (finals.has(0) && finals.has(1)) {
+		const dead = [0, 1].filter((team) => finals.get(team) === 0);
+		if (dead.length === 1) return 1 - dead[0];
+	}
+	let last: number | null = null;
+	for (const teamId of state.lastStandEvents) {
+		if (teamId === 0 || teamId === 1) last = teamId;
+	}
+	if (last === null) return null;
+	return 1 - last;
 }
 
 /**

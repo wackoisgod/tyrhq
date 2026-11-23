@@ -97,6 +97,18 @@ interface NetFieldExportGroup {
 	fields: Map<number, string>; // handle -> field name
 }
 
+export interface TeamInfoRec {
+	teamId?: number;
+	health: number[];
+	maxHealth: number[];
+}
+
+/** Raw content-block tail captured for BP_TyrGameState_C (Python rpc_raw_blocks). */
+export interface RpcRawBlock {
+	nbits: number;
+	raw: Uint8Array;
+}
+
 export interface NetstreamState {
 	guidMap: Map<number, NetGUIDExport>;
 	channels: Map<number, Channel>;
@@ -107,6 +119,11 @@ export interface NetstreamState {
 	frameCount: number;
 	packetCount: number;
 	bunchCount: number;
+	/** class -> captured blocks, largest is the end-game scoreboard RPC */
+	rpcRawBlocks: Map<string, RpcRawBlock[]>;
+	teamInfo: Map<number, TeamInfoRec>;
+	/** TeamWithLastStandId samples in arrival order; null means cleared */
+	lastStandEvents: Array<number | null>;
 }
 
 /**
@@ -375,6 +392,18 @@ function groupForGuid(state: NetstreamState, guid: number): NetFieldExportGroup 
 	return state.groupsByPath.get(classKey(exp.pathName));
 }
 
+/** Port of State.classnetcache_for_guid. */
+function classNetCacheForGuid(state: NetstreamState, guid: number): NetFieldExportGroup | undefined {
+	const path = state.guidMap.get(guid)?.pathName;
+	if (!path) return undefined;
+	const group = state.groupsByPath.get(classKey(path));
+	if (!group) return undefined;
+	return state.groupsByPath.get(classKey(group.path) + '_ClassNetCache');
+}
+
+const RPC_CAPTURE_CLASSES = new Set(['BP_TyrGameState_C']);
+const RPC_CAPTURE_CAP = 50;
+
 /**
  * UActorChannel::ReadContentBlockHeader (Python decode.py:1194-1225).
  */
@@ -507,12 +536,48 @@ function processBunchPayload(
 				continue;
 			}
 			const group = groupForGuid(state, repObj);
-			if (group && bHasRepLayout) {
+			if (!group) {
+				continue;
+			}
+			const sub = new BitReader(payload, payloadBits);
+			if (bHasRepLayout) {
 				try {
-					receiveProperties(payload, payloadBits, group, state, ch);
+					receiveProperties(sub, group, state, ch);
 				} catch {
-					// Python: state.warn["receive_properties_failed"] += 1
+					// Python: state.warn["receive_properties_failed"] += 1; continue
+					continue;
 				}
+			}
+			if (sub.atEnd()) {
+				continue;
+			}
+			const cnc = classNetCacheForGuid(state, repObj);
+			if (!cnc) {
+				continue;
+			}
+			const cls = classKey(group.path);
+			let fieldReader = sub;
+			if (RPC_CAPTURE_CLASSES.has(cls) && !bHasRepLayout) {
+				const left = fieldReader.bitsLeft();
+				const raw = fieldReader.readBitsBytes(left);
+				const blocks = state.rpcRawBlocks.get(cls) ?? [];
+				if (blocks.length < RPC_CAPTURE_CAP) {
+					blocks.push({ nbits: left, raw });
+					state.rpcRawBlocks.set(cls, blocks);
+				}
+				fieldReader = new BitReader(raw, left);
+			}
+			try {
+				while (!fieldReader.atEnd()) {
+					fieldReader.serializedInt(Math.max(cnc.num + 1, 2));
+					const fieldBits = fieldReader.intPacked();
+					if (fieldBits > fieldReader.bitsLeft()) {
+						throw new DecodeError('field payload too big');
+					}
+					fieldReader.readBitsBytes(fieldBits);
+				}
+			} catch {
+				// Python: state.warn["classnetcache_fields_failed"] += 1
 			}
 		} catch (e) {
 			if (e instanceof DecodeError) {
@@ -528,14 +593,12 @@ function processBunchPayload(
  * Port of Python decode.py:957-1192 (receive_properties function).
  */
 function receiveProperties(
-	payload: Uint8Array,
-	numBits: number,
+	bits: BitReader,
 	group: NetFieldExportGroup,
 	state: NetstreamState,
 	ch: Channel
 ): void {
-	const bits = new BitReader(payload, numBits);
-	const cls = group.path.split('.').pop()?.replace(/^Default__/, '') || group.path;
+	const cls = classKey(group.path);
 	
 	// doChecksum bit
 	bits.readBit();
@@ -630,6 +693,26 @@ function handleProperty(
 		rec.class = cls;
 		rec.actorGuid = ch.actorGuid;
 	}
+	else if (
+		cls === 'TyrTeamPublicInfo' &&
+		numBits === 32 &&
+		(name === 'TeamId' || name === 'CurrentTeamHealth' || name === 'MaxTeamHealth') &&
+		ch.actorGuid != null
+	) {
+		const v = readUintFromBytes(payload, numBits);
+		let rec = state.teamInfo.get(ch.actorGuid);
+		if (!rec) {
+			rec = { health: [], maxHealth: [] };
+			state.teamInfo.set(ch.actorGuid, rec);
+		}
+		if (name === 'TeamId') rec.teamId = v;
+		else if (name === 'CurrentTeamHealth') rec.health.push(v);
+		else rec.maxHealth.push(v);
+	}
+	else if (name === 'TeamWithLastStandId' && cls === 'BP_TyrGameState_C' && numBits > 0 && numBits <= 32) {
+		const raw = readUintFromBytes(payload, numBits);
+		state.lastStandEvents.push(raw === 0xffffffff ? null : raw);
+	}
 	// UniqueID (Steam ID)
 	else if ((name === 'UniqueID' || name === 'UniqueId') && isPlayerIdentityClass && numBits >= 16) {
 		const steamId = decodeUniqueNetId(payload);
@@ -650,12 +733,17 @@ function handleProperty(
  * Read an integer from bytes (little-endian).
  */
 function readIntFromBytes(bytes: Uint8Array, numBits: number): number {
+	return readUintFromBytes(bytes, numBits);
+}
+
+function readUintFromBytes(bytes: Uint8Array, numBits: number): number {
 	const numBytes = Math.ceil(numBits / 8);
 	let value = 0;
 	for (let i = 0; i < numBytes && i < bytes.length; i++) {
-		value |= bytes[i] << (i * 8);
+		value += bytes[i] * 2 ** (i * 8);
 	}
-	return value;
+	if (numBits >= 32) return value >>> 0;
+	return value & ((1 << numBits) - 1);
 }
 
 /**
@@ -938,7 +1026,10 @@ export function walkNetstream(
 		warnings: [],
 		frameCount: 0,
 		packetCount: 0,
-		bunchCount: 0
+		bunchCount: 0,
+		rpcRawBlocks: new Map(),
+		teamInfo: new Map(),
+		lastStandEvents: []
 	};
 
 	let offset = 0;

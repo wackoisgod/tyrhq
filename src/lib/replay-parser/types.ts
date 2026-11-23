@@ -30,7 +30,7 @@ export interface ReplayParseResult {
 	roster: PlayerRosterEntry[];
 	/** End-game stats (scoreboard) */
 	endgameStats: PlayerEndGameStats[];
-	/** Winning team (0 or 1), derived from last-stand winner */
+	/** Winning team (0 or 1). Health-pool result, else the other side of the last stand. */
 	winnerTeam: number | null;
 	/** Replay GUID (16-byte hex string from header) */
 	replayGuid: string | null;
