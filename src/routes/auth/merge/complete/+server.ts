@@ -97,26 +97,17 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 			throw httpError(500, 'Account merge failed. Please try again.');
 		}
 
-		let deleteWarning: string | null = null;
+		// IMPORTANT: Do NOT delete secondary auth user - ban it instead to allow undo
+		// Deleting would destroy identities permanently, making undo impossible
+		// Secondary user stays banned until merge is undone
+		const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
+			secondaryUserId,
+			{ ban_duration: '876000h' } // 100 years - effectively permanent until undo
+		);
 
-		// Delete the secondary auth user
-		const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(secondaryUserId);
-
-		if (deleteError) {
-			console.error('[account-merge] Failed to delete secondary auth user:', deleteError);
-			
-			// Try to ban the user instead
-			const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
-				secondaryUserId,
-				{ ban_duration: '876000h' } // 100 years
-			);
-
-			if (banError) {
-				console.error('[account-merge] Failed to ban secondary user:', banError);
-				deleteWarning = 'Warning: Secondary account could not be fully removed. Please contact support.';
-			} else {
-				deleteWarning = 'Warning: Secondary account was disabled but not deleted. It cannot be used to sign in.';
-			}
+		if (banError) {
+			console.error('[account-merge] Failed to ban secondary user:', banError);
+			throw httpError(500, 'Failed to disable secondary account. Merge aborted.');
 		}
 
 		// Delete the merge cookie
@@ -131,10 +122,7 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 			primaryUserId,
 			secondaryUserId,
 			mergeResult,
-			warning: deleteWarning,
-			message: deleteWarning 
-				? 'Accounts merged with warnings. Please sign in to your primary account.' 
-				: 'Accounts merged successfully. Please sign in to your primary account.'
+			message: 'Accounts merged successfully. Secondary account has been disabled. Please sign in to your primary account.'
 		});
 	} catch (err: any) {
 		console.error('[account-merge] Unexpected error:', err);

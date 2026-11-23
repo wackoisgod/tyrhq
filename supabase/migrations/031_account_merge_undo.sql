@@ -61,25 +61,8 @@ REVOKE ALL ON public.account_merge_rows FROM public, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.account_merges TO service_role;
 GRANT SELECT, INSERT, DELETE ON public.account_merge_rows TO service_role;
 
--- View for users to see their own merge history (read-only)
-CREATE OR REPLACE VIEW public.user_merge_history AS
-SELECT 
-    am.id,
-    am.primary_user_id,
-    am.secondary_user_id,
-    am.merged_at,
-    am.undone_at,
-    am.status,
-    (am.secondary_snapshot->>'email') AS secondary_email,
-    (am.secondary_snapshot->>'display_name') AS secondary_display_name,
-    (am.secondary_snapshot->>'verified_steam_id') AS secondary_steam_id
-FROM public.account_merges am;
-
--- RLS on view: users can see their own merges
-ALTER VIEW public.user_merge_history SET (security_invoker = true);
-
--- Grant authenticated users read access to their own merge history
-GRANT SELECT ON public.user_merge_history TO authenticated;
+-- No client-accessible view - merge history is read via server routes with admin client
+-- This ensures proper filtering by primary_user_id and prevents data leaks
 
 -- Updated merge_accounts function with logging
 CREATE OR REPLACE FUNCTION public.merge_accounts(
@@ -685,8 +668,7 @@ REVOKE ALL ON FUNCTION public.unmerge_accounts(uuid) FROM public, anon, authenti
 GRANT EXECUTE ON FUNCTION public.unmerge_accounts(uuid) TO service_role;
 
 -- Documentation
-COMMENT ON FUNCTION public.merge_accounts IS 'Merges secondary account into primary with full provenance logging. Secondary auth user should be disabled (not deleted) by app code after merge to allow undo.';
-COMMENT ON FUNCTION public.unmerge_accounts IS 'Undoes a merge by restoring data to secondary account. Requires app code to restore auth user and identities. SECURITY DEFINER, service_role only.';
-COMMENT ON TABLE public.account_merges IS 'Audit log of account merges with snapshots for undo capability';
-COMMENT ON TABLE public.account_merge_rows IS 'Detailed row-level changes during merge for precise undo';
-COMMENT ON VIEW public.user_merge_history IS 'User-readable view of their own merge history';
+COMMENT ON FUNCTION public.merge_accounts IS 'Merges secondary account into primary with full provenance logging. Secondary auth user is banned (not deleted) by app code to allow undo.';
+COMMENT ON FUNCTION public.unmerge_accounts IS 'Undoes a merge by restoring data to secondary account. Auth user is unbanned by app code. SECURITY DEFINER, service_role only.';
+COMMENT ON TABLE public.account_merges IS 'Audit log of account merges with snapshots for undo capability. Service_role only - read via server routes.';
+COMMENT ON TABLE public.account_merge_rows IS 'Detailed row-level changes during merge for precise undo. Service_role only.';

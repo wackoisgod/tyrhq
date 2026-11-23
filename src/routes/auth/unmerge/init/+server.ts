@@ -1,16 +1,25 @@
 /**
- * POST /auth/unmerge
+ * POST /auth/unmerge/init
  * Initiates undo of a merge (requires re-authentication)
  */
 
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { createUnmergeCookie, getUnmergeSecret, UNMERGE_COOKIE_NAME } from '$lib/server/account-unmerge';
 
-export const POST: RequestHandler = async ({ locals, request }) => {
+export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 	const { session, user } = await locals.safeGetSession();
 
 	if (!session || !user) {
 		throw error(401, 'Not authenticated');
+	}
+
+	// Verify MERGE_SECRET is configured
+	try {
+		getUnmergeSecret();
+	} catch (err: any) {
+		console.error('[unmerge] MERGE_SECRET not configured:', err);
+		throw error(500, 'Account unmerge is not configured. Please contact support.');
 	}
 
 	const body = await request.json();
@@ -20,7 +29,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		throw error(400, 'Missing merge ID');
 	}
 
-	// Get admin client
+	// Get admin client to verify merge exists and belongs to this user
 	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 	const supabaseAdmin = getSupabaseAdminClient();
 
@@ -44,34 +53,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		throw error(400, 'This merge has already been undone');
 	}
 
-	// Call unmerge function
-	try {
-		const { data: result, error: unmergeError } = await supabaseAdmin.rpc('unmerge_accounts', {
-			p_merge_id: mergeId
-		});
+	// Create unmerge cookie
+	const { value, options } = createUnmergeCookie(user.id, mergeId);
+	cookies.set(UNMERGE_COOKIE_NAME, value, options);
 
-		if (unmergeError) {
-			console.error('[unmerge] Failed to undo merge:', unmergeError);
-			throw error(500, 'Failed to undo merge. Please try again.');
-		}
-
-		// Note: Auth user restoration must be done here
-		// For now, just return success - full implementation would restore auth.users
-		
-		return json({
-			success: true,
-			mergeId,
-			result,
-			message: 'Merge undone successfully. Secondary account data has been restored.',
-			note: 'Auth user restoration requires additional implementation.'
-		});
-	} catch (err: any) {
-		console.error('[unmerge] Unexpected error:', err);
-
-		if (err.status) {
-			throw err;
-		}
-
-		throw error(500, 'Unexpected error during unmerge');
-	}
+	return json({
+		success: true,
+		primaryUserId: user.id,
+		mergeId,
+		expiresIn: options.maxAge
+	});
 };

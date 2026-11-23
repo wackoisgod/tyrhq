@@ -33,7 +33,8 @@
 		email_confirmed: 'Email confirmed successfully!',
 		password_set: 'Password set successfully!',
 		accounts_merged: 'Accounts merged successfully! All data has been consolidated.',
-		split_complete: 'Sign-in method split successfully! Sign in with that method to access your new account.'
+		split_complete: 'Sign-in method split successfully! Sign in with that method to access your new account.',
+		merge_undone: 'Merge undone successfully! The secondary account has been restored.'
 	};
 	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
 
@@ -302,7 +303,9 @@
 		steam_conflict: 'Your account already has a different Steam ID linked. Cannot link a different Steam account.',
 		steam_already_linked: 'This Steam account is already linked to another TyrHQ account.',
 		split_expired: 'Sign-in method split session expired. Please try again.',
-		split_wrong_user: 'Session mismatch during split. Please restart the process.'
+		split_wrong_user: 'Session mismatch during split. Please restart the process.',
+		unmerge_expired: 'Undo merge session expired. Please try again.',
+		unmerge_unauthorized: 'You are not authorized to undo this merge.'
 	};
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
@@ -913,12 +916,8 @@
 											type="button"
 											class="hud-cta-outline px-3 py-2 text-xs"
 											onclick={async () => {
-												if (!confirm('Are you sure you want to undo this merge? This will restore the secondary account and move data back.')) {
-													return;
-												}
-												
 												try {
-													const response = await fetch('/auth/unmerge', {
+													const response = await fetch('/auth/unmerge/init', {
 														method: 'POST',
 														headers: { 'Content-Type': 'application/json' },
 														body: JSON.stringify({ mergeId: merge.id })
@@ -926,15 +925,15 @@
 													
 													if (!response.ok) {
 														const error = await response.json();
-														alert(error.message || 'Failed to undo merge');
+														alert(error.message || 'Failed to initiate undo');
 														return;
 													}
 													
-													await invalidateAll();
-													alert('Merge undone successfully!');
+													// Redirect to confirmation page
+													goto('/auth/unmerge/confirm');
 												} catch (err) {
-													console.error('Error undoing merge:', err);
-													alert('Failed to undo merge. Please try again.');
+													console.error('Error initiating undo:', err);
+													alert('Failed to initiate undo. Please try again.');
 												}
 											}}
 											title="Undo this merge and restore the secondary account"
