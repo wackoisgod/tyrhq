@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import { STEAM_PROVIDER } from './steam-oidc-provider';
 
 export interface SignInMethodsResult {
 	/**
@@ -78,7 +79,7 @@ export function computeSignInMethods(
 
 	// Steam from identity (new OIDC provider) OR legacy verified_steam_id
 	// Once migration is complete, this simplifies to just checking identities
-	const hasSteamIdentity = identities.some((i) => i.provider === 'steam');
+	const hasSteamIdentity = identities.some((i) => i.provider === STEAM_PROVIDER);
 	const hasSteam = hasSteamIdentity || !!verifiedSteamId;
 
 	// Count distinct methods

@@ -45,8 +45,9 @@
 		}
 		
 		// Use Supabase OAuth with custom Steam provider
+		// Supabase custom providers use 'custom:' prefix
 		supabase.auth.signInWithOAuth({
-			provider: 'steam' as any, // Custom provider registered in Supabase
+			provider: 'custom:steam' as any,
 			options: {
 				redirectTo
 			}

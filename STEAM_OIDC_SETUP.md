@@ -198,7 +198,7 @@ function handleSteamLogin() {
 function handleSteamLogin() {
   if (!supabase) return;
   supabase.auth.signInWithOAuth({
-    provider: 'steam',  // Custom provider name from Supabase dashboard
+    provider: 'custom:steam',  // Supabase custom provider identifier
     options: {
       redirectTo: getAuthCallbackUrl(window.location.origin)
     }
@@ -213,7 +213,7 @@ async function linkSteam() {
   if (!supabase) return;
   
   const { error } = await supabase.auth.linkIdentity({
-    provider: 'steam'
+    provider: 'custom:steam'
   });
   
   if (error) {
@@ -230,7 +230,7 @@ async function unlinkSteam() {
   
   // Find Steam identity
   const { data: { user } } = await supabase.auth.getUser();
-  const steamIdentity = user?.identities?.find(i => i.provider === 'steam');
+  const steamIdentity = user?.identities?.find(i => i.provider === 'custom:steam');
   
   if (!steamIdentity) return;
   
@@ -339,7 +339,7 @@ export function computeSignInMethods(
   const identities = user.identities || [];
 
   const hasGoogle = identities.some((i) => i.provider === 'google');
-  const hasSteam = identities.some((i) => i.provider === 'steam');
+  const hasSteam = identities.some((i) => i.provider === 'custom:steam');
   
   const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
   const hasEmailIdentity = identities.some((i) => i.provider === 'email');

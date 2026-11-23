@@ -26,6 +26,9 @@ import type { JWK } from 'jose';
 import { createPublicKey } from 'node:crypto';
 import { timingSafeEqual } from 'node:crypto';
 
+// Supabase custom provider identifier MUST start with 'custom:'
+export const STEAM_PROVIDER = 'custom:steam' as const;
+
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
 const STEAM_API_TIMEOUT_MS = 3000;

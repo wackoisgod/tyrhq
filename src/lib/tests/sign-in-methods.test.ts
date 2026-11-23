@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeSignInMethods } from '$lib/server/sign-in-methods';
+import { STEAM_PROVIDER } from '$lib/server/steam-oidc-provider';
 import type { User } from '@supabase/supabase-js';
 
 describe('Sign-in Method Computation', () => {
@@ -28,7 +29,7 @@ describe('Sign-in Method Computation', () => {
 			const user = {
 				id: 'user-1b',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
-				identities: [{ provider: 'steam', id: 'identity-steam' }]
+				identities: [{ provider: STEAM_PROVIDER, id: 'identity-steam' }]
 			} as User;
 
 			const result = computeSignInMethods(user, '76561198012345678');
@@ -111,7 +112,7 @@ describe('Sign-in Method Computation', () => {
 				id: 'user-3b',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
 				identities: [
-					{ provider: 'steam', id: 'identity-steam' },
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' },
 					{ provider: 'google', id: 'identity-2' }
 				]
 			} as User;
@@ -194,7 +195,7 @@ describe('Sign-in Method Computation', () => {
 				identities: [
 					{ provider: 'google', id: 'identity-2' },
 					{ provider: 'email', id: 'identity-1' },
-					{ provider: 'steam', id: 'identity-steam' }
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
 				]
 			} as User;
 
@@ -214,7 +215,7 @@ describe('Sign-in Method Computation', () => {
 				id: 'user-5c',
 				email: 'user@example.com',
 				identities: [
-					{ provider: 'steam', id: 'identity-steam' }
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
 				]
 			} as User;
 

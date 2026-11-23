@@ -4,8 +4,18 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { STEAM_PROVIDER } from '$lib/server/steam-oidc-provider';
 
 describe('Steam OIDC Security', () => {
+	describe('Provider Identifier', () => {
+		it('should use custom:steam identifier required by Supabase', () => {
+			// Supabase custom provider identifiers MUST start with 'custom:'
+			// See: https://supabase.com/docs/guides/auth/custom-oauth-providers
+			expect(STEAM_PROVIDER).toBe('custom:steam');
+			expect(STEAM_PROVIDER).toMatch(/^custom:/);
+		});
+	});
+
 	describe('JWKS Public Key Safety', () => {
 		it('should NOT expose private key components in public JWK', () => {
 			// This test documents the CRITICAL security requirement:

@@ -3,6 +3,7 @@
 -- Part of TYR-19: Steam as real Supabase auth provider
 
 -- Function to sync verified_steam_id when Steam identity is added/updated
+-- Handles Supabase custom provider identifier 'custom:steam'
 CREATE OR REPLACE FUNCTION public.sync_steam_identity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -13,11 +14,13 @@ DECLARE
     v_steam_id text;
     v_persona_name text;
 BEGIN
-    -- Only process Steam identities
-    IF NEW.provider = 'steam' THEN
-        -- Extract Steam ID from identity subject (format: steam:<steamid64>)
+    -- Only process Steam identities (custom:steam)
+    IF NEW.provider = 'custom:steam' THEN
+        -- Extract Steam ID from identity
+        -- For OIDC custom providers, Supabase may store it as provider_id or in identity_data->>'sub'
+        -- Format: steam:<steamid64>
         v_steam_id := regexp_replace(
-            COALESCE(NEW.identity_data->>'sub', ''),
+            COALESCE(NEW.provider_id, NEW.identity_data->>'sub', ''),
             '^steam:',
             ''
         );
@@ -26,12 +29,19 @@ BEGIN
         v_persona_name := NEW.identity_data->>'name';
         
         -- Update profile with Steam ID and persona name
+        -- Use INSERT ... ON CONFLICT to avoid unique violation blocking sign-in
         IF v_steam_id != '' THEN
-            UPDATE public.profiles
-            SET verified_steam_id = v_steam_id,
-                steam_verified_at = now(),
-                steam_display_name = v_persona_name
-            WHERE id = NEW.user_id;
+            BEGIN
+                UPDATE public.profiles
+                SET verified_steam_id = v_steam_id,
+                    steam_verified_at = now(),
+                    steam_display_name = v_persona_name
+                WHERE id = NEW.user_id;
+            EXCEPTION WHEN unique_violation THEN
+                -- Another user already has this Steam ID
+                -- Don't block the identity insert, just log a warning
+                RAISE WARNING 'Steam ID % already linked to another account', v_steam_id;
+            END;
         END IF;
     END IF;
     
@@ -44,7 +54,7 @@ DROP TRIGGER IF EXISTS on_steam_identity_change ON auth.identities;
 CREATE TRIGGER on_steam_identity_change
     AFTER INSERT OR UPDATE ON auth.identities
     FOR EACH ROW
-    WHEN (NEW.provider = 'steam')
+    WHEN (NEW.provider = 'custom:steam')
     EXECUTE FUNCTION public.sync_steam_identity();
 
 -- Function to cleanup verified_steam_id when Steam identity is removed
@@ -57,11 +67,11 @@ AS $$
 DECLARE
     v_steam_id text;
 BEGIN
-    -- Only process Steam identities
-    IF OLD.provider = 'steam' THEN
+    -- Only process Steam identities (custom:steam)
+    IF OLD.provider = 'custom:steam' THEN
         -- Extract Steam ID from deleted identity
         v_steam_id := regexp_replace(
-            COALESCE(OLD.identity_data->>'sub', ''),
+            COALESCE(OLD.provider_id, OLD.identity_data->>'sub', ''),
             '^steam:',
             ''
         );
@@ -85,7 +95,7 @@ DROP TRIGGER IF EXISTS on_steam_identity_delete ON auth.identities;
 CREATE TRIGGER on_steam_identity_delete
     AFTER DELETE ON auth.identities
     FOR EACH ROW
-    WHEN (OLD.provider = 'steam')
+    WHEN (OLD.provider = 'custom:steam')
     EXECUTE FUNCTION public.cleanup_steam_identity();
 
 -- Migration note: No data migration needed

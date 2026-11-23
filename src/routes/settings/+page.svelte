@@ -268,10 +268,10 @@
 		try {
 			// Build callback URL with link marker
 			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
-			const callbackWithMarker = `${callbackUrl}&link=steam`;
+			const callbackWithMarker = `${callbackUrl}&link=custom:steam`;
 			
 			const { data: linkData, error } = await supabase.auth.linkIdentity({
-				provider: 'steam' as any, // Custom provider registered in Supabase
+				provider: 'custom:steam' as any,
 				options: {
 					redirectTo: callbackWithMarker
 				}

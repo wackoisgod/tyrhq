@@ -191,7 +191,8 @@ export const actions: Actions = {
 		}
 
 		// Find Steam identity from current user's identities
-		const steamIdentity = user.identities?.find((i) => i.provider === 'steam');
+		const { STEAM_PROVIDER } = await import('$lib/server/steam-oidc-provider');
+		const steamIdentity = user.identities?.find((i) => i.provider === STEAM_PROVIDER);
 
 		if (!steamIdentity) {
 			// No Steam identity - check if legacy verified_steam_id exists
