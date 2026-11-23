@@ -77,18 +77,18 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 				redirect(303, '/auth?merge=1&provider=google');
 			}
 			
-			// Other Google link errors - show generic error
-			const settingsUrl = new URL('/settings', url.origin);
-			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'google'));
-			redirect(303, settingsUrl.toString());
+		// Other Google link errors - show generic error
+		const settingsUrl = new URL('/settings', url.origin);
+		settingsUrl.searchParams.set('error', mapErrorCode(errorCode ?? undefined, 'google'));
+		redirect(303, settingsUrl.toString());
 		}
 		
-		if (isEmailLinkFlow) {
-			// Email linking-specific error
-			const settingsUrl = new URL('/settings', url.origin);
-			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'email'));
-			redirect(303, settingsUrl.toString());
-		}
+	if (isEmailLinkFlow) {
+		// Email linking-specific error
+		const settingsUrl = new URL('/settings', url.origin);
+		settingsUrl.searchParams.set('error', mapErrorCode(errorCode ?? undefined, 'email'));
+		redirect(303, settingsUrl.toString());
+	}
 		
 		if (isSteamLinkFlow) {
 			// Steam linking error
@@ -121,17 +121,16 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 				redirect(303, '/auth?merge=1&provider=steam');
 			}
 			
-			// Other Steam link errors - show generic error
-			const settingsUrl = new URL('/settings', url.origin);
-			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'steam'));
-			redirect(303, settingsUrl.toString());
+		// Other Steam link errors - show generic error
+		const settingsUrl = new URL('/settings', url.origin);
+		settingsUrl.searchParams.set('error', mapErrorCode(errorCode ?? undefined, 'steam'));
+		redirect(303, settingsUrl.toString());
 		}
 		
-		// General auth error
-		const fallbackNext = next || '/auth';
-		const errorUrl = new URL(fallbackNext, url.origin);
-		errorUrl.searchParams.set('error', 'auth_callback_failed');
-		redirect(303, errorUrl.toString());
+	// General auth error - always redirect to /auth with error
+	const errorUrl = new URL('/auth', url.origin);
+	errorUrl.searchParams.set('error', 'auth_callback_failed');
+	redirect(303, errorUrl.toString());
 	}
 
 	// Exchange code for session
@@ -251,9 +250,9 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		}
 	}
 
-	// Fallback error - use sanitized next or default to /auth
-	const fallbackNext = next || '/auth';
-	const errorUrl = new URL(fallbackNext, url.origin);
+	// Fallback error - redirect to /auth with error
+	// (sanitized 'next' defaults to '/' which isn't useful for auth errors)
+	const errorUrl = new URL('/auth', url.origin);
 	errorUrl.searchParams.set('error', 'auth_callback_failed');
 	redirect(303, errorUrl.toString());
 };

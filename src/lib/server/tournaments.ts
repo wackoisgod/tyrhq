@@ -819,13 +819,15 @@ export async function listTournaments() {
 		.from('tournaments')
 		.select('*, organizer:profiles!tournaments_organizer_id_fkey(id, display_name)')
 		.neq('status', 'draft')
+		.neq('status', 'cancelled')
 		.order('starts_at', { ascending: true });
 	if (error) throw new TournamentError('Could not load tournaments.', 500);
 	const now = Date.now();
 	const rows = ((data as TournamentRow[]) ?? []).map(toTournament);
+	const liveStatuses = new Set(['open', 'in_progress']);
 	return {
-		upcoming: rows.filter((t) => new Date(t.startsAt).getTime() >= now && t.status !== 'completed'),
-		past: rows.filter((t) => new Date(t.startsAt).getTime() < now || t.status === 'completed')
+		upcoming: rows.filter((t) => new Date(t.startsAt).getTime() >= now || liveStatuses.has(t.status)),
+		past: rows.filter((t) => new Date(t.startsAt).getTime() < now && !liveStatuses.has(t.status))
 	};
 }
 

@@ -71,7 +71,7 @@ export function computeSignInMethods(
 	// Email+password requires BOTH:
 	// 1. Real email (not placeholder)
 	// 2. Email identity (password is set)
-	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
+	const hasRealEmail = !!user.email && !user.email.endsWith('@users.tyrhq.invalid');
 	const hasEmailIdentity = identities.some((i) => i.provider === 'email');
 	const hasEmailPassword = hasRealEmail && hasEmailIdentity;
 

@@ -267,19 +267,19 @@ describe('Email & Password Linking', () => {
 			expect(password === confirmPassword).toBe(true);
 		});
 
-		it('should reject non-matching passwords', () => {
-			const password = 'MyPassword123';
-			const confirmPassword = 'DifferentPassword';
+	it('should reject non-matching passwords', () => {
+		const password: string = 'MyPassword123';
+		const confirmPassword: string = 'DifferentPassword';
 
-			expect(password === confirmPassword).toBe(false);
-		});
+		expect(password === confirmPassword).toBe(false);
+	});
 
-		it('should be case-sensitive', () => {
-			const password = 'MyPassword123';
-			const confirmPassword = 'mypassword123';
+	it('should be case-sensitive', () => {
+		const password: string = 'MyPassword123';
+		const confirmPassword: string = 'mypassword123';
 
-			expect(password === confirmPassword).toBe(false);
-		});
+		expect(password === confirmPassword).toBe(false);
+	});
 	});
 
 	describe('User UI states', () => {

@@ -124,23 +124,34 @@ describe('fetchSteamPersonaName', () => {
 describe('updateProfileWithPersona', () => {
 	let mockSupabaseAdmin: any;
 
-	beforeEach(async () => {
-		// Setup mock Supabase admin client
-		mockSupabaseAdmin = {
-			from: vi.fn(() => ({
-				select: vi.fn(() => ({
-					ilike: vi.fn(() => ({
-						limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
-					}))
-				})),
-				update: vi.fn(() => ({
-					eq: vi.fn(() => Promise.resolve({ data: {}, error: null }))
-				}))
-			}))
-		};
+beforeEach(async () => {
+	// Setup mock Supabase admin client with shared spies
+	const eqSpy = vi.fn(() => Promise.resolve({ data: {}, error: null }));
+	const updateSpy = vi.fn(() => ({ eq: eqSpy }));
+	const selectSpy = vi.fn(() => ({
+		ilike: vi.fn(() => ({
+			limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+		}))
+	}));
+	
+	mockSupabaseAdmin = {
+		from: vi.fn((table: string) => {
+			if (table === 'profiles') {
+				return {
+					select: selectSpy,
+					update: updateSpy
+				};
+			}
+			return {};
+		})
+	};
+	
+	// Store the spies for assertions
+	(mockSupabaseAdmin as any).updateSpy = updateSpy;
+	(mockSupabaseAdmin as any).eqSpy = eqSpy;
 
-		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-		vi.mocked(getSupabaseAdminClient).mockReturnValue(mockSupabaseAdmin);
+	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	vi.mocked(getSupabaseAdminClient).mockReturnValue(mockSupabaseAdmin);
 
 		// Mock fetch for persona API
 		global.fetch = vi.fn().mockResolvedValue({
@@ -163,7 +174,7 @@ describe('updateProfileWithPersona', () => {
 		await updateProfileWithPersona('user-id', '76561198012345678', 'Player_123456');
 
 		// Should update both display_name and steam_display_name
-		expect(mockSupabaseAdmin.from().update).toHaveBeenCalledWith(
+		expect(mockSupabaseAdmin.updateSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
 				display_name: 'FreshPersona',
 				steam_display_name: 'FreshPersona'
@@ -175,13 +186,13 @@ describe('updateProfileWithPersona', () => {
 		await updateProfileWithPersona('user-id', '76561198012345678', 'MyCustomName');
 
 		// Should only update steam_display_name, not display_name
-		expect(mockSupabaseAdmin.from().update).toHaveBeenCalledWith(
+		expect(mockSupabaseAdmin.updateSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
 				steam_display_name: 'FreshPersona'
 			})
 		);
 		
-		const updateCall = vi.mocked(mockSupabaseAdmin.from().update).mock.calls[0][0];
+		const updateCall = mockSupabaseAdmin.updateSpy.mock.calls[0][0];
 		expect(updateCall).not.toHaveProperty('display_name');
 	});
 
@@ -195,7 +206,7 @@ describe('updateProfileWithPersona', () => {
 		await updateProfileWithPersona('user-id', '76561198012345678', 'Player_123456');
 
 		// Should still update with null
-		expect(mockSupabaseAdmin.from().update).toHaveBeenCalledWith(
+		expect(mockSupabaseAdmin.updateSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
 				steam_display_name: null
 			})

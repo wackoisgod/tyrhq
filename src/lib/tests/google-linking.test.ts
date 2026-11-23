@@ -48,17 +48,17 @@ describe('Google Linking Logic', () => {
 			expect(placeholderEmail.endsWith('@users.tyrhq.invalid')).toBe(true);
 		});
 
-		it('should allow Steam-only users to link Google', () => {
-			// Steam-only user has placeholder email but no email/password identity
-			const linkedIdentities = [
-				// No email identity, just Steam metadata
-			];
-			const userEmail = 'steam_76561198012345678@users.tyrhq.invalid';
-			
-			// User can link Google even without other identities (Steam auth exists)
-			const canLinkGoogle = !linkedIdentities.some((i) => i.provider === 'google');
-			expect(canLinkGoogle).toBe(true);
-		});
+	it('should allow Steam-only users to link Google', () => {
+		// Steam-only user has placeholder email but no email/password identity
+		const linkedIdentities: Array<{ provider: string; email?: string }> = [
+			// No email identity, just Steam metadata
+		];
+		const userEmail = 'steam_76561198012345678@users.tyrhq.invalid';
+		
+		// User can link Google even without other identities (Steam auth exists)
+		const canLinkGoogle = !linkedIdentities.some((i) => i.provider === 'google');
+		expect(canLinkGoogle).toBe(true);
+	});
 
 		it('should allow Steam+Google users to unlink Google if they have 2+ methods', () => {
 			const linkedIdentities = [

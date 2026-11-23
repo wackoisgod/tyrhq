@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from '../../routes/auth/callback/+server';
-import type { RequestEvent } from '@sveltejs/kit';
 
 // Mock dependencies
 vi.mock('$lib/server/security', () => ({
@@ -23,7 +22,7 @@ vi.mock('$env/dynamic/private', () => ({
 }));
 
 describe('Auth Callback - Email Confirmation', () => {
-	let mockEvent: Partial<RequestEvent>;
+	let mockEvent: any;
 	let mockSupabase: any;
 
 	beforeEach(() => {
@@ -34,17 +33,24 @@ describe('Auth Callback - Email Confirmation', () => {
 			}
 		};
 
-		mockEvent = {
-			url: new URL('http://localhost:5173/auth/callback'),
-			locals: {
-				supabase: mockSupabase
-			},
-			cookies: {
-				get: () => undefined,
-				set: vi.fn(),
-				delete: vi.fn()
-			}
-		};
+	mockEvent = {
+		url: new URL('http://localhost:5173/auth/callback'),
+		locals: {
+			supabase: mockSupabase,
+			safeGetSession: vi.fn().mockResolvedValue({
+				session: null,
+				user: null,
+				role: 'user'
+			})
+		},
+		cookies: {
+			get: () => undefined,
+			set: vi.fn(),
+			delete: vi.fn(),
+			getAll: vi.fn().mockReturnValue([]),
+			serialize: vi.fn().mockReturnValue('')
+		}
+	};
 	});
 
 	describe('Email confirmation success', () => {
@@ -69,7 +75,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings?success=email_confirmed
 				expect(err.status).toBe(303);
@@ -99,7 +105,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings without success banner
 				expect(err.status).toBe(303);
@@ -129,7 +135,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings without success banner
 				expect(err.status).toBe(303);
@@ -160,7 +166,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings?success=google_linked
 				expect(err.status).toBe(303);
@@ -177,7 +183,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -191,7 +197,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -205,7 +211,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -226,7 +232,7 @@ describe('Auth Callback - Email Confirmation', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
