@@ -53,5 +53,30 @@ describe('Replay Parser', () => {
 				}))
 			}).toEqual(expected);
 		});
+
+		it('matches the Python scoreboard for ravine-40016-full.replay', () => {
+			const buffer = new Uint8Array(
+				readFileSync('tests/fixtures/replay-parser/ravine-40016-full.replay')
+			);
+			const expected = JSON.parse(
+				readFileSync('tests/fixtures/replay-parser/ravine-40016-full.expected.json', 'utf-8')
+			);
+			const result = parseReplay(buffer);
+			expect(result.warnings).toEqual([]);
+			expect(result.winnerTeam).toEqual(expected.winnerTeam);
+			expect(
+				result.endgameStats.map((e) => ({
+					name: e.name,
+					team: e.team,
+					tank: e.tank,
+					tankIdx: e.tankIdx,
+					kills: e.kills,
+					damage: e.damage,
+					blocked: e.blocked,
+					assist: e.assist,
+					partyId: e.partyId
+				}))
+			).toEqual(expected.endgameStats);
+		}, 20_000);
 	});
 });

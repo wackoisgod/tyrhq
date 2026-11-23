@@ -74,14 +74,14 @@ export class BitReader {
 		const off = start & 7;
 		const eb = (start + n + 7) >> 3;
 
-		// Extract bytes and assemble little-endian
-		let val = 0;
+		// A misaligned 32-bit read spans 5 bytes. JS << is 32-bit, so assemble with BigInt
+		// (Python int.from_bytes).
+		let val = 0n;
 		for (let i = sb; i < eb && i < this.data.length; i++) {
-			val |= this.data[i] << ((i - sb) * 8);
+			val |= BigInt(this.data[i]) << BigInt((i - sb) * 8);
 		}
-		val = val >>> off;
-		// Mask to n bits, handling the case where n can be up to 32
-		return n === 32 ? val >>> 0 : val & ((1 << n) - 1);
+		val = (val >> BigInt(off)) & ((1n << BigInt(n)) - 1n);
+		return Number(val);
 	}
 
 	readBitsBytes(n: number): Uint8Array {
@@ -135,8 +135,7 @@ export class BitReader {
 
 	i32(): number {
 		const v = this.readBitsInt(32);
-		// Sign-extend if high bit is set
-		return v & 0x80000000 ? v | ~0xffffffff : v;
+		return v & 0x80000000 ? v - 0x100000000 : v;
 	}
 
 	f32(): number {
