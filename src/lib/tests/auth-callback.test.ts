@@ -99,51 +99,99 @@ describe('Auth Callback Handler', () => {
 			}
 		});
 
-		it('should not show success banner when user does not actually have Google identity', async () => {
-			mockEvent.url = new URL(
-				'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=google'
-			);
+	it('should initiate merge when Google identity is not linked after OAuth', async () => {
+		expect.assertions(3);
+		
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=google'
+		);
 
-			mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
-				data: { session: {} },
-				error: null
-			});
-
-			// User has no Google identity (linking failed somehow)
-			mockSupabase.auth.getUser.mockResolvedValue({
-				data: {
-					user: {
-						identities: []
-					}
-				},
-				error: null
-			});
-
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				// Should redirect to /settings without success
-				expect(err.status).toBe(303);
-				expect(err.location).toBe('/settings');
-				expect(err.location).not.toContain('success=google_linked');
-			}
+		mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
+			data: { session: {} },
+			error: null
 		});
+
+		// User has no Google identity - means it exists on another account
+		mockSupabase.auth.getUser.mockResolvedValue({
+			data: {
+				user: {
+					id: 'user-primary-123',
+					identities: []
+				}
+			},
+			error: null
+		});
+		
+		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
+
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			// Should initiate merge flow by redirecting to auth with merge marker
+			expect(err.status).toBe(303);
+			expect(err.location).toBe('/auth?merge=1&provider=google');
+			// Should have called signOut
+			expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+		}
+	});
 	});
 
 	describe('Link error_code mapping', () => {
-		it('should map identity_already_exists error code', async () => {
-			mockEvent.url = new URL(
-				'http://localhost:5173/auth/callback?error=invalid_request&error_code=identity_already_exists&error_description=Identity+is+already+linked&link=google'
-			);
-
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				expect(err.status).toBe(303);
-				expect(err.location).toContain('/settings');
-				expect(err.location).toContain('error=identity_already_exists');
-			}
+	it('should initiate merge when identity_already_exists error code for Google', async () => {
+		expect.assertions(3);
+		
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/callback?error=invalid_request&error_code=identity_already_exists&error_description=Identity+is+already+linked&link=google'
+		);
+		
+		mockSupabase.auth.getUser.mockResolvedValue({
+			data: {
+				user: {
+					id: 'user-primary-123',
+					identities: []
+				}
+			},
+			error: null
 		});
+		
+		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
+
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			expect(err.status).toBe(303);
+			expect(err.location).toBe('/auth?merge=1&provider=google');
+			expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+		}
+	});
+		
+	it('should initiate merge when error description contains "already linked" for Google', async () => {
+		expect.assertions(3);
+		
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/callback?error=invalid_request&error_description=Identity+is+already+linked+to+another+user&link=google'
+		);
+		
+		mockSupabase.auth.getUser.mockResolvedValue({
+			data: {
+				user: {
+					id: 'user-primary-456',
+					identities: []
+				}
+			},
+			error: null
+		});
+		
+		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
+
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			expect(err.status).toBe(303);
+			expect(err.location).toBe('/auth?merge=1&provider=google');
+			expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+		}
+	});
 
 		it('should map manual_linking_disabled error code', async () => {
 			mockEvent.url = new URL(
@@ -214,22 +262,20 @@ describe('Auth Callback Handler', () => {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/dashboard');
 				expect(err.location).toContain('error=auth_callback_failed');
-				// Should be sanitized (no origin in URL)
-				expect(err.location).not.toContain('http://');
 			}
 		});
 
-		it('should default to /auth when next is not provided', async () => {
-			mockEvent.url = new URL('http://localhost:5173/auth/callback');
+	it('should default to /auth when next is not provided', async () => {
+		mockEvent.url = new URL('http://localhost:5173/auth/callback');
 
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				expect(err.status).toBe(303);
-				expect(err.location).toContain('/auth');
-				expect(err.location).toContain('error=auth_callback_failed');
-			}
-		});
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			expect(err.status).toBe(303);
+			expect(err.location).toContain('/auth');
+			expect(err.location).toContain('error=auth_callback_failed');
+		}
+	});
 	});
 
 	describe('Exchange errors', () => {

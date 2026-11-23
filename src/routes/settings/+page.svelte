@@ -18,9 +18,6 @@
 	let emailFormError = $state('');
 	let emailFormLoading = $state(false);
 	let pendingEmailChange = $state<string | null>(null);
-	let showMergeInfo = $state(false);
-	let mergeInProgress = $state(false);
-	let mergeError = $state('');
 	let showSteamUnlinkConfirm = $state(false);
 
 	const profileError = $derived(form && 'profileError' in form ? form.profileError : null);
@@ -29,9 +26,11 @@
 	// Check for success messages
 	const urlSuccess = $page.url.searchParams.get('success');
 	const successMessages: Record<string, string> = {
-		google_linked: 'Google account linked successfully!',
+		google_linked: 'Google account added successfully!',
+		steam_linked: 'Steam account added successfully!',
 		email_confirmed: 'Email confirmed successfully!',
-		password_set: 'Password set successfully!'
+		password_set: 'Password set successfully!',
+		accounts_merged: 'Accounts merged successfully! All data has been consolidated.'
 	};
 	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
 
@@ -162,11 +161,38 @@
 				
 				// Map by error code if available, fallback to message
 				const errorCode = (emailError as any).code || (emailError as any).error_code;
-				if (errorCode === 'email_exists' || errorCode === 'email_address_taken') {
-					emailFormError = 'This email is already in use by another account.';
-				} else if (emailError.message?.toLowerCase().includes('already') || 
-				           emailError.message?.toLowerCase().includes('exists')) {
-					emailFormError = 'This email is already in use by another account.';
+				if (errorCode === 'email_exists' || errorCode === 'email_address_taken' ||
+				    emailError.message?.toLowerCase().includes('already') || 
+				    emailError.message?.toLowerCase().includes('exists')) {
+					// Email exists on another account - initiate merge flow
+					// User will prove ownership by signing in with that account's password or magic link
+					try {
+						const response = await fetch('/auth/merge/init', {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json'
+							}
+						});
+						
+						if (!response.ok) {
+							emailFormError = 'Failed to initiate merge. Please try again.';
+							emailFormLoading = false;
+							return;
+						}
+						
+						// Store email in sessionStorage to prefill on auth page
+						sessionStorage.setItem('merge_email', emailFormData.email);
+						
+						// Sign out and redirect to auth with merge marker
+						await supabase.auth.signOut();
+						goto('/auth?merge=1&provider=email');
+						return;
+					} catch (err) {
+						console.error('[settings] Exception initiating merge:', err);
+						emailFormError = 'Failed to initiate merge. Please try again.';
+						emailFormLoading = false;
+						return;
+					}
 				} else {
 					emailFormError = 'Failed to update email. Please try again.';
 				}
@@ -194,47 +220,6 @@
 		emailFormData = { email: '', password: '', confirmPassword: '' };
 		emailFormError = '';
 	}
-	
-	async function handleStartMerge() {
-		mergeError = '';
-		mergeInProgress = true;
-		
-		try {
-			const response = await fetch('/auth/merge/init', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			});
-			
-			if (!response.ok) {
-				const error = await response.json();
-				mergeError = error.message || 'Failed to start merge';
-				mergeInProgress = false;
-				return;
-			}
-			
-			// Merge initiated - redirect to auth page with instructions
-			goto('/auth?merge=1');
-		} catch (err) {
-			console.error('[settings] Exception starting merge:', err);
-			mergeError = 'An unexpected error occurred';
-			mergeInProgress = false;
-		}
-	}
-	
-	async function handleCancelMerge() {
-		try {
-			await fetch('/auth/merge/cancel', {
-				method: 'POST'
-			});
-			
-			mergeInProgress = false;
-			showMergeInfo = false;
-		} catch (err) {
-			console.error('[settings] Exception cancelling merge:', err);
-		}
-	}
 
 	async function handleLinkGoogle() {
 		if (!supabase) return;
@@ -257,9 +242,9 @@
 				// Check for specific error types
 				if (error.message?.includes('Manual linking') || error.message?.includes('disabled')) {
 					goto('/settings?error=manual_linking_disabled');
-				} else if (error.message?.includes('already') || error.message?.includes('linked')) {
-					goto('/settings?error=identity_already_exists');
 				} else {
+					// For other errors (including identity_already_exists), show generic error
+					// The actual merge routing will happen server-side in the callback handler
 					goto('/settings?error=link_failed');
 				}
 			}
@@ -276,17 +261,16 @@
 	// Check for linking errors from URL params
 	const urlError = $page.url.searchParams.get('error');
 	const errorMessages: Record<string, string> = {
-		link_failed: 'Failed to link Google account. Please try again.',
-		identity_already_exists: 'This Google account is already linked to another user.',
+		link_failed: 'Failed to link account. Please try again.',
 		manual_linking_disabled: 'Manual linking is not enabled. Contact your administrator.',
 		unlink_failed: 'Failed to unlink account. You must have at least one sign-in method.',
 		auth_callback_failed: 'Authentication failed. Please try again.',
-		email_exists: 'This email is already in use by another account.',
 		invalid_credentials: 'Invalid email or password.',
 		email_change_failed: 'Failed to update email. Please try again.',
 		merge_expired: 'Account merge session expired. Please try again.',
-		cannot_merge_self: 'Cannot merge an account into itself. Please sign in with the other account.',
-		steam_conflict: 'Both accounts have different Steam IDs. Cannot merge accounts with conflicting Steam identities.'
+		cannot_merge_self: 'Cannot add an account to itself. Please sign in with the other account.',
+		steam_conflict: 'Your account already has a different Steam ID linked. Cannot link a different Steam account.',
+		steam_already_linked: 'This Steam account is already linked to another TyrHQ account.'
 	};
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
@@ -788,91 +772,8 @@
 				</p>
 				<form method="POST" action="/auth/logout" class="mt-4">
 					<button type="submit" class="hud-cta-ghost px-5 py-3">Sign Out</button>
-				</form>
-			</div>
-			
-			<!-- Account Merge -->
-			<div class="mt-8 border-t border-[var(--hud-variant)] pt-6">
-				<h2 class="text-xl font-semibold text-[var(--hud-text)]">Account Merge</h2>
-				<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
-					Merge another TyrHQ account into this one to consolidate your builds, tournament registrations, and teams.
-				</p>
-				
-				{#if mergeError}
-					<div class="mt-4 rounded-sm bg-red-900/20 border border-red-700/50 p-3 text-sm text-red-200">
-						{mergeError}
-					</div>
-				{/if}
-				
-				{#if !showMergeInfo}
-					<div class="mt-4">
-						<button
-							type="button"
-							class="hud-cta-outline px-4 py-2 text-sm"
-							onclick={() => showMergeInfo = true}
-						>
-							Merge Another Account
-						</button>
-					</div>
-				{:else}
-					<div class="mt-4 rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-						<div class="space-y-3">
-							<div>
-								<p class="text-sm font-semibold text-[var(--hud-text)]">How Account Merge Works</p>
-								<div class="mt-2 space-y-2 text-xs text-[var(--hud-muted)]">
-									<p>
-										1. <strong>Stay signed in here</strong> - This account will be your primary account
-									</p>
-									<p>
-										2. <strong>Re-authenticate as the other account</strong> - Sign in with Steam, Google, or email/password
-									</p>
-									<p>
-										3. <strong>Confirm the merge</strong> - All data from the other account will move here
-									</p>
-								</div>
-							</div>
-							
-							<div class="rounded-sm bg-[var(--hud-inset)] p-3">
-								<p class="text-xs font-semibold text-[var(--hud-warning)]">⚠ What Gets Merged</p>
-								<ul class="mt-2 space-y-1 text-xs text-[var(--hud-muted)] list-disc list-inside">
-									<li>All builds and build stars</li>
-									<li>Tournament registrations and rosters</li>
-									<li>Team memberships</li>
-									<li>Community events and contributions</li>
-									<li>Steam verification (if the other account has it)</li>
-									<li>Display name (if yours is auto-generated)</li>
-								</ul>
-								<p class="mt-2 text-xs text-[var(--hud-warning)]">
-									<strong>The other account will be permanently deleted.</strong> This cannot be undone.
-								</p>
-							</div>
-							
-							<div class="flex gap-2">
-								<button
-									type="button"
-									class="hud-cta px-4 py-2 text-sm"
-									onclick={handleStartMerge}
-									disabled={mergeInProgress}
-								>
-									{#if mergeInProgress}
-										Starting...
-									{:else}
-										Start Merge Process
-									{/if}
-								</button>
-								<button
-									type="button"
-									class="hud-cta-outline px-4 py-2 text-sm"
-									onclick={() => showMergeInfo = false}
-									disabled={mergeInProgress}
-								>
-									Cancel
-								</button>
-							</div>
-						</div>
-					</div>
-				{/if}
-			</div>
+		</form>
+	</div>
 		{/if}
 	</div>
 
