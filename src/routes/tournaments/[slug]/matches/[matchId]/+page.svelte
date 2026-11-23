@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ReplayUpload from './ReplayUpload.svelte';
+
 	let { data, form } = $props();
 
 	const mapsById = $derived(new Map(data.detail.maps.map((map) => [map.id, map])));
@@ -178,6 +180,12 @@
 
 	{#if data.detail.canManage && data.detail.match.teamA && data.detail.match.teamB}
 		<div class="mt-4">
+			<div class="mb-6">
+				<ReplayUpload
+					matchId={data.detail.match.id}
+					preview={form && 'replayPreview' in form ? form.replayPreview : null}
+				/>
+			</div>
 			<form method="POST" action="?/batchGames" id="batch-games-form">
 				<input type="hidden" name="matchId" value={data.detail.match.id} />
 				<input type="hidden" name="games" value={JSON.stringify(gameFormData)} />

@@ -18,6 +18,8 @@ import {
 	saveTournamentMatchGames,
 	updateTournamentMatchSettings
 } from '$lib/server/tournament-series';
+import { MAX_REPLAY_PAYLOAD_CHARS } from '$lib/replay/upload-payload.schema';
+import { previewReplayUpload } from '$lib/server/replay-upload';
 
 function datetimeLocalToIso(value: FormDataEntryValue | null) {
 	const raw = String(value ?? '').trim();
@@ -167,6 +169,43 @@ export const actions: Actions = {
 				success: state.isComplete
 					? 'All games saved and series completed.'
 					: `All games saved. Series score is ${state.scoreA}-${state.scoreB}.`
+			};
+		} catch (caught) {
+			return tournamentFailure(caught);
+		}
+	},
+	previewReplay: async ({ request, locals, params }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		const form = await request.formData();
+		const matchId = String(form.get('matchId') ?? '');
+		const raw = String(form.get('payload') ?? '');
+		if (!raw) return fail(400, { error: 'Parse a replay in the browser before sending it.' });
+		if (raw.length > MAX_REPLAY_PAYLOAD_CHARS) {
+			return fail(413, { error: 'Parsed replay is too large to submit.' });
+		}
+		if (form.get('replayFile')) {
+			return fail(400, { error: 'Send the parsed scoreboard, not the replay file.' });
+		}
+		let payload: unknown;
+		try {
+			payload = JSON.parse(raw);
+		} catch {
+			return fail(400, { error: 'Parsed replay data was not valid JSON.' });
+		}
+		try {
+			const tournament = await getTournamentBySlug(params.slug, user.id, role);
+			if (!tournament) return fail(404, { error: 'Tournament not found' });
+			const replayPreview = await previewReplayUpload({
+				tournamentId: tournament.id,
+				matchId,
+				actorId: user.id,
+				role,
+				payload
+			});
+			return {
+				success: 'Replay parsed in the browser. Review it before saving.',
+				replayPreview
 			};
 		} catch (caught) {
 			return tournamentFailure(caught);
