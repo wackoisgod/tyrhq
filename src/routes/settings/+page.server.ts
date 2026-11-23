@@ -9,6 +9,7 @@ import {
 	type CommunityEventRecord
 } from '$lib/server/events';
 import { isSupabaseAdminConfigured } from '$lib/server/supabase-admin';
+import { computeSignInMethods } from '$lib/server/sign-in-methods';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const { session, user, role } = await locals.safeGetSession();
@@ -61,6 +62,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// The password is added to their existing account, so we show "Set password" for any real-email user
 	const canSetPassword = hasRealEmail;
 
+	// Compute sign-in methods for unlink/remove guards
+	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+
 	return {
 		profile,
 		isOnboarding,
@@ -73,7 +77,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		userEmail: user.email,
 		hasEmailIdentity,
 		hasEmailPassword,
-		canSetPassword
+		canSetPassword,
+		canUnlinkGoogle: signInMethods.canUnlinkGoogle,
+		canUnlinkSteam: signInMethods.canUnlinkSteam,
+		canRemovePassword: signInMethods.canRemovePassword
 	};
 };
 
@@ -145,9 +152,27 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
+		// Load profile to get current Steam verification
+		const profile = await loadProfile(locals, user.id);
+		if (!profile?.verified_steam_id) {
+			return fail(400, { profileError: 'No Steam account to unlink' });
+		}
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user, profile.verified_steam_id);
+		if (!signInMethods.canUnlinkSteam) {
+			return fail(400, {
+				profileError:
+					'Cannot unlink Steam: you must have at least one other sign-in method (Google or Email+Password) before unlinking Steam.'
+			});
+		}
+
 		// Use admin client to bypass the Steam column protection trigger
 		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 		const supabaseAdmin = getSupabaseAdminClient();
+		if (!supabaseAdmin) {
+			return fail(500, { profileError: 'Admin client not configured' });
+		}
 
 		const { error: updateError } = await supabaseAdmin
 			.from('profiles')
@@ -164,5 +189,96 @@ export const actions: Actions = {
 		}
 
 		return { profileSuccess: 'Steam account unlinked' };
+	},
+
+	unlinkGoogle: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Load profile to get Steam verification status
+		const profile = await loadProfile(locals, user.id);
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+		if (!signInMethods.canUnlinkGoogle) {
+			return fail(400, {
+				profileError:
+					'Cannot unlink Google: you must have at least one other sign-in method (Steam or Email+Password) before unlinking Google.'
+			});
+		}
+
+		// Find Google identity from current user's identities
+		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
+
+		if (!googleIdentity) {
+			return fail(400, { profileError: 'No Google account to unlink' });
+		}
+
+		// Unlink via user-scoped client (requires user session)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(googleIdentity);
+
+		if (unlinkError) {
+			console.error('Error unlinking Google:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError:
+						'Cannot unlink: you must have at least one other sign-in method first.'
+				});
+			}
+			return fail(500, { profileError: 'Failed to unlink Google account' });
+		}
+
+		return { profileSuccess: 'Google account unlinked' };
+	},
+
+	removePassword: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Load profile to get Steam verification status
+		const profile = await loadProfile(locals, user.id);
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+		if (!signInMethods.canRemovePassword) {
+			return fail(400, {
+				profileError:
+					'Cannot remove email+password: you must have at least one other sign-in method (Steam or Google) before removing email+password.'
+			});
+		}
+
+		// Find email identity from current user's identities
+		const emailIdentity = user.identities?.find((i) => i.provider === 'email');
+
+		if (!emailIdentity) {
+			return fail(400, { profileError: 'No email identity to remove' });
+		}
+
+		// Unlink email identity via user-scoped client (removes password)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(emailIdentity);
+
+		if (unlinkError) {
+			console.error('Error removing password:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError: 'Cannot remove: you must have at least one other sign-in method first.'
+				});
+			}
+			return fail(500, { profileError: 'Failed to remove email+password' });
+		}
+
+		return { profileSuccess: 'Email+password removed' };
 	}
 };
