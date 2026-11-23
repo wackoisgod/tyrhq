@@ -178,14 +178,11 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
-		// Load profile to get current Steam verification
+		// Load profile to get Steam verification status
 		const profile = await loadProfile(locals, user.id);
-		if (!profile?.verified_steam_id) {
-			return fail(400, { profileError: 'No Steam account to unlink' });
-		}
 
 		// Server-side guard: Check if user has at least one other sign-in method
-		const signInMethods = computeSignInMethods(user, profile.verified_steam_id);
+		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
 		if (!signInMethods.canUnlinkSteam) {
 			return fail(400, {
 				profileError:
@@ -193,24 +190,55 @@ export const actions: Actions = {
 			});
 		}
 
-		// Use admin client to bypass the Steam column protection trigger
-		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-		const supabaseAdmin = getSupabaseAdminClient();
-		if (!supabaseAdmin) {
-			return fail(500, { profileError: 'Admin client not configured' });
+		// Find Steam identity from current user's identities
+		const steamIdentity = user.identities?.find((i) => i.provider === 'steam');
+
+		if (!steamIdentity) {
+			// No Steam identity - check if legacy verified_steam_id exists
+			if (profile?.verified_steam_id) {
+				// Legacy Steam user - clear verified_steam_id directly
+				const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+				const supabaseAdmin = getSupabaseAdminClient();
+				if (!supabaseAdmin) {
+					return fail(500, { profileError: 'Admin client not configured' });
+				}
+
+				const { error: updateError } = await supabaseAdmin
+					.from('profiles')
+					.update({
+						verified_steam_id: null,
+						steam_display_name: null,
+						steam_verified_at: null
+					})
+					.eq('id', user.id);
+
+				if (updateError) {
+					console.error('Error unlinking legacy Steam:', updateError);
+					return fail(500, { profileError: 'Failed to unlink Steam account' });
+				}
+
+				return { profileSuccess: 'Steam account unlinked' };
+			}
+
+			return fail(400, { profileError: 'No Steam account to unlink' });
 		}
 
-		const { error: updateError } = await supabaseAdmin
-			.from('profiles')
-			.update({
-				verified_steam_id: null,
-				steam_display_name: null,
-				steam_verified_at: null
-			})
-			.eq('id', user.id);
+		// Unlink via user-scoped client (triggers cleanup via database trigger)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(steamIdentity);
 
-		if (updateError) {
-			console.error('Error unlinking Steam:', updateError);
+		if (unlinkError) {
+			console.error('Error unlinking Steam:', unlinkError);
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError:
+						'Cannot unlink: you must have at least one other sign-in method first.'
+				});
+			}
 			return fail(500, { profileError: 'Failed to unlink Steam account' });
 		}
 

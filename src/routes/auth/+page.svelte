@@ -34,16 +34,23 @@
 	}
 
 	function handleSteamLogin() {
+		if (!supabase) return;
+		
 		const next = $page.url.searchParams.get('next') || $page.url.searchParams.get('redirectTo');
-		const merge = $page.url.searchParams.get('merge');
-		const steamUrl = new URL('/auth/steam/login', window.location.origin);
+		let redirectTo = getAuthCallbackUrl(window.location.origin);
+		
+		// Append next path if provided
 		if (next) {
-			steamUrl.searchParams.set('next', next);
+			redirectTo += `?next=${encodeURIComponent(next)}`;
 		}
-		if (merge === '1') {
-			steamUrl.searchParams.set('merge', '1');
-		}
-		window.location.href = steamUrl.toString();
+		
+		// Use Supabase OAuth with custom Steam provider
+		supabase.auth.signInWithOAuth({
+			provider: 'steam' as any, // Custom provider registered in Supabase
+			options: {
+				redirectTo
+			}
+		});
 	}
 
 	const headings: Record<typeof mode, { eyebrow: string; title: string }> = {
