@@ -62,7 +62,20 @@
 	
 	// Check if this is a merge flow
 	const isMergeFlow = $page.url.searchParams.get('merge') === '1';
-	const suggestedProvider = $page.url.searchParams.get('provider'); // 'google' hint for merge
+	const suggestedProvider = $page.url.searchParams.get('provider'); // 'google', 'email' hint for merge
+	
+	// Prefill email if coming from email merge flow
+	let prefilledEmail = $state('');
+	
+	onMount(() => {
+		if (isMergeFlow && suggestedProvider === 'email') {
+			const storedEmail = sessionStorage.getItem('merge_email');
+			if (storedEmail) {
+				prefilledEmail = storedEmail;
+				sessionStorage.removeItem('merge_email');
+			}
+		}
+	});
 </script>
 
 <svelte:head>
@@ -97,6 +110,8 @@
 					<p class="mt-2 text-xs text-[var(--hud-text)]">
 						{#if suggestedProvider === 'google'}
 							Sign in with the <strong>Google account</strong> you want to add to your primary account.
+						{:else if suggestedProvider === 'email'}
+							Sign in with the <strong>email account</strong> you want to add to your primary account.
 						{:else}
 							Sign in with the account you want to <strong>add to your primary account</strong>.
 						{/if}
@@ -193,7 +208,7 @@
 							type="email"
 							name="email"
 							required
-							value={form?.email ?? ''}
+							value={prefilledEmail || form?.email || ''}
 							class="hud-input w-full px-3 py-2.5 text-sm text-[var(--hud-text)]"
 							placeholder="pilot@tyr.gg"
 						/>

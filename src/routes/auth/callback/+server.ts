@@ -46,12 +46,46 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 	if (error || errorCode) {
 		console.error('[auth-callback] OAuth error:', { error, errorCode, errorDescription });
 		
-		if (isLinkFlow) {
-			// Linking-specific error - redirect to settings with mapped error
-			const linkType = isEmailLinkFlow ? 'email' : 'google';
-			const mappedError = mapErrorCode(errorCode, linkType);
+		if (isGoogleLinkFlow) {
+			// Check if Google identity already exists on another account
+			const isIdentityExists = 
+				errorCode === 'identity_already_exists' ||
+				errorDescription?.toLowerCase().includes('already linked') ||
+				errorDescription?.toLowerCase().includes('already exists');
+			
+			if (isIdentityExists) {
+				// Get current user to initiate merge
+				const { data: { user } } = await locals.supabase.auth.getUser();
+				
+				if (!user) {
+					// No session - shouldn't happen but handle gracefully
+					const settingsUrl = new URL('/settings', url.origin);
+					settingsUrl.searchParams.set('error', 'link_failed');
+					redirect(303, settingsUrl.toString());
+				}
+				
+				// Initiate merge flow
+				const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+				const { value, options } = createMergeCookie(user.id);
+				cookies.set(MERGE_COOKIE_NAME, value, options);
+				
+				// Sign out current user
+				await locals.supabase.auth.signOut();
+				
+				// Redirect to auth page with merge marker
+				redirect(303, '/auth?merge=1&provider=google');
+			}
+			
+			// Other Google link errors - show generic error
 			const settingsUrl = new URL('/settings', url.origin);
-			settingsUrl.searchParams.set('error', mappedError);
+			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'google'));
+			redirect(303, settingsUrl.toString());
+		}
+		
+		if (isEmailLinkFlow) {
+			// Email linking-specific error
+			const settingsUrl = new URL('/settings', url.origin);
+			settingsUrl.searchParams.set('error', mapErrorCode(errorCode, 'email'));
 			redirect(303, settingsUrl.toString());
 		}
 		

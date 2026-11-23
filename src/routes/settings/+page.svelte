@@ -164,11 +164,35 @@
 				if (errorCode === 'email_exists' || errorCode === 'email_address_taken' ||
 				    emailError.message?.toLowerCase().includes('already') || 
 				    emailError.message?.toLowerCase().includes('exists')) {
-					// Email exists on another account - this would require merge flow
-					// For now, show a message that the email is taken
-					// Note: We can't initiate merge here because user hasn't proven ownership yet
-					// They would need to sign in with that email first (which we can't do without password)
-					emailFormError = 'This email is already in use. If you want to merge that account, please contact support.';
+					// Email exists on another account - initiate merge flow
+					// User will prove ownership by signing in with that account's password or magic link
+					try {
+						const response = await fetch('/auth/merge/init', {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json'
+							}
+						});
+						
+						if (!response.ok) {
+							emailFormError = 'Failed to initiate merge. Please try again.';
+							emailFormLoading = false;
+							return;
+						}
+						
+						// Store email in sessionStorage to prefill on auth page
+						sessionStorage.setItem('merge_email', emailFormData.email);
+						
+						// Sign out and redirect to auth with merge marker
+						await supabase.auth.signOut();
+						goto('/auth?merge=1&provider=email');
+						return;
+					} catch (err) {
+						console.error('[settings] Exception initiating merge:', err);
+						emailFormError = 'Failed to initiate merge. Please try again.';
+						emailFormLoading = false;
+						return;
+					}
 				} else {
 					emailFormError = 'Failed to update email. Please try again.';
 				}

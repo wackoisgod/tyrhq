@@ -135,17 +135,55 @@ describe('Auth Callback Handler', () => {
 	});
 
 	describe('Link error_code mapping', () => {
-		it('should map identity_already_exists error code', async () => {
+		it('should initiate merge when identity_already_exists error code for Google', async () => {
 			mockEvent.url = new URL(
 				'http://localhost:5173/auth/callback?error=invalid_request&error_code=identity_already_exists&error_description=Identity+is+already+linked&link=google'
 			);
+			
+			mockSupabase.auth.getUser.mockResolvedValue({
+				data: {
+					user: {
+						id: 'user-primary-123',
+						identities: []
+					}
+				},
+				error: null
+			});
+			
+			mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
 
 			try {
 				await GET(mockEvent as RequestEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
-				expect(err.location).toContain('/settings');
-				expect(err.location).toContain('error=identity_already_exists');
+				expect(err.location).toBe('/auth?merge=1&provider=google');
+				expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+			}
+		});
+		
+		it('should initiate merge when error description contains "already linked" for Google', async () => {
+			mockEvent.url = new URL(
+				'http://localhost:5173/auth/callback?error=invalid_request&error_description=Identity+is+already+linked+to+another+user&link=google'
+			);
+			
+			mockSupabase.auth.getUser.mockResolvedValue({
+				data: {
+					user: {
+						id: 'user-primary-456',
+						identities: []
+					}
+				},
+				error: null
+			});
+			
+			mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
+
+			try {
+				await GET(mockEvent as RequestEvent);
+			} catch (err: any) {
+				expect(err.status).toBe(303);
+				expect(err.location).toBe('/auth?merge=1&provider=google');
+				expect(mockSupabase.auth.signOut).toHaveBeenCalled();
 			}
 		});
 

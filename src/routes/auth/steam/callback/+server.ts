@@ -146,11 +146,16 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 	const supabaseAdmin = getSupabaseAdminClient();
 	
-	const { data: existingProfile } = await supabaseAdmin
+	const { data: existingProfile, error: lookupError } = await supabaseAdmin
 		.from('profiles')
 		.select('id')
 		.eq('verified_steam_id', steamId)
-		.single();
+		.maybeSingle();
+	
+	if (lookupError) {
+		console.error('[steam-callback] Profile lookup failed:', lookupError);
+		throw error(500, 'Failed to check Steam account');
+	}
 	
 	if (existingProfile && existingProfile.id !== user.id) {
 		// Steam ID belongs to another account - initiate merge flow
@@ -182,6 +187,29 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 
 	if (updateError) {
 		console.error('[steam-callback] Failed to link Steam:', updateError);
+		
+		// Handle race condition: Steam ID was just linked by another request
+		if (updateError.code === '23505') {
+			// Check again if it belongs to this user or another
+			const { data: recheckProfile } = await supabaseAdmin
+				.from('profiles')
+				.select('id')
+				.eq('verified_steam_id', steamId)
+				.maybeSingle();
+			
+			if (recheckProfile && recheckProfile.id !== user.id) {
+				// Another account claimed it - initiate merge flow
+				const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+				const { value, options } = createMergeCookie(user.id);
+				cookies.set(MERGE_COOKIE_NAME, value, options);
+				await locals.supabase.auth.signOut();
+				throw redirect(303, '/auth/steam/login?merge=1');
+			}
+			
+			// Same user somehow - treat as success
+			throw redirect(303, '/settings?success=steam_linked');
+		}
+		
 		throw error(500, 'Failed to link Steam account');
 	}
 
