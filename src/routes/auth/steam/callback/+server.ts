@@ -128,12 +128,48 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		throw error(400, 'Steam signature verification failed');
 	}
 
-	// Fetch Steam persona name and update profile
-	const { fetchSteamPersonaName } = await import('$lib/server/steam-persona');
-	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	// Check if user already has a different Steam ID
+	const { loadProfile } = await import('$lib/server/settings');
+	const currentProfile = await loadProfile(locals, user.id);
 	
-	const displayName = await fetchSteamPersonaName(steamId);
+	if (currentProfile?.verified_steam_id && currentProfile.verified_steam_id !== steamId) {
+		// User is trying to link a DIFFERENT Steam account - this is a conflict
+		throw error(400, 'You already have a different Steam account linked. Cannot link multiple Steam accounts.');
+	}
+	
+	if (currentProfile?.verified_steam_id === steamId) {
+		// User is re-linking the same Steam account - allow as no-op
+		throw redirect(303, '/settings?success=steam_linked');
+	}
+
+	// Check if this Steam ID is already linked to ANOTHER user
+	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
 	const supabaseAdmin = getSupabaseAdminClient();
+	
+	const { data: existingProfile } = await supabaseAdmin
+		.from('profiles')
+		.select('id')
+		.eq('verified_steam_id', steamId)
+		.single();
+	
+	if (existingProfile && existingProfile.id !== user.id) {
+		// Steam ID belongs to another account - initiate merge flow
+		const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+		
+		// Set merge cookie with current user as primary
+		const { value, options } = createMergeCookie(user.id);
+		cookies.set(MERGE_COOKIE_NAME, value, options);
+		
+		// Sign out current user
+		await locals.supabase.auth.signOut();
+		
+		// Redirect to Steam login for re-authentication (user will sign in as secondary account)
+		throw redirect(303, '/auth/steam/login?merge=1');
+	}
+	
+	// No conflict - proceed with normal linking
+	const { fetchSteamPersonaName } = await import('$lib/server/steam-persona');
+	const displayName = await fetchSteamPersonaName(steamId);
 	
 	const { error: updateError } = await supabaseAdmin
 		.from('profiles')
@@ -145,10 +181,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 		.eq('id', user.id);
 
 	if (updateError) {
-		if (updateError.code === '23505') {
-			// Unique constraint violation - Steam ID already linked to another account
-			throw error(400, 'This Steam account is already linked to another profile');
-		}
+		console.error('[steam-callback] Failed to link Steam:', updateError);
 		throw error(500, 'Failed to link Steam account');
 	}
 

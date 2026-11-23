@@ -32,7 +32,7 @@
 			
 			// Wait 2 seconds then redirect to sign in
 			setTimeout(() => {
-				goto('/auth?merge_complete=1');
+				goto('/auth');
 			}, 2000);
 		} catch (err) {
 			console.error('[merge-confirm] Exception:', err);
@@ -56,16 +56,16 @@
 </script>
 
 <svelte:head>
-	<title>Tyr HQ | Confirm Account Merge</title>
+	<title>Tyr HQ | Add Account</title>
 </svelte:head>
 
 <section class="mx-auto max-w-md px-6 py-16">
 	<div class="hud-panel p-8">
-		<p class="hud-eyebrow tracking-[0.35em]">Account Merge</p>
+		<p class="hud-eyebrow tracking-[0.35em]">Add Account</p>
 		<h1
 			class="mt-4 font-[var(--font-display)] text-4xl font-bold uppercase text-[var(--hud-text)]"
 		>
-			Confirm Merge
+			Add This Account to Yours
 		</h1>
 		
 		{#if error}
@@ -80,15 +80,15 @@
 			<div
 				class="mt-4 border-l-2 border-[var(--hud-teal)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[var(--hud-teal)]"
 			>
-				Accounts merged successfully! Redirecting to sign in...
+				Account added successfully! Redirecting to sign in...
 			</div>
 		{:else}
 			<div class="mt-6 space-y-4">
 				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-					<p class="text-sm font-semibold text-[var(--hud-text)]">You're about to merge:</p>
+					<p class="text-sm font-semibold text-[var(--hud-text)]">Add this account to your primary account:</p>
 					<div class="mt-3 space-y-2">
 						<div class="rounded-sm bg-[var(--hud-inset)] p-3">
-							<p class="text-xs font-semibold text-[var(--hud-muted)]">Secondary Account (will be deleted)</p>
+							<p class="text-xs font-semibold text-[var(--hud-muted)]">Account to Add</p>
 							<p class="mt-1 text-sm text-[var(--hud-text)]">{data.secondaryEmail || 'Current account'}</p>
 						</div>
 						<div class="flex items-center justify-center">
@@ -97,17 +97,27 @@
 							</svg>
 						</div>
 						<div class="rounded-sm bg-[var(--hud-teal)]/10 border border-[var(--hud-teal)] p-3">
-							<p class="text-xs font-semibold text-[var(--hud-teal)]">Primary Account (keeps everything)</p>
+							<p class="text-xs font-semibold text-[var(--hud-teal)]">Your Primary Account</p>
 							<p class="mt-1 text-sm text-[var(--hud-text)]">{data.primaryEmail || 'Unknown'}</p>
 						</div>
 					</div>
 				</div>
 				
+				<div class="rounded-sm bg-[var(--hud-teal)]/10 border border-[var(--hud-teal)] p-4">
+					<p class="text-xs font-semibold text-[var(--hud-teal)]">📦 What Will Be Added</p>
+					<ul class="mt-2 space-y-1 text-xs text-[var(--hud-muted)] list-disc list-inside">
+						<li>All builds and build stars</li>
+						<li>Tournament registrations and rosters</li>
+						<li>Team memberships</li>
+						<li>Community events and contributions</li>
+						<li>Steam verification (if present)</li>
+					</ul>
+				</div>
+				
 				<div class="rounded-sm bg-[var(--hud-warning)]/10 border border-[var(--hud-warning)] p-3">
-					<p class="text-xs font-semibold text-[var(--hud-warning)]">⚠ Warning</p>
+					<p class="text-xs font-semibold text-[var(--hud-warning)]">⚠ Important</p>
 					<p class="mt-2 text-xs text-[var(--hud-muted)]">
-						This action cannot be undone. All data from the secondary account will be moved to the primary account,
-						and the secondary account will be permanently deleted.
+						This action cannot be undone. The account being added will be permanently removed after all data is transferred.
 					</p>
 				</div>
 				
@@ -119,9 +129,9 @@
 						disabled={merging}
 					>
 						{#if merging}
-							Merging...
+							Adding Account...
 						{:else}
-							Confirm Merge
+							Add Account
 						{/if}
 					</button>
 					<button

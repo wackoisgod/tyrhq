@@ -28,6 +28,9 @@ const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 export const GET: RequestHandler = async ({ url, cookies }) => {
 	// Get optional redirect target
 	const next = sanitizePostAuthRedirect(url.searchParams.get('next'));
+	
+	// Check if this is a merge flow
+	const isMergeFlow = url.searchParams.get('merge') === '1';
 
 	// Generate random state nonce for CSRF protection
 	const stateNonce = crypto.randomUUID();
@@ -36,8 +39,8 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const returnUrl = new URL('/auth/steam/login/callback', url.origin);
 	returnUrl.searchParams.set('state', stateNonce);
 
-	// Encode the mode and next path in the state
-	const state = JSON.stringify({ mode: 'login', next, nonce: stateNonce });
+	// Encode the mode, next path, and merge flag in the state
+	const state = JSON.stringify({ mode: 'login', next, nonce: stateNonce, merge: isMergeFlow });
 
 	// Generate OpenID 2.0 request parameters
 	const params = new URLSearchParams({

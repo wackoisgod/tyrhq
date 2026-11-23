@@ -69,9 +69,13 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		if (!exchangeError) {
 			// Check if this is a merge flow (MUST check before link flow)
 			// Never allow link=google to hijack into merge
-			if (isMergeFlow && !isLinkFlow && mergeCookie && mergeCookie.phase === 'initiated') {
-				// Redirect to merge confirmation page
-				redirect(303, '/auth/merge/confirm');
+			if (isMergeFlow && !isLinkFlow && mergeCookie) {
+				if (mergeCookie.phase === 'initiated') {
+					// Redirect to merge confirmation page
+					redirect(303, '/auth/merge/confirm');
+				}
+				// If phase is 'authenticated', the merge has been confirmed but cookie not yet cleaned up
+				// Just continue with normal flow (merge already happened)
 			}
 			
 			// Success - check if this was a linking flow
@@ -81,9 +85,31 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 				const hasGoogleIdentity = user?.identities?.some((i) => i.provider === 'google');
 				
 				if (hasGoogleIdentity) {
+					// Successfully linked
 					const settingsUrl = new URL('/settings', url.origin);
 					settingsUrl.searchParams.set('success', 'google_linked');
 					redirect(303, settingsUrl.toString());
+				} else {
+					// OAuth succeeded but Google identity NOT linked - this means it already exists on another account
+					// Initiate merge flow
+					const { createMergeCookie, MERGE_COOKIE_NAME } = await import('$lib/server/account-merge');
+					
+					if (!user) {
+						// Should not happen but guard against it
+						const settingsUrl = new URL('/settings', url.origin);
+						settingsUrl.searchParams.set('error', 'link_failed');
+						redirect(303, settingsUrl.toString());
+					}
+					
+					// Set merge cookie with current user as primary
+					const { value, options } = createMergeCookie(user.id);
+					cookies.set(MERGE_COOKIE_NAME, value, options);
+					
+					// Sign out current user
+					await locals.supabase.auth.signOut();
+					
+					// Redirect to auth page with merge marker to sign in with Google again
+					redirect(303, '/auth?merge=1&provider=google');
 				}
 			}
 			

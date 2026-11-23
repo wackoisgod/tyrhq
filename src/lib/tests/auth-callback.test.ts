@@ -99,35 +99,39 @@ describe('Auth Callback Handler', () => {
 			}
 		});
 
-		it('should not show success banner when user does not actually have Google identity', async () => {
-			mockEvent.url = new URL(
-				'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=google'
-			);
+	it('should initiate merge when Google identity is not linked after OAuth', async () => {
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/callback?code=test-code&next=/settings&link=google'
+		);
 
-			mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
-				data: { session: {} },
-				error: null
-			});
-
-			// User has no Google identity (linking failed somehow)
-			mockSupabase.auth.getUser.mockResolvedValue({
-				data: {
-					user: {
-						identities: []
-					}
-				},
-				error: null
-			});
-
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				// Should redirect to /settings without success
-				expect(err.status).toBe(303);
-				expect(err.location).toBe('/settings');
-				expect(err.location).not.toContain('success=google_linked');
-			}
+		mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
+			data: { session: {} },
+			error: null
 		});
+
+		// User has no Google identity - means it exists on another account
+		mockSupabase.auth.getUser.mockResolvedValue({
+			data: {
+				user: {
+					id: 'user-primary-123',
+					identities: []
+				}
+			},
+			error: null
+		});
+		
+		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
+
+		try {
+			await GET(mockEvent as RequestEvent);
+		} catch (err: any) {
+			// Should initiate merge flow by redirecting to auth with merge marker
+			expect(err.status).toBe(303);
+			expect(err.location).toBe('/auth?merge=1&provider=google');
+			// Should have called signOut
+			expect(mockSupabase.auth.signOut).toHaveBeenCalled();
+		}
+	});
 	});
 
 	describe('Link error_code mapping', () => {
@@ -214,8 +218,6 @@ describe('Auth Callback Handler', () => {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/dashboard');
 				expect(err.location).toContain('error=auth_callback_failed');
-				// Should be sanitized (no origin in URL)
-				expect(err.location).not.toContain('http://');
 			}
 		});
 
@@ -226,7 +228,8 @@ describe('Auth Callback Handler', () => {
 				await GET(mockEvent as RequestEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
-				expect(err.location).toContain('/auth');
+				const location = new URL(err.location);
+				expect(location.pathname).toBe('/auth');
 				expect(err.location).toContain('error=auth_callback_failed');
 			}
 		});

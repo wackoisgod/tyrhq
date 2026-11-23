@@ -35,9 +35,13 @@
 
 	function handleSteamLogin() {
 		const next = $page.url.searchParams.get('next') || $page.url.searchParams.get('redirectTo');
+		const merge = $page.url.searchParams.get('merge');
 		const steamUrl = new URL('/auth/steam/login', window.location.origin);
 		if (next) {
 			steamUrl.searchParams.set('next', next);
+		}
+		if (merge === '1') {
+			steamUrl.searchParams.set('merge', '1');
 		}
 		window.location.href = steamUrl.toString();
 	}
@@ -58,6 +62,7 @@
 	
 	// Check if this is a merge flow
 	const isMergeFlow = $page.url.searchParams.get('merge') === '1';
+	const suggestedProvider = $page.url.searchParams.get('provider'); // 'google' hint for merge
 </script>
 
 <svelte:head>
@@ -88,13 +93,17 @@
 		<div class="hud-panel p-8">
 			{#if isMergeFlow}
 				<div class="mb-6 rounded-sm bg-[var(--hud-teal)]/10 border border-[var(--hud-teal)] p-4">
-					<p class="text-sm font-semibold text-[var(--hud-teal)]">📋 Account Merge in Progress</p>
+					<p class="text-sm font-semibold text-[var(--hud-teal)]">📋 Adding Account</p>
 					<p class="mt-2 text-xs text-[var(--hud-text)]">
-						Sign in with the account you want to <strong>merge into your primary account</strong>.
-						After signing in, you'll be prompted to confirm the merge.
+						{#if suggestedProvider === 'google'}
+							Sign in with the <strong>Google account</strong> you want to add to your primary account.
+						{:else}
+							Sign in with the account you want to <strong>add to your primary account</strong>.
+						{/if}
+						After signing in, you'll be prompted to confirm.
 					</p>
 					<p class="mt-2 text-xs text-[var(--hud-muted)]">
-						The account you sign in with here will be permanently deleted after the merge.
+						The account you sign in with here will be permanently merged.
 					</p>
 				</div>
 			{/if}
