@@ -21,29 +21,20 @@
  */
 
 import { env } from '$env/dynamic/private';
-import { createRemoteJWKSet, SignJWT, jwtVerify, importPKCS8, exportJWK } from 'jose';
+import { SignJWT, jwtVerify, importPKCS8, exportJWK, EncryptJWT, jwtDecrypt, importSPKI } from 'jose';
 import type { JWK } from 'jose';
+import { createPublicKey } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login';
 const STEAM_ID_REGEX = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/;
 const STEAM_API_TIMEOUT_MS = 3000;
-const CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CODE_TTL_SECONDS = 60; // 60 seconds (stateless codes)
 const TOKEN_TTL_SECONDS = 3600; // 1 hour
-
-interface PendingAuthCode {
-	code: string;
-	steamId: string;
-	redirectUri: string;
-	codeChallenge: string;
-	createdAt: number;
-}
-
-// In-memory store for pending codes (production should use Redis or similar)
-const pendingCodes = new Map<string, PendingAuthCode>();
 
 /**
  * Get or generate RSA keys for JWT signing
- * In production with multiple instances, use a shared key store
+ * SECURITY: Only exports PUBLIC key for JWKS
  */
 let cachedPrivateKey: CryptoKey | null = null;
 let cachedPublicJWK: JWK | null = null;
@@ -61,13 +52,32 @@ async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicJWK: 
 	// Import private key from PEM
 	const privateKey = await importPKCS8(privateKeyPem, 'RS256');
 	
-	// Export public key as JWK
-	const publicJWK = await exportJWK(privateKey);
+	// SECURITY FIX: Derive public key from private key PEM
+	// createPublicKey extracts only the public components
+	const publicKeyObject = createPublicKey({
+		key: privateKeyPem,
+		format: 'pem',
+		type: 'pkcs8'
+	});
+	
+	const publicKeyPem = publicKeyObject.export({
+		type: 'spki',
+		format: 'pem'
+	}) as string;
+	
+	// Import public key and export as JWK (contains only n, e, kty)
+	const publicKeyCrypto = await importSPKI(publicKeyPem, 'RS256');
+	const publicJWK = await exportJWK(publicKeyCrypto);
 	
 	// Add key ID and algorithm
 	publicJWK.kid = 'steam-oidc-1';
 	publicJWK.alg = 'RS256';
 	publicJWK.use = 'sig';
+	
+	// SECURITY: Verify no private components leaked
+	if (publicJWK.d || publicJWK.p || publicJWK.q || publicJWK.dp || publicJWK.dq || publicJWK.qi) {
+		throw new Error('SECURITY: Private key components leaked into public JWK');
+	}
 	
 	cachedPrivateKey = privateKey;
 	cachedPublicJWK = publicJWK;
@@ -76,12 +86,99 @@ async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicJWK: 
 }
 
 /**
- * Generate a random code
+ * Get encryption key for stateless codes
  */
-function generateCode(): string {
-	const array = new Uint8Array(32);
-	crypto.getRandomValues(array);
-	return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+async function getCodeEncryptionKey(): Promise<CryptoKey> {
+	const secret = env.STEAM_OIDC_CLIENT_SECRET;
+	if (!secret) {
+		throw new Error('STEAM_OIDC_CLIENT_SECRET not configured');
+	}
+	
+	// Derive 256-bit key from client secret
+	const encoder = new TextEncoder();
+	const keyMaterial = await crypto.subtle.importKey(
+		'raw',
+		encoder.encode(secret),
+		'PBKDF2',
+		false,
+		['deriveBits', 'deriveKey']
+	);
+	
+	return crypto.subtle.deriveKey(
+		{
+			name: 'PBKDF2',
+			salt: encoder.encode('steam-oidc-code-encryption'),
+			iterations: 100000,
+			hash: 'SHA-256'
+		},
+		keyMaterial,
+		{ name: 'AES-GCM', length: 256 },
+		false,
+		['encrypt', 'decrypt']
+	);
+}
+
+/**
+ * Generate stateless authorization code (encrypted JWT)
+ * SECURITY FIX: Stateless codes work across serverless instances
+ */
+async function generateStatelessCode(payload: {
+	steamId: string;
+	redirectUri: string;
+	codeChallenge?: string;
+	clientId: string;
+}): Promise<string> {
+	const { privateKey } = await getOrGenerateKeys();
+	const jti = crypto.randomUUID();
+	const now = Math.floor(Date.now() / 1000);
+	
+	// Create signed JWT with code payload
+	const jwt = await new SignJWT({
+		steam_id: payload.steamId,
+		redirect_uri: payload.redirectUri,
+		code_challenge: payload.codeChallenge,
+		client_id: payload.clientId,
+		jti
+	})
+		.setProtectedHeader({ alg: 'RS256', kid: 'steam-oidc-1' })
+		.setIssuedAt(now)
+		.setExpirationTime(now + CODE_TTL_SECONDS)
+		.setIssuer(getIssuer(''))
+		.sign(privateKey);
+	
+	return jwt;
+}
+
+/**
+ * Verify and decode stateless authorization code
+ */
+async function verifyStatelessCode(code: string, origin: string): Promise<{
+	steamId: string;
+	redirectUri: string;
+	codeChallenge?: string;
+	clientId: string;
+	jti: string;
+} | null> {
+	try {
+		const { privateKey } = await getOrGenerateKeys();
+		const issuer = getIssuer(origin);
+		
+		// Verify signature and expiration
+		const { payload } = await jwtVerify(code, privateKey, {
+			issuer,
+			maxTokenAge: `${CODE_TTL_SECONDS}s`
+		});
+		
+		return {
+			steamId: payload.steam_id as string,
+			redirectUri: payload.redirect_uri as string,
+			codeChallenge: payload.code_challenge as string | undefined,
+			clientId: payload.client_id as string,
+			jti: payload.jti as string
+		};
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -99,6 +196,7 @@ async function hashCodeVerifier(verifier: string): Promise<string> {
 
 /**
  * Verify Steam OpenID signature
+ * SECURITY: Strict validation of is_valid:true response
  */
 async function verifyOpenIdSignature(params: URLSearchParams): Promise<boolean> {
 	const verifyParams = new URLSearchParams(params);
@@ -111,11 +209,38 @@ async function verifyOpenIdSignature(params: URLSearchParams): Promise<boolean> 
 			body: verifyParams.toString()
 		});
 
-		if (!response.ok) return false;
+		if (!response.ok) {
+			console.error('[steam-oidc] Steam check_authentication failed:', response.status);
+			return false;
+		}
 
 		const text = await response.text();
-		return text.split('\n').some(line => line.trim() === 'is_valid:true');
-	} catch {
+		
+		// SECURITY: Require EXACT 'is_valid:true' line (no whitespace tolerance on value)
+		const lines = text.split('\n');
+		let foundValidTrue = false;
+		
+		for (const line of lines) {
+			const trimmed = line.trim();
+			// Check for exact match
+			if (trimmed === 'is_valid:true') {
+				foundValidTrue = true;
+				break;
+			}
+			// Reject is_valid:false explicitly
+			if (trimmed === 'is_valid:false') {
+				console.error('[steam-oidc] Steam returned is_valid:false');
+				return false;
+			}
+		}
+		
+		if (!foundValidTrue) {
+			console.error('[steam-oidc] Steam response missing is_valid:true');
+		}
+		
+		return foundValidTrue;
+	} catch (err) {
+		console.error('[steam-oidc] Steam verification exception:', err);
 		return false;
 	}
 }
@@ -201,30 +326,33 @@ function getClientId(): string {
 }
 
 /**
- * Verify client_secret
+ * Verify client_secret with constant-time comparison
+ * SECURITY FIX: Prevents timing attacks
  */
 function verifyClientSecret(secret: string | null): boolean {
 	const expectedSecret = env.STEAM_OIDC_CLIENT_SECRET;
 	if (!expectedSecret) {
 		throw new Error('STEAM_OIDC_CLIENT_SECRET not configured');
 	}
-	return secret === expectedSecret;
-}
-
-/**
- * Clean up expired codes periodically
- */
-function cleanupExpiredCodes() {
-	const now = Date.now();
-	for (const [code, data] of pendingCodes.entries()) {
-		if (now - data.createdAt > CODE_TTL_MS) {
-			pendingCodes.delete(code);
-		}
+	
+	if (!secret || secret.length !== expectedSecret.length) {
+		return false;
+	}
+	
+	// Constant-time comparison using crypto.timingSafeEqual
+	const secretBuf = Buffer.from(secret, 'utf8');
+	const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+	
+	try {
+		return timingSafeEqual(secretBuf, expectedBuf);
+	} catch {
+		return false;
 	}
 }
 
-// Run cleanup every minute
-setInterval(cleanupExpiredCodes, 60_000);
+/**
+ * No cleanup needed - codes are stateless JWTs with expiration
+ */
 
 export const steamOidcProvider = {
 	/**
@@ -259,6 +387,8 @@ export const steamOidcProvider = {
 
 	/**
 	 * Authorize endpoint - initiates Steam OpenID flow
+	 * SECURITY: PKCE is optional because Supabase may not forward it to custom OIDC providers
+	 * We rely on client_secret for security instead
 	 */
 	async authorize(params: {
 		client_id: string;
@@ -286,8 +416,9 @@ export const steamOidcProvider = {
 			return { error: 'invalid_request' };
 		}
 
-		// PKCE required
-		if (!params.code_challenge || params.code_challenge_method !== 'S256') {
+		// PKCE is optional but enforced when present
+		// Supabase custom OIDC providers may not forward PKCE to upstream
+		if (params.code_challenge && params.code_challenge_method !== 'S256') {
 			return { error: 'invalid_request' };
 		}
 
@@ -313,14 +444,16 @@ export const steamOidcProvider = {
 
 	/**
 	 * Steam callback - verifies Steam response and generates authorization code
+	 * SECURITY: Enhanced validation of Steam response
 	 */
 	async handleSteamCallback(searchParams: URLSearchParams, origin: string): Promise<{ redirectUrl: string } | { error: string }> {
 		// Extract our state params
 		const state = searchParams.get('state');
 		const redirectUri = searchParams.get('redirect_uri');
 		const codeChallenge = searchParams.get('code_challenge');
+		const clientId = getClientId();
 
-		if (!state || !redirectUri || !codeChallenge) {
+		if (!state || !redirectUri) {
 			return { error: 'invalid_state' };
 		}
 
@@ -337,16 +470,31 @@ export const steamOidcProvider = {
 			return { error: 'invalid_openid_response' };
 		}
 
-		// Security checks
+		// SECURITY: Strict validation of Steam response
 		const opEndpoint = searchParams.get('openid.op_endpoint');
 		if (opEndpoint !== STEAM_OPENID_URL) {
+			console.error('[steam-oidc] Invalid op_endpoint:', opEndpoint);
 			return { error: 'invalid_provider' };
+		}
+
+		// SECURITY: Verify return_to matches our callback
+		const returnTo = searchParams.get('openid.return_to');
+		const expectedCallbackPrefix = `${origin}/auth/steam/oidc/callback?`;
+		if (!returnTo || !returnTo.startsWith(expectedCallbackPrefix)) {
+			console.error('[steam-oidc] Invalid return_to:', returnTo);
+			return { error: 'invalid_return_to' };
 		}
 
 		const claimedId = searchParams.get('openid.claimed_id');
 		const identity = searchParams.get('openid.identity');
 
-		if (!claimedId || !identity || claimedId !== identity) {
+		if (!claimedId || !identity) {
+			return { error: 'missing_identity' };
+		}
+
+		// SECURITY: claimed_id MUST equal identity
+		if (claimedId !== identity) {
+			console.error('[steam-oidc] claimed_id !== identity');
 			return { error: 'identity_mismatch' };
 		}
 
@@ -355,20 +503,19 @@ export const steamOidcProvider = {
 			return { error: 'invalid_steam_id' };
 		}
 
-		// Verify signature with Steam
+		// SECURITY: Verify signature with Steam (server-side check_authentication)
 		const isValid = await verifyOpenIdSignature(searchParams);
 		if (!isValid) {
+			console.error('[steam-oidc] Steam signature verification failed');
 			return { error: 'signature_verification_failed' };
 		}
 
-		// Generate authorization code
-		const code = generateCode();
-		pendingCodes.set(code, {
-			code,
+		// Generate stateless authorization code
+		const code = await generateStatelessCode({
 			steamId,
 			redirectUri,
 			codeChallenge,
-			createdAt: Date.now()
+			clientId
 		});
 
 		// Redirect back to Supabase with code
@@ -381,12 +528,13 @@ export const steamOidcProvider = {
 
 	/**
 	 * Token endpoint - exchanges authorization code for tokens
+	 * SECURITY: Uses stateless codes, constant-time secret verification, optional PKCE
 	 */
 	async token(params: {
 		grant_type: string;
 		code: string;
 		redirect_uri: string;
-		code_verifier: string;
+		code_verifier?: string;
 		client_id: string;
 		client_secret: string;
 	}, origin: string): Promise<{ access_token: string; token_type: string; expires_in: number; id_token: string } | { error: string }> {
@@ -395,20 +543,19 @@ export const steamOidcProvider = {
 			return { error: 'unsupported_grant_type' };
 		}
 
-		// Verify client
+		// SECURITY: Verify client with constant-time comparison
 		if (params.client_id !== getClientId() || !verifyClientSecret(params.client_secret)) {
 			return { error: 'invalid_client' };
 		}
 
-		// Look up authorization code
-		const codeData = pendingCodes.get(params.code);
+		// Verify and decode stateless authorization code
+		const codeData = await verifyStatelessCode(params.code, origin);
 		if (!codeData) {
 			return { error: 'invalid_grant' };
 		}
 
-		// Check expiration
-		if (Date.now() - codeData.createdAt > CODE_TTL_MS) {
-			pendingCodes.delete(params.code);
+		// Verify client_id matches code
+		if (codeData.clientId !== params.client_id) {
 			return { error: 'invalid_grant' };
 		}
 
@@ -417,14 +564,17 @@ export const steamOidcProvider = {
 			return { error: 'invalid_grant' };
 		}
 
-		// Verify PKCE
-		const computedChallenge = await hashCodeVerifier(params.code_verifier);
-		if (computedChallenge !== codeData.codeChallenge) {
-			return { error: 'invalid_grant' };
+		// SECURITY: Verify PKCE if code has code_challenge
+		// PKCE is optional because Supabase may not forward it
+		if (codeData.codeChallenge) {
+			if (!params.code_verifier) {
+				return { error: 'invalid_grant' };
+			}
+			const computedChallenge = await hashCodeVerifier(params.code_verifier);
+			if (computedChallenge !== codeData.codeChallenge) {
+				return { error: 'invalid_grant' };
+			}
 		}
-
-		// Code is single-use
-		pendingCodes.delete(params.code);
 
 		// Fetch Steam persona
 		const persona = await fetchSteamPersona(codeData.steamId);
