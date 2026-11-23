@@ -136,6 +136,10 @@ openssl rand -base64 32
 
 **Provider Name:** `Steam`
 
+**IMPORTANT: Provider Identifier**
+
+The Supabase provider identifier MUST be set to `custom:steam` (not just `steam`). This is the full identifier including the `custom:` prefix.
+
 **Issuer URL:**
 ```
 https://www.tyrhq.com
@@ -152,6 +156,19 @@ tyrhq-steam-oidc
 ```
 <paste your STEAM_OIDC_CLIENT_SECRET>
 ```
+
+**IMPORTANT: Paste client secret and private key as multi-line text**
+
+When pasting the `STEAM_OIDC_PRIVATE_KEY` PEM in Vercel or Supabase, paste it with actual newlines (multi-line), NOT escaped as `\n`. The PEM format requires actual line breaks:
+
+```
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+...more lines...
+-----END PRIVATE KEY-----
+```
+
+Do NOT paste as: `-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----`
 
 **Discovery URL:**
 ```
@@ -368,16 +385,9 @@ export function computeSignInMethods(
 
 ## Migration Notes
 
-**No user migration needed.** Only Andrew's test account has used Steam, and he can:
+**Legacy OpenID 2.0 routes removed:** The old `/auth/steam/login` and `/auth/steam/callback` routes have been removed in favor of the unified Supabase OAuth flow. All Steam authentication now goes through the OIDC bridge at `/auth/steam/oidc/*`.
 
-1. Sign out
-2. Sign in with Google (or email+password if set)
-3. Go to Settings
-4. Click "Link Steam Account"
-5. Authenticate with Steam
-6. Done! His `verified_steam_id` will be populated from the new identity
-
-The old `/auth/steam/login/callback` flow can remain for backward compatibility or be removed after re-linking.
+**Database trigger syncs verified_steam_id:** Migration 032 added a trigger that automatically syncs `profiles.verified_steam_id` from `auth.identities` when a Steam identity is added or removed. No manual writes to `verified_steam_id` are needed in application code.
 
 ## Security Notes
 

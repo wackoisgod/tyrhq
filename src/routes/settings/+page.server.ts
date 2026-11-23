@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const canSetPassword = hasRealEmail;
 
 	// Compute sign-in methods for unlink/remove guards
-	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+	const signInMethods = computeSignInMethods(user);
 
 	// Fetch merge history via admin client (service_role only)
 	// SECURITY: Filter by primary_user_id = current user to prevent leaking other users' merges
@@ -178,11 +178,8 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
-		// Load profile to get Steam verification status
-		const profile = await loadProfile(locals, user.id);
-
 		// Server-side guard: Check if user has at least one other sign-in method
-		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+		const signInMethods = computeSignInMethods(user);
 		if (!signInMethods.canUnlinkSteam) {
 			return fail(400, {
 				profileError:
@@ -195,32 +192,6 @@ export const actions: Actions = {
 		const steamIdentity = user.identities?.find((i) => i.provider === STEAM_PROVIDER);
 
 		if (!steamIdentity) {
-			// No Steam identity - check if legacy verified_steam_id exists
-			if (profile?.verified_steam_id) {
-				// Legacy Steam user - clear verified_steam_id directly
-				const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-				const supabaseAdmin = getSupabaseAdminClient();
-				if (!supabaseAdmin) {
-					return fail(500, { profileError: 'Admin client not configured' });
-				}
-
-				const { error: updateError } = await supabaseAdmin
-					.from('profiles')
-					.update({
-						verified_steam_id: null,
-						steam_display_name: null,
-						steam_verified_at: null
-					})
-					.eq('id', user.id);
-
-				if (updateError) {
-					console.error('Error unlinking legacy Steam:', updateError);
-					return fail(500, { profileError: 'Failed to unlink Steam account' });
-				}
-
-				return { profileSuccess: 'Steam account unlinked' };
-			}
-
 			return fail(400, { profileError: 'No Steam account to unlink' });
 		}
 
@@ -250,11 +221,8 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
-		// Load profile to get Steam verification status
-		const profile = await loadProfile(locals, user.id);
-
 		// Server-side guard: Check if user has at least one other sign-in method
-		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+		const signInMethods = computeSignInMethods(user);
 		if (!signInMethods.canUnlinkGoogle) {
 			return fail(400, {
 				profileError:
@@ -296,11 +264,8 @@ export const actions: Actions = {
 		const { session, user } = await locals.safeGetSession();
 		if (!session || !user) return fail(401, { error: 'Not authenticated' });
 
-		// Load profile to get Steam verification status
-		const profile = await loadProfile(locals, user.id);
-
 		// Server-side guard: Check if user has at least one other sign-in method
-		const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+		const signInMethods = computeSignInMethods(user);
 		if (!signInMethods.canRemovePassword) {
 			return fail(400, {
 				profileError:

@@ -32,8 +32,7 @@ export interface SplitCookieData {
 	nonce: string;
 	currentUserId: string;
 	provider: 'google' | 'email' | 'steam';
-	identityId?: string; // For Google/email identity
-	steamId?: string; // For Steam verification
+	identityId?: string; // Identity ID for all providers
 	phase: 'initiated' | 'authenticated';
 	issuedAt: number;
 	expiresAt: number;
@@ -43,8 +42,7 @@ export interface SplitCookieData {
  * Create a signed split cookie
  * @param currentUserId The current user's ID
  * @param provider Which sign-in method to split off
- * @param identityId Optional identity ID for Google/email
- * @param steamId Optional Steam ID for Steam verification
+ * @param identityId Identity ID for the provider to split
  * @param phase 'initiated' or 'authenticated'
  * @returns Cookie value and options
  */
@@ -52,7 +50,6 @@ export function createSplitCookie(
 	currentUserId: string,
 	provider: 'google' | 'email' | 'steam',
 	identityId?: string,
-	steamId?: string,
 	phase: 'initiated' | 'authenticated' = 'initiated'
 ): {
 	value: string;
@@ -73,7 +70,6 @@ export function createSplitCookie(
 		currentUserId,
 		provider,
 		identityId,
-		steamId,
 		phase,
 		issuedAt,
 		expiresAt

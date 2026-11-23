@@ -30,14 +30,14 @@ describe('Account Split', () => {
 			expect(verified?.nonce.length).toBe(64);
 		});
 
-		it('should create valid split cookie for Steam', () => {
-			const { value } = createSplitCookie('user-123', 'steam', undefined, '76561198012345678');
+	it('should create valid split cookie for Steam', () => {
+		const { value } = createSplitCookie('user-123', 'steam', 'steam-identity-456');
 
-			const verified = verifySplitCookie(value);
-			expect(verified).toBeTruthy();
-			expect(verified?.provider).toBe('steam');
-			expect(verified?.steamId).toBe('76561198012345678');
-		});
+		const verified = verifySplitCookie(value);
+		expect(verified).toBeTruthy();
+		expect(verified?.provider).toBe('steam');
+		expect(verified?.identityId).toBe('steam-identity-456');
+	});
 
 		it('should create valid split cookie for email', () => {
 			const { value } = createSplitCookie('user-123', 'email', 'email-identity-789');
@@ -48,19 +48,18 @@ describe('Account Split', () => {
 			expect(verified?.identityId).toBe('email-identity-789');
 		});
 
-		it('should create authenticated phase cookie', () => {
-			const { value } = createSplitCookie(
-				'user-123',
-				'google',
-				'google-identity-456',
-				undefined,
-				'authenticated'
-			);
+	it('should create authenticated phase cookie', () => {
+		const { value } = createSplitCookie(
+			'user-123',
+			'google',
+			'google-identity-456',
+			'authenticated'
+		);
 
-			const verified = verifySplitCookie(value);
-			expect(verified).toBeTruthy();
-			expect(verified?.phase).toBe('authenticated');
-		});
+		const verified = verifySplitCookie(value);
+		expect(verified).toBeTruthy();
+		expect(verified?.phase).toBe('authenticated');
+	});
 
 		it('should reject tampered cookie', () => {
 			const { value } = createSplitCookie('user-123', 'google', 'identity-456');

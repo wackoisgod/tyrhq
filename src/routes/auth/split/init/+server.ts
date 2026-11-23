@@ -8,7 +8,6 @@ import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createSplitCookie, getSplitSecret, SPLIT_COOKIE_NAME } from '$lib/server/account-split';
 import { computeSignInMethods } from '$lib/server/sign-in-methods';
-import { loadProfile } from '$lib/server/settings';
 
 export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 	const { session, user } = await locals.safeGetSession();
@@ -32,50 +31,60 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 		throw error(400, 'Invalid provider. Must be google, email, or steam.');
 	}
 
-	// Load profile to check Steam verification
-	const profile = await loadProfile(locals, user.id);
-
 	// Verify user has at least 2 sign-in methods
-	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+	const signInMethods = computeSignInMethods(user);
 
 	if (signInMethods.count < 2) {
 		throw error(400, 'Cannot split sign-in method: you must have at least 2 sign-in methods.');
 	}
 
-	// Verify user has the requested method
-	let identityId: string | undefined;
-	let steamId: string | undefined;
+	// Map provider to identity provider name and validation
+	const { STEAM_PROVIDER } = await import('$lib/server/steam-oidc-provider');
+	const providerConfig: Record<string, {
+		identityProvider: string;
+		hasMethod: boolean;
+		canUnlink: boolean;
+		errorName: string;
+	}> = {
+		google: {
+			identityProvider: 'google',
+			hasMethod: signInMethods.hasGoogle,
+			canUnlink: signInMethods.canUnlinkGoogle,
+			errorName: 'Google'
+		},
+		email: {
+			identityProvider: 'email',
+			hasMethod: signInMethods.hasEmailPassword,
+			canUnlink: signInMethods.canRemovePassword,
+			errorName: 'email+password'
+		},
+		steam: {
+			identityProvider: STEAM_PROVIDER,
+			hasMethod: signInMethods.hasSteam,
+			canUnlink: signInMethods.canUnlinkSteam,
+			errorName: 'Steam'
+		}
+	};
 
-	if (provider === 'google') {
-		if (!signInMethods.hasGoogle) {
-			throw error(400, 'You do not have a Google sign-in method to split.');
-		}
-		if (!signInMethods.canUnlinkGoogle) {
-			throw error(400, 'Cannot split Google: you must keep at least one sign-in method.');
-		}
-		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
-		identityId = googleIdentity?.id;
-	} else if (provider === 'email') {
-		if (!signInMethods.hasEmailPassword) {
-			throw error(400, 'You do not have an email+password sign-in method to split.');
-		}
-		if (!signInMethods.canRemovePassword) {
-			throw error(400, 'Cannot split email+password: you must keep at least one sign-in method.');
-		}
-		const emailIdentity = user.identities?.find((i) => i.provider === 'email');
-		identityId = emailIdentity?.id;
-	} else if (provider === 'steam') {
-		if (!signInMethods.hasSteam) {
-			throw error(400, 'You do not have a verified Steam sign-in method to split.');
-		}
-		if (!signInMethods.canUnlinkSteam) {
-			throw error(400, 'Cannot split Steam: you must keep at least one sign-in method.');
-		}
-		steamId = profile?.verified_steam_id ?? undefined;
+	const config = providerConfig[provider];
+	if (!config) {
+		throw error(400, `Unsupported provider: ${provider}`);
 	}
 
+	if (!config.hasMethod) {
+		throw error(400, `You do not have a ${config.errorName} sign-in method to split.`);
+	}
+
+	if (!config.canUnlink) {
+		throw error(400, `Cannot split ${config.errorName}: you must keep at least one sign-in method.`);
+	}
+
+	// Find the identity
+	const identity = user.identities?.find((i) => i.provider === config.identityProvider);
+	const identityId = identity?.id;
+
 	// Create split cookie
-	const { value, options } = createSplitCookie(user.id, provider, identityId, steamId);
+	const { value, options } = createSplitCookie(user.id, provider, identityId);
 
 	cookies.set(SPLIT_COOKIE_NAME, value, options);
 
