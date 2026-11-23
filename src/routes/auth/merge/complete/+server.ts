@@ -84,7 +84,21 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 			throw httpError(500, 'Failed to validate merge request');
 		}
 
-		// Call the merge function
+		// IMPORTANT: Ban secondary user BEFORE merge to prevent partial state
+		// If merge fails, we can unban. If we merge first and ban fails, data is already moved.
+		const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
+			secondaryUserId,
+			{ ban_duration: '876000h' } // 100 years - effectively permanent until undo
+		);
+
+		if (banError) {
+			console.error('[account-merge] Failed to ban secondary user:', banError);
+			// Clean up nonce
+			await supabaseAdmin.from('merge_nonces').delete().eq('nonce', mergeCookie.nonce);
+			throw httpError(500, 'Failed to disable secondary account. Merge aborted before data move.');
+		}
+
+		// Call the merge function (moves data and identities)
 		const { data: mergeResult, error: mergeError } = await supabaseAdmin.rpc('merge_accounts', {
 			p_primary_user_id: primaryUserId,
 			p_secondary_user_id: secondaryUserId
@@ -92,31 +106,18 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 
 		if (mergeError) {
 			console.error('[account-merge] Merge function failed:', mergeError);
+			
+			// CRITICAL: Unban secondary user since merge failed
+			await supabaseAdmin.auth.admin.updateUserById(
+				secondaryUserId,
+				{ ban_duration: 'none' }
+			).catch(unbanErr => {
+				console.error('[account-merge] CRITICAL: Failed to unban after merge failure:', unbanErr);
+			});
+			
 			// Clean up nonce on failure
 			await supabaseAdmin.from('merge_nonces').delete().eq('nonce', mergeCookie.nonce);
-			throw httpError(500, 'Account merge failed. Please try again.');
-		}
-
-		let deleteWarning: string | null = null;
-
-		// Delete the secondary auth user
-		const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(secondaryUserId);
-
-		if (deleteError) {
-			console.error('[account-merge] Failed to delete secondary auth user:', deleteError);
-			
-			// Try to ban the user instead
-			const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
-				secondaryUserId,
-				{ ban_duration: '876000h' } // 100 years
-			);
-
-			if (banError) {
-				console.error('[account-merge] Failed to ban secondary user:', banError);
-				deleteWarning = 'Warning: Secondary account could not be fully removed. Please contact support.';
-			} else {
-				deleteWarning = 'Warning: Secondary account was disabled but not deleted. It cannot be used to sign in.';
-			}
+			throw httpError(500, 'Account merge failed. Secondary account has been restored.');
 		}
 
 		// Delete the merge cookie
@@ -131,10 +132,7 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 			primaryUserId,
 			secondaryUserId,
 			mergeResult,
-			warning: deleteWarning,
-			message: deleteWarning 
-				? 'Accounts merged with warnings. Please sign in to your primary account.' 
-				: 'Accounts merged successfully. Please sign in to your primary account.'
+			message: 'Accounts merged successfully. Secondary account has been disabled. Please sign in to your primary account.'
 		});
 	} catch (err: any) {
 		console.error('[account-merge] Unexpected error:', err);

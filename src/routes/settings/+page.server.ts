@@ -65,6 +65,31 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Compute sign-in methods for unlink/remove guards
 	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
 
+	// Fetch merge history via admin client (service_role only)
+	// SECURITY: Filter by primary_user_id = current user to prevent leaking other users' merges
+	// Reuse supabaseAdmin from above (already imported)
+	let mergeHistory: any[] = [];
+	if (supabaseAdmin) {
+		const { data } = await supabaseAdmin
+			.from('account_merges')
+			.select('id, primary_user_id, secondary_user_id, merged_at, undone_at, status, secondary_snapshot')
+			.eq('primary_user_id', user.id)
+			.order('merged_at', { ascending: false });
+		
+		// Transform to safe format (extract email/name from snapshot)
+		mergeHistory = (data || []).map(merge => ({
+			id: merge.id,
+			primary_user_id: merge.primary_user_id,
+			secondary_user_id: merge.secondary_user_id,
+			merged_at: merge.merged_at,
+			undone_at: merge.undone_at,
+			status: merge.status,
+			secondary_email: merge.secondary_snapshot?.user?.email || null,
+			secondary_display_name: merge.secondary_snapshot?.profile?.display_name || null,
+			secondary_steam_id: merge.secondary_snapshot?.profile?.verified_steam_id || null
+		}));
+	}
+
 	return {
 		profile,
 		isOnboarding,
@@ -80,7 +105,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		canSetPassword,
 		canUnlinkGoogle: signInMethods.canUnlinkGoogle,
 		canUnlinkSteam: signInMethods.canUnlinkSteam,
-		canRemovePassword: signInMethods.canRemovePassword
+		canRemovePassword: signInMethods.canRemovePassword,
+		mergeHistory
 	};
 };
 
