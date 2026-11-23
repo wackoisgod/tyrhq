@@ -21,6 +21,7 @@
 	let showMergeInfo = $state(false);
 	let mergeInProgress = $state(false);
 	let mergeError = $state('');
+	let showSteamUnlinkConfirm = $state(false);
 
 	const profileError = $derived(form && 'profileError' in form ? form.profileError : null);
 	const profileSuccess = $derived(form && 'profileSuccess' in form ? form.profileSuccess : null);
@@ -269,25 +270,8 @@
 		}
 	}
 
-	async function handleUnlinkGoogle() {
-		if (!supabase) return;
-		
-		// Get current user to find Google identity
-		const { data: { user } } = await supabase.auth.getUser();
-		if (!user) return;
-
-		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
-		if (!googleIdentity) return;
-
-		const { error } = await supabase.auth.unlinkIdentity(googleIdentity);
-		
-		if (error) {
-			console.error('[settings] Failed to unlink Google:', error);
-			goto('/settings?error=unlink_failed');
-		} else {
-			await invalidateAll();
-		}
-	}
+	// Google unlink is now handled by server action (see unlinkGoogle form below)
+	// No client-side handler needed
 
 	// Check for linking errors from URL params
 	const urlError = $page.url.searchParams.get('error');
@@ -307,36 +291,10 @@
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
 
-	// Check if user can unlink (must have at least 2 distinct usable sign-in methods)
-	// Count distinct methods without double-counting:
-	// - Google identity (can sign in via Google OAuth)
-	// - Email+password (real email + email identity = can sign in with password)
-	// - Verified Steam (profile.verified_steam_id = can sign in via Steam OpenID)
-	const signInMethodCount = $derived(() => {
-		let count = 0;
-		
-		// Google identity
-		if (data.linkedIdentities.some((i) => i.provider === 'google')) {
-			count += 1;
-		}
-		
-		// Email+password (real email AND email identity)
-		if (data.hasEmailPassword) {
-			count += 1;
-		}
-		
-		// Verified Steam
-		if (data.profile?.verified_steam_id) {
-			count += 1;
-		}
-		
-		return count;
-	});
-	
-	const canUnlinkGoogle = $derived(
-		signInMethodCount() >= 2 && 
-		data.linkedIdentities.some((i) => i.provider === 'google')
-	);
+	// Use server-computed sign-in method guards (more secure than client-only)
+	const canUnlinkGoogle = $derived(data.canUnlinkGoogle);
+	const canUnlinkSteam = $derived(data.canUnlinkSteam);
+	const canRemovePassword = $derived(data.canRemovePassword);
 </script>
 
 <svelte:head>
@@ -495,10 +453,40 @@
 				<!-- User has real email+password (can sign in with password) -->
 				<div class="rounded-sm bg-[var(--hud-inset)] p-4">
 					<div class="flex items-center justify-between gap-4">
-						<div>
+						<div class="flex-1">
 							<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Email & Password</p>
 							<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
+							{#if !canRemovePassword}
+								<p class="mt-2 text-xs text-[var(--hud-warning)]">
+									⚠ This is your only sign-in method. Add Steam or Google before removing email+password.
+								</p>
+							{/if}
 						</div>
+						{#if canRemovePassword}
+							<form method="POST" action="?/removePassword"
+								use:enhance={() => {
+									return async ({ result, update }) => {
+										await update();
+										if (result.type === 'success') {
+											await invalidateAll();
+										}
+									};
+								}}
+							>
+								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+									Remove
+								</button>
+							</form>
+						{:else}
+							<button 
+								type="button"
+								class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+								disabled
+								title="Add another sign-in method first"
+							>
+								Remove
+							</button>
+						{/if}
 					</div>
 				</div>
 			{:else if pendingEmailChange}
@@ -636,80 +624,160 @@
 				</div>
 			{/if}
 
-				<!-- Google -->
-				{#if data.linkedIdentities.some((i) => i.provider === 'google')}
-					{@const googleIdentity = data.linkedIdentities.find((i) => i.provider === 'google')}
+			<!-- Google -->
+			{#if data.linkedIdentities.some((i) => i.provider === 'google')}
+				{@const googleIdentity = data.linkedIdentities.find((i) => i.provider === 'google')}
+				<div class="rounded-sm bg-[var(--hud-inset)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div class="flex-1">
+							<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Google</p>
+							{#if googleIdentity?.email}
+								<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
+							{/if}
+							{#if !canUnlinkGoogle}
+								<p class="mt-2 text-xs text-[var(--hud-warning)]">
+									⚠ This is your only sign-in method. Add Steam or Email+Password before unlinking Google.
+								</p>
+							{/if}
+						</div>
+						{#if canUnlinkGoogle}
+							<form method="POST" action="?/unlinkGoogle"
+								use:enhance={() => {
+									return async ({ result, update }) => {
+										await update();
+										if (result.type === 'success') {
+											await invalidateAll();
+										}
+									};
+								}}
+							>
+								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+									Unlink
+								</button>
+							</form>
+						{:else}
+							<button 
+								type="button"
+								class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+								disabled
+								title="Add another sign-in method first"
+							>
+								Unlink
+							</button>
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<p class="text-sm font-semibold text-[var(--hud-muted)]">Google</p>
+							<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked</p>
+						</div>
+						<button 
+							type="button"
+							class="hud-cta-outline px-3 py-2 text-xs"
+							onclick={handleLinkGoogle}
+						>
+							Link Google
+						</button>
+					</div>
+				</div>
+			{/if}
+
+				<!-- Steam -->
+				{#if data.profile?.verified_steam_id}
 					<div class="rounded-sm bg-[var(--hud-inset)] p-4">
-						<div class="flex items-center justify-between gap-4">
-							<div>
-								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Google</p>
-								{#if googleIdentity?.email}
-									<p class="mt-1 text-xs text-[var(--hud-muted)]">{googleIdentity.email}</p>
+						<div class="flex items-start justify-between gap-4">
+							<div class="flex-1">
+								<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Steam</p>
+								{#if data.profile.steam_display_name}
+									<p class="mt-1 text-xs text-[var(--hud-muted)]">Steam Name: {data.profile.steam_display_name}</p>
+								{/if}
+								<p class="mt-1 text-xs text-[var(--hud-dim)]">SteamID64: {data.profile.verified_steam_id}</p>
+								{#if data.profile.steam_verified_at}
+									<p class="mt-1 text-xs text-[var(--hud-dim)]">
+										Verified {new Date(data.profile.steam_verified_at).toLocaleDateString()}
+									</p>
+								{/if}
+								{#if !canUnlinkSteam}
+									<p class="mt-2 text-xs text-[var(--hud-warning)]">
+										⚠ This is your only sign-in method. Add Google or Email+Password before unlinking Steam.
+									</p>
 								{/if}
 							</div>
-							{#if canUnlinkGoogle}
+							{#if canUnlinkSteam}
+								{#if showSteamUnlinkConfirm}
+									<div class="flex flex-col gap-2">
+										<form method="POST" action="?/unlinkSteam"
+											use:enhance={() => {
+												return async ({ result, update }) => {
+													showSteamUnlinkConfirm = false;
+													await update();
+													if (result.type === 'success') {
+														await invalidateAll();
+													}
+												};
+											}}
+										>
+											<button type="submit" class="hud-cta-outline px-3 py-2 text-xs bg-red-900/20 border-red-700/50 text-red-200 hover:bg-red-900/30">
+												Confirm Unlink
+											</button>
+										</form>
+										<button 
+											type="button"
+											class="hud-cta-outline px-3 py-2 text-xs"
+											onclick={() => showSteamUnlinkConfirm = false}
+										>
+											Cancel
+										</button>
+									</div>
+								{:else}
+									<button 
+										type="button"
+										class="hud-cta-outline px-3 py-2 text-xs"
+										onclick={() => showSteamUnlinkConfirm = true}
+									>
+										Unlink
+									</button>
+								{/if}
+							{:else}
 								<button 
-									type="button" 
-									class="hud-cta-outline px-3 py-2 text-xs"
-									onclick={handleUnlinkGoogle}
+									type="button"
+									class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+									disabled
+									title="Add another sign-in method first"
 								>
 									Unlink
 								</button>
 							{/if}
 						</div>
+						{#if showSteamUnlinkConfirm}
+							<div class="mt-3 rounded-sm bg-[var(--hud-warning)]/10 border border-[var(--hud-warning)]/30 p-3 text-xs text-[var(--hud-muted)]">
+								<p class="font-semibold text-[var(--hud-warning)]">⚠ Warning</p>
+								<p class="mt-1">
+									If you have tournament registrations or are on team rosters tied to your Steam account, 
+									you will need to re-verify your Steam identity to participate in those tournaments again.
+								</p>
+								<p class="mt-1">
+									Your tournament history will remain intact, but you'll lose the association until you re-link Steam.
+								</p>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
 						<div class="flex items-center justify-between gap-4">
 							<div>
-								<p class="text-sm font-semibold text-[var(--hud-muted)]">Google</p>
-								<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked</p>
+								<p class="text-sm font-semibold text-[var(--hud-muted)]">Steam</p>
+								<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Link Steam for tournament match auto-matching.</p>
 							</div>
-							<button 
-								type="button"
-								class="hud-cta-outline px-3 py-2 text-xs"
-								onclick={handleLinkGoogle}
-							>
-								Link Google
-							</button>
+							<a href="/auth/steam" class="hud-cta-outline px-3 py-2 text-xs">
+								Link Steam
+							</a>
 						</div>
 					</div>
 				{/if}
-
-					<!-- Steam -->
-					{#if data.profile?.verified_steam_id}
-						<div class="rounded-sm bg-[var(--hud-inset)] p-4">
-							<div class="flex items-start justify-between gap-4">
-								<div>
-									<p class="text-sm font-semibold text-[var(--hud-teal)]">✓ Steam</p>
-									{#if data.profile.steam_display_name}
-										<p class="mt-1 text-xs text-[var(--hud-muted)]">Steam Name: {data.profile.steam_display_name}</p>
-									{/if}
-									<p class="mt-1 text-xs text-[var(--hud-dim)]">SteamID64: {data.profile.verified_steam_id}</p>
-									{#if data.profile.steam_verified_at}
-										<p class="mt-1 text-xs text-[var(--hud-dim)]">
-											Verified {new Date(data.profile.steam_verified_at).toLocaleDateString()}
-										</p>
-									{/if}
-								</div>
-								<form method="POST" action="?/unlinkSteam">
-									<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">Unlink</button>
-								</form>
-							</div>
-						</div>
-					{:else}
-						<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div>
-									<p class="text-sm font-semibold text-[var(--hud-muted)]">Steam</p>
-									<p class="mt-1 text-xs text-[var(--hud-dim)]">Not linked. Link Steam for tournament match auto-matching.</p>
-								</div>
-								<a href="/auth/steam" class="hud-cta-outline px-3 py-2 text-xs">
-									Link Steam
-								</a>
-							</div>
-						</div>
-					{/if}
 				</div>
 			</div>
 
