@@ -112,6 +112,8 @@ interface GameRow {
 	winner_team_id: string | null;
 	vod_url: string | null;
 	notes: string | null;
+	replay_guid?: string | null;
+	replay_changelist?: number | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -552,6 +554,8 @@ export async function getTournamentMatchDetail(
 			winnerTeamId: game.winner_team_id,
 			vodUrl: game.vod_url,
 			notes: game.notes,
+			replayGuid: game.replay_guid ?? null,
+			replayChangelist: game.replay_changelist ?? null,
 			updatedAt: game.updated_at
 		})),
 		rosters: teamIds.map((teamId) => ({
@@ -939,17 +943,5 @@ export async function deleteTournamentGameLineup(
 	if (error) throw new TournamentError('Could not delete lineup entry.', 500);
 }
 
-// NOTE: Replay upload auto-fill feature removed pending full netstream walker implementation
-// Porting the endgame stats extraction requires ~1000+ LOC of bit-packed netstream parsing
-// (ReplayData chunks, demo frames, packets, bunches, NetGUID exports, RPC capture)
-// plus the endgame stats decoder. This is deferred to a future enhancement.
-// 
-// Current migration 029 provides:
-// - Steam account verification (verified_steam_id on profiles)
-// - Replay GUID tracking (replay_guid on tournament_match_games for version/duplicate checks)
-//
-// Future enhancement would add:
-// - Full netstream walker
-// - Endgame stats extraction (kills/damage/assists/blocked per player)
-// - Winner determination from last-stand events
-// - tournament_game_replay_stats table for extracted player stats
+// Replay upload lives in replay-upload.ts. The browser parses the file and
+// confirmReplayUpload writes replay_guid plus tournament_game_player_stats.

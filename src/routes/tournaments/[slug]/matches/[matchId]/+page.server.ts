@@ -19,7 +19,7 @@ import {
 	updateTournamentMatchSettings
 } from '$lib/server/tournament-series';
 import { MAX_REPLAY_PAYLOAD_CHARS } from '$lib/replay/upload-payload.schema';
-import { previewReplayUpload } from '$lib/server/replay-upload';
+import { confirmReplayUpload, previewReplayUpload } from '$lib/server/replay-upload';
 
 function datetimeLocalToIso(value: FormDataEntryValue | null) {
 	const raw = String(value ?? '').trim();
@@ -204,9 +204,51 @@ export const actions: Actions = {
 				payload
 			});
 			return {
-				success: 'Replay parsed in the browser. Review it before saving.',
+				success: 'Replay parsed in the browser. Review the scoreboard, then confirm to save.',
 				replayPreview
 			};
+		} catch (caught) {
+			return tournamentFailure(caught);
+		}
+	},
+	confirmReplay: async ({ request, locals, params }) => {
+		const { session, user, role } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Authentication required' });
+		const form = await request.formData();
+		if (form.get('replayFile')) {
+			return fail(400, { error: 'Send the parsed scoreboard, not the replay file.' });
+		}
+		const raw = String(form.get('payload') ?? '');
+		if (!raw) return fail(400, { error: 'Parse a replay in the browser before saving it.' });
+		if (raw.length > MAX_REPLAY_PAYLOAD_CHARS) {
+			return fail(413, { error: 'Parsed replay is too large to submit.' });
+		}
+		let payload: unknown;
+		let acceptedUserIds: unknown;
+		try {
+			payload = JSON.parse(raw);
+			acceptedUserIds = JSON.parse(String(form.get('acceptedUserIds') ?? '[]'));
+		} catch {
+			return fail(400, { error: 'Parsed replay data was not valid JSON.' });
+		}
+		try {
+			const tournament = await getTournamentBySlug(params.slug, user.id, role);
+			if (!tournament) return fail(404, { error: 'Tournament not found' });
+			const success = await confirmReplayUpload({
+				tournamentId: tournament.id,
+				matchId: String(form.get('matchId') ?? ''),
+				actorId: user.id,
+				role,
+				gameNumber: Number(form.get('gameNumber') ?? 0),
+				mapId: String(form.get('mapId') ?? ''),
+				pickedByTeamId: String(form.get('pickedByTeamId') ?? ''),
+				winnerTeamId: String(form.get('winnerTeamId') ?? ''),
+				vodUrl: String(form.get('vodUrl') ?? ''),
+				notes: String(form.get('notes') ?? ''),
+				payload,
+				acceptedUserIds
+			});
+			return { success };
 		} catch (caught) {
 			return tournamentFailure(caught);
 		}
