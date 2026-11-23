@@ -158,7 +158,13 @@
 		if (placement === 1) return '1st';
 		if (placement === 2) return '2nd';
 		if (placement === 3) return '3rd';
-		return '4th';
+		const lastDigit = placement % 10;
+		const lastTwoDigits = placement % 100;
+		if (lastTwoDigits >= 11 && lastTwoDigits <= 13) return `${placement}th`;
+		if (lastDigit === 1) return `${placement}st`;
+		if (lastDigit === 2) return `${placement}nd`;
+		if (lastDigit === 3) return `${placement}rd`;
+		return `${placement}th`;
 	}
 
 	function placementColor(placement: number | null) {

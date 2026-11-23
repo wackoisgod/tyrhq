@@ -68,14 +68,14 @@ describe('Unified Link/Merge Flow - Routing Decisions', () => {
 			expect(shouldMerge).toBe(true);
 		});
 
-		it('should error when user tries to link different Steam ID', () => {
-			const userSteamId = '76561198087654321';
-			const attemptedSteamId = '76561198012345678';
-			
-			const isConflict = userSteamId !== null && userSteamId !== attemptedSteamId;
-			
-			expect(isConflict).toBe(true);
-		});
+	it('should error when user tries to link different Steam ID', () => {
+		const userSteamId: string = '76561198087654321';
+		const attemptedSteamId: string = '76561198012345678';
+		
+		const isConflict = userSteamId !== null && userSteamId !== attemptedSteamId;
+		
+		expect(isConflict).toBe(true);
+	});
 
 		it('should allow re-linking same Steam ID (no-op)', () => {
 			const userSteamId = '76561198012345678';
@@ -210,16 +210,16 @@ describe('Unified Link/Merge Flow - Routing Decisions', () => {
 			expect(hasConflict).toBe(false);
 		});
 
-		it('should block merge when both have different Steam IDs', () => {
-			const primarySteamId = '76561198087654321';
-			const secondarySteamId = '76561198012345678';
-			
-			const hasConflict = 
-				primarySteamId !== null && 
-				secondarySteamId !== null && 
-				primarySteamId !== secondarySteamId;
-			
-			expect(hasConflict).toBe(true);
-		});
+	it('should block merge when both have different Steam IDs', () => {
+		const primarySteamId: string = '76561198087654321';
+		const secondarySteamId: string = '76561198012345678';
+		
+		const hasConflict = 
+			primarySteamId !== null && 
+			secondarySteamId !== null && 
+			primarySteamId !== secondarySteamId;
+		
+		expect(hasConflict).toBe(true);
+	});
 	});
 });

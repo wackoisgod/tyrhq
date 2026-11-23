@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from '../../routes/auth/callback/+server';
-import type { RequestEvent } from '@sveltejs/kit';
 
 // Mock dependencies
 vi.mock('$lib/server/security', () => ({
@@ -23,7 +22,7 @@ vi.mock('$env/dynamic/private', () => ({
 }));
 
 describe('Auth Callback Handler', () => {
-	let mockEvent: Partial<RequestEvent>;
+	let mockEvent: any;
 	let mockSupabase: any;
 
 	beforeEach(() => {
@@ -34,17 +33,24 @@ describe('Auth Callback Handler', () => {
 			}
 		};
 
-		mockEvent = {
-			url: new URL('http://localhost:5173/auth/callback'),
-			locals: {
-				supabase: mockSupabase
-			},
-			cookies: {
-				get: () => undefined,
-				set: vi.fn(),
-				delete: vi.fn()
-			}
-		};
+	mockEvent = {
+		url: new URL('http://localhost:5173/auth/callback'),
+		locals: {
+			supabase: mockSupabase,
+			safeGetSession: vi.fn().mockResolvedValue({
+				session: null,
+				user: null,
+				role: 'user'
+			})
+		},
+		cookies: {
+			get: () => undefined,
+			set: vi.fn(),
+			delete: vi.fn(),
+			getAll: vi.fn().mockReturnValue([]),
+			serialize: vi.fn().mockReturnValue('')
+		}
+	};
 	});
 
 	describe('Link success marker', () => {
@@ -70,7 +76,7 @@ describe('Auth Callback Handler', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings?success=google_linked
 				expect(err.status).toBe(303);
@@ -90,7 +96,7 @@ describe('Auth Callback Handler', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				// Should redirect to /settings without success param
 				expect(err.status).toBe(303);
@@ -125,7 +131,7 @@ describe('Auth Callback Handler', () => {
 		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
 
 		try {
-			await GET(mockEvent as RequestEvent);
+			await GET(mockEvent);
 		} catch (err: any) {
 			// Should initiate merge flow by redirecting to auth with merge marker
 			expect(err.status).toBe(303);
@@ -157,7 +163,7 @@ describe('Auth Callback Handler', () => {
 		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
 
 		try {
-			await GET(mockEvent as RequestEvent);
+			await GET(mockEvent);
 		} catch (err: any) {
 			expect(err.status).toBe(303);
 			expect(err.location).toBe('/auth?merge=1&provider=google');
@@ -185,7 +191,7 @@ describe('Auth Callback Handler', () => {
 		mockSupabase.auth.signOut = vi.fn().mockResolvedValue({ error: null });
 
 		try {
-			await GET(mockEvent as RequestEvent);
+			await GET(mockEvent);
 		} catch (err: any) {
 			expect(err.status).toBe(303);
 			expect(err.location).toBe('/auth?merge=1&provider=google');
@@ -199,7 +205,7 @@ describe('Auth Callback Handler', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -213,7 +219,7 @@ describe('Auth Callback Handler', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -227,7 +233,7 @@ describe('Auth Callback Handler', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');
@@ -241,7 +247,7 @@ describe('Auth Callback Handler', () => {
 			);
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('error=auth_callback_failed');
@@ -249,34 +255,34 @@ describe('Auth Callback Handler', () => {
 		});
 	});
 
-	describe('Sanitization', () => {
-		it('should use sanitized next parameter in fallback URL', async () => {
-			// No code, should fall back to error redirect
-			mockEvent.url = new URL(
-				'http://localhost:5173/auth/callback?next=/dashboard'
-			);
-
-			try {
-				await GET(mockEvent as RequestEvent);
-			} catch (err: any) {
-				expect(err.status).toBe(303);
-				expect(err.location).toContain('/dashboard');
-				expect(err.location).toContain('error=auth_callback_failed');
-			}
-		});
-
-	it('should default to /auth when next is not provided', async () => {
-		mockEvent.url = new URL('http://localhost:5173/auth/callback');
+describe('Sanitization', () => {
+	it('should redirect auth errors to /auth regardless of next parameter', async () => {
+		// No code, should fall back to error redirect at /auth
+		mockEvent.url = new URL(
+			'http://localhost:5173/auth/callback?next=/dashboard'
+		);
 
 		try {
-			await GET(mockEvent as RequestEvent);
+			await GET(mockEvent);
 		} catch (err: any) {
 			expect(err.status).toBe(303);
 			expect(err.location).toContain('/auth');
 			expect(err.location).toContain('error=auth_callback_failed');
 		}
 	});
-	});
+
+it('should default to /auth when next is not provided', async () => {
+	mockEvent.url = new URL('http://localhost:5173/auth/callback');
+
+	try {
+		await GET(mockEvent);
+	} catch (err: any) {
+		expect(err.status).toBe(303);
+		expect(err.location).toContain('/auth');
+		expect(err.location).toContain('error=auth_callback_failed');
+	}
+});
+});
 
 	describe('Exchange errors', () => {
 		it('should redirect to settings with error when link flow exchange fails', async () => {
@@ -290,7 +296,7 @@ describe('Auth Callback Handler', () => {
 			});
 
 			try {
-				await GET(mockEvent as RequestEvent);
+				await GET(mockEvent);
 			} catch (err: any) {
 				expect(err.status).toBe(303);
 				expect(err.location).toContain('/settings');

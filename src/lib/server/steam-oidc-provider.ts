@@ -59,8 +59,7 @@ async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicJWK: 
 	// createPublicKey extracts only the public components
 	const publicKeyObject = createPublicKey({
 		key: privateKeyPem,
-		format: 'pem',
-		type: 'pkcs8'
+		format: 'pem'
 	});
 	
 	const publicKeyPem = publicKeyObject.export({
@@ -429,7 +428,9 @@ export const steamOidcProvider = {
 		const callbackUrl = new URL('/auth/steam/oidc/callback', origin);
 		callbackUrl.searchParams.set('state', params.state);
 		callbackUrl.searchParams.set('redirect_uri', params.redirect_uri);
-		callbackUrl.searchParams.set('code_challenge', params.code_challenge);
+		if (params.code_challenge) {
+			callbackUrl.searchParams.set('code_challenge', params.code_challenge);
+		}
 
 		const steamParams = new URLSearchParams({
 			'openid.ns': 'http://specs.openid.net/auth/2.0',
@@ -453,7 +454,7 @@ export const steamOidcProvider = {
 		// Extract our state params
 		const state = searchParams.get('state');
 		const redirectUri = searchParams.get('redirect_uri');
-		const codeChallenge = searchParams.get('code_challenge');
+		const codeChallenge = searchParams.get('code_challenge') ?? undefined;
 		const clientId = getClientId();
 
 		if (!state || !redirectUri) {

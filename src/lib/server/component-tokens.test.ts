@@ -28,9 +28,12 @@ describe('exported component value tokens', () => {
 	});
 
 	it('renders Adaptive Hardening as a percentage like the game', () => {
-		const description = componentById.get('adaptivehardening')?.description ?? '';
-		expect(description).toContain('0.6%');
-		expect(description).not.toMatch(/by 0\.01 /);
+		const component = componentById.get('adaptivehardening')!;
+		const description = component.description ?? '';
+		// GameData CL 40062: value changed from 0.006 (0.6%) to 0.003 (0.3%)
+		const expectedPercentage = `${(component.pointValues[0] * 100).toFixed(1)}%`;
+		expect(description).toContain(expectedPercentage);
+		expect(description).not.toMatch(/by 0\.003 /);
 	});
 
 	it('renders Signature Obscurer spotted-time seconds without a negative sign', () => {

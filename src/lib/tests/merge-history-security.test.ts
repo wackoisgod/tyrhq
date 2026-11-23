@@ -59,7 +59,10 @@ describe('Merge History Security', () => {
 	});
 
 	it('should handle missing snapshot data gracefully', () => {
-		const mockMerge = {
+		const mockMerge: {
+			id: string;
+			secondary_snapshot: { user?: { email?: string }; profile?: { display_name?: string } } | null;
+		} = {
 			id: 'merge-123',
 			secondary_snapshot: null
 		};
