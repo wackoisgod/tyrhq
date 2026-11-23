@@ -1015,7 +1015,8 @@ export function walkNetstream(
 	buffer: Uint8Array,
 	fileVersion: number,
 	networkVersion: number,
-	engineNetVersion: number
+	engineNetVersion: number,
+	onProgress?: (fraction: number) => void
 ): NetstreamState {
 	const state: NetstreamState = {
 		guidMap: new Map(),
@@ -1033,6 +1034,14 @@ export function walkNetstream(
 	};
 
 	let offset = 0;
+	let lastReported = -1;
+	const report = (fraction: number) => {
+		if (!onProgress || buffer.length === 0) return;
+		const clamped = Math.max(0, Math.min(1, fraction));
+		if (clamped < 1 && clamped - lastReported < 0.02) return;
+		lastReported = clamped;
+		onProgress(clamped);
+	};
 	
 	// Find ReplayData chunks
 	let chunkCount = 0;
@@ -1063,7 +1072,9 @@ export function walkNetstream(
 		
 		offset += chunkSize;
 		chunkCount++;
+		report(offset / buffer.length);
 	}
+	report(1);
 
 	
 	// Log channels with archetype=107

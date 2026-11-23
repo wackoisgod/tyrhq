@@ -18,6 +18,12 @@ import { walkNetstream, type NetstreamState } from './netstream';
 import type { ReplayParseResult, PlayerRosterEntry, PlayerEndGameStats } from './types';
 import { TANK_CODENAMES } from './types';
 
+export interface ReplayParseProgress {
+	phase: 'header' | 'netstream' | 'scoreboard';
+	/** Overall progress from 0 to 1. */
+	fraction: number;
+}
+
 // Endgame stats bit offsets (from Python reference)
 const EGS_TEAM_OFF = 49;
 const EGS_STAT_BITS = 32;
@@ -193,8 +199,17 @@ function decodeEndGameStats(
 /**
  * Parse a Tyr replay file: header, roster, end-game scoreboard, and winner.
  */
-export function parseReplay(buffer: Uint8Array): ReplayParseResult {
+export function parseReplay(
+	buffer: Uint8Array,
+	options?: { onProgress?: (progress: ReplayParseProgress) => void }
+): ReplayParseResult {
 	const warnings: string[] = [];
+	const report = (phase: ReplayParseProgress['phase'], fraction: number) => {
+		options?.onProgress?.({
+			phase,
+			fraction: Math.max(0, Math.min(1, fraction))
+		});
+	};
 	const result: ReplayParseResult = {
 		roster: [],
 		endgameStats: [],
@@ -204,21 +219,28 @@ export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 		warnings
 	};
 
+	report('header', 0.02);
+
 	// Parse header
 	const header = probeReplayHeader(buffer);
 	if (!header) {
 		warnings.push('Invalid replay file format');
+		report('header', 1);
 		return result;
 	}
 
 	result.replayGuid = header.guid;
 	result.changelist = header.changelist;
+	report('header', 0.08);
 
 	// Walk netstream to extract player identity
 	try {
 		// Use the header chunk end offset to find where ReplayData chunks begin
 		const chunkBuffer = buffer.slice(header.headerChunkEnd);
-		const netstreamState = walkNetstream(chunkBuffer, 7, 19, 42);
+		const netstreamState = walkNetstream(chunkBuffer, 7, 19, 42, (fraction) => {
+			report('netstream', 0.08 + fraction * 0.84);
+		});
+		report('scoreboard', 0.94);
 		
 		// Convert player identity to roster
 		const playersByName = new Map<string, PlayerRosterEntry>();
@@ -255,9 +277,10 @@ export function parseReplay(buffer: Uint8Array): ReplayParseResult {
 		}
 		result.winnerTeam = deriveWinnerTeam(netstreamState);
 		warnings.push(...netstreamState.warnings);
-		
+		report('scoreboard', 1);
 	} catch (e) {
 		warnings.push(`Netstream parse error: ${e instanceof Error ? e.message : String(e)}`);
+		report('scoreboard', 1);
 	}
 
 	return result;

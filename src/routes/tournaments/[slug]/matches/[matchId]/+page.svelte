@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ReplayUpload from './ReplayUpload.svelte';
+
 	let { data, form } = $props();
 
 	const mapsById = $derived(new Map(data.detail.maps.map((map) => [map.id, map])));
@@ -178,6 +180,16 @@
 
 	{#if data.detail.canManage && data.detail.match.teamA && data.detail.match.teamB}
 		<div class="mt-4">
+			<div class="mb-6">
+				<ReplayUpload
+					matchId={data.detail.match.id}
+					preview={form && 'replayPreview' in form ? form.replayPreview : null}
+					teamA={data.detail.match.teamA}
+					teamB={data.detail.match.teamB}
+					maps={data.detail.maps}
+					bind:gameFormData
+				/>
+			</div>
 			<form method="POST" action="?/batchGames" id="batch-games-form">
 				<input type="hidden" name="matchId" value={data.detail.match.id} />
 				<input type="hidden" name="games" value={JSON.stringify(gameFormData)} />
@@ -198,6 +210,7 @@
 								{#if game}
 									<p class="mt-2 text-sm text-[var(--hud-muted)]">Picked by <strong class="text-[var(--hud-text)]">{teamName(game.pickedByTeamId)}</strong></p>
 									<p class="mt-1 text-sm text-[var(--hud-muted)]">Winner <strong class="text-[var(--hud-teal)]">{teamName(game.winnerTeamId)}</strong></p>
+									{#if game.replayGuid}<p class="mt-1 text-xs text-[var(--hud-muted)]">Replay {game.replayGuid.slice(0, 8)} linked</p>{/if}
 									<div class="mt-3 flex flex-wrap gap-2">
 										{#if map}<a href="/maps/{map.slug}" class="hud-cta-outline px-3 py-2 text-xs">View Map</a>{/if}
 										{#if game.vodUrl}<a href={game.vodUrl} target="_blank" rel="noreferrer" class="hud-cta-outline px-3 py-2 text-xs">Watch Game</a>{/if}
@@ -310,6 +323,7 @@
 							{#if game}
 								<p class="mt-2 text-sm text-[var(--hud-muted)]">Picked by <strong class="text-[var(--hud-text)]">{teamName(game.pickedByTeamId)}</strong></p>
 								<p class="mt-1 text-sm text-[var(--hud-muted)]">Winner <strong class="text-[var(--hud-teal)]">{teamName(game.winnerTeamId)}</strong></p>
+								{#if game.replayGuid}<p class="mt-1 text-xs text-[var(--hud-muted)]">Replay {game.replayGuid.slice(0, 8)} linked</p>{/if}
 								<div class="mt-3 flex flex-wrap gap-2">
 									{#if map}<a href="/maps/{map.slug}" class="hud-cta-outline px-3 py-2 text-xs">View Map</a>{/if}
 									{#if game.vodUrl}<a href={game.vodUrl} target="_blank" rel="noreferrer" class="hud-cta-outline px-3 py-2 text-xs">Watch Game</a>{/if}
