@@ -8,7 +8,6 @@ import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createSplitCookie, getSplitSecret, SPLIT_COOKIE_NAME } from '$lib/server/account-split';
 import { computeSignInMethods } from '$lib/server/sign-in-methods';
-import { loadProfile } from '$lib/server/settings';
 
 export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 	const { session, user } = await locals.safeGetSession();
@@ -32,11 +31,8 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 		throw error(400, 'Invalid provider. Must be google, email, or steam.');
 	}
 
-	// Load profile to check Steam verification
-	const profile = await loadProfile(locals, user.id);
-
 	// Verify user has at least 2 sign-in methods
-	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
+	const signInMethods = computeSignInMethods(user);
 
 	if (signInMethods.count < 2) {
 		throw error(400, 'Cannot split sign-in method: you must have at least 2 sign-in methods.');
@@ -71,11 +67,13 @@ export const POST: RequestHandler = async ({ locals, cookies, request }) => {
 		if (!signInMethods.canUnlinkSteam) {
 			throw error(400, 'Cannot split Steam: you must keep at least one sign-in method.');
 		}
-		steamId = profile?.verified_steam_id ?? undefined;
+		const { STEAM_PROVIDER } = await import('$lib/server/steam-oidc-provider');
+		const steamIdentity = user.identities?.find((i) => i.provider === STEAM_PROVIDER);
+		identityId = steamIdentity?.id;
 	}
 
 	// Create split cookie
-	const { value, options } = createSplitCookie(user.id, provider, identityId, steamId);
+	const { value, options } = createSplitCookie(user.id, provider, identityId);
 
 	cookies.set(SPLIT_COOKIE_NAME, value, options);
 

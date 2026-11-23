@@ -38,7 +38,7 @@ export interface SignInMethodsResult {
  * A user can sign in via:
  * 1. Google OAuth (has 'google' identity)
  * 2. Email+password (has real email + 'email' identity)
- * 3. Verified Steam (has verified_steam_id in profile)
+ * 3. Steam OIDC (has 'custom:steam' identity)
  * 
  * This function counts these methods WITHOUT double-counting:
  * - Steam placeholder users (steam_*@users.tyrhq.invalid) do NOT have email+password method
@@ -46,12 +46,10 @@ export interface SignInMethodsResult {
  * - Only when BOTH real email AND email identity exist does email+password count
  * 
  * @param user - Supabase auth user (contains identities and email)
- * @param verifiedSteamId - Steam ID from profiles table (verified_steam_id column)
  * @returns Object with method counts and unlink permissions
  */
 export function computeSignInMethods(
-	user: User | null,
-	verifiedSteamId: string | null
+	user: User | null
 ): SignInMethodsResult {
 	if (!user) {
 		return {
@@ -77,10 +75,8 @@ export function computeSignInMethods(
 	const hasEmailIdentity = identities.some((i) => i.provider === 'email');
 	const hasEmailPassword = hasRealEmail && hasEmailIdentity;
 
-	// Steam from identity (new OIDC provider) OR legacy verified_steam_id
-	// Once migration is complete, this simplifies to just checking identities
-	const hasSteamIdentity = identities.some((i) => i.provider === STEAM_PROVIDER);
-	const hasSteam = hasSteamIdentity || !!verifiedSteamId;
+	// Steam is now a first-class Supabase identity provider
+	const hasSteam = identities.some((i) => i.provider === STEAM_PROVIDER);
 
 	// Count distinct methods
 	let count = 0;

@@ -50,88 +50,42 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 	}
 
 	try {
-		let newUserId: string;
 		let splitResult: any = {};
 
-		if (splitCookie.provider === 'google') {
-			// For Google: unlink from current, user signs in fresh (creates new account)
-			if (!splitCookie.identityId) {
-				throw httpError(400, 'Missing identity ID for Google split');
-			}
-
-			// Unlink Google identity from current user
-			const googleIdentity = user.identities?.find((i) => i.provider === 'google');
-			if (!googleIdentity) {
-				throw httpError(400, 'Google identity not found');
-			}
-
-			const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(googleIdentity);
-
-			if (unlinkError) {
-				console.error('[account-split] Failed to unlink Google:', unlinkError);
-				throw httpError(500, 'Failed to unlink Google identity. Please try again.');
-			}
-
-			splitResult = {
-				provider: 'google',
-				action: 'unlinked',
-				note: 'Sign in with Google to create your new account'
-			};
-
-		} else if (splitCookie.provider === 'email') {
-			// For email+password: unlink email identity
-			// User will need to sign up fresh with their email
-			if (!splitCookie.identityId) {
-				throw httpError(400, 'Missing identity ID for email split');
-			}
-
-			const emailIdentity = user.identities?.find((i) => i.provider === 'email');
-			if (!emailIdentity) {
-				throw httpError(400, 'Email identity not found');
-			}
-
-			const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(emailIdentity);
-
-			if (unlinkError) {
-				console.error('[account-split] Failed to unlink email:', unlinkError);
-				throw httpError(500, 'Failed to unlink email identity. Please try again.');
-			}
-
-			splitResult = {
-				provider: 'email',
-				action: 'unlinked',
-				note: 'Sign up with your email to create your new account'
-			};
-
-		} else if (splitCookie.provider === 'steam') {
-			// For Steam: clear verified_steam_id from current profile
-			// User will need to verify Steam on new account
-			if (!splitCookie.steamId) {
-				throw httpError(400, 'Missing Steam ID for split');
-			}
-
-			// Use admin client to clear Steam verification
-			const { error: clearError } = await supabaseAdmin
-				.from('profiles')
-				.update({
-					verified_steam_id: null,
-					steam_display_name: null,
-					steam_verified_at: null
-				})
-				.eq('id', user.id);
-
-			if (clearError) {
-				console.error('[account-split] Failed to clear Steam:', clearError);
-				throw httpError(500, 'Failed to remove Steam verification. Please try again.');
-			}
-
-			splitResult = {
-				provider: 'steam',
-				steamId: splitCookie.steamId,
-				action: 'cleared',
-				note: 'Steam verification removed. Sign in with Steam to create your new account.'
-			};
+		// Unified unlinkIdentity flow for all providers
+		if (!splitCookie.identityId) {
+			throw httpError(400, `Missing identity ID for ${splitCookie.provider} split`);
 		}
+
+		// Find and unlink the identity
+		const providerMap: Record<string, string> = {
+			google: 'google',
+			email: 'email',
+			steam: 'custom:steam'
+		};
+
+		const providerKey = providerMap[splitCookie.provider];
+		if (!providerKey) {
+			throw httpError(400, `Unsupported provider: ${splitCookie.provider}`);
+		}
+
+		const identity = user.identities?.find((i) => i.provider === providerKey);
+		if (!identity) {
+			throw httpError(400, `${splitCookie.provider} identity not found`);
+		}
+
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(identity);
+
+		if (unlinkError) {
+			console.error(`[account-split] Failed to unlink ${splitCookie.provider}:`, unlinkError);
+			throw httpError(500, `Failed to unlink ${splitCookie.provider} identity. Please try again.`);
+		}
+
+		splitResult = {
+			provider: splitCookie.provider,
+			action: 'unlinked',
+			note: `Sign in with ${splitCookie.provider} to create your new account`
+		};
 
 		// Delete the split cookie
 		const { value, options } = deleteSplitCookie();

@@ -8,31 +8,15 @@ import { STEAM_PROVIDER } from '$lib/server/steam-oidc-provider';
 import type { User } from '@supabase/supabase-js';
 
 describe('Sign-in Method Computation', () => {
-	describe('Steam-only user (legacy)', () => {
-		it('should count 1 method: Steam only (legacy verified_steam_id)', () => {
-			const user = {
-				id: 'user-1',
-				email: 'steam_76561198012345678@users.tyrhq.invalid',
-				identities: [{ provider: 'email', id: 'identity-1' }]
-			} as User;
-
-			const result = computeSignInMethods(user, '76561198012345678');
-
-			expect(result.count).toBe(1);
-			expect(result.hasGoogle).toBe(false);
-			expect(result.hasEmailPassword).toBe(false);
-			expect(result.hasSteam).toBe(true);
-			expect(result.canUnlinkSteam).toBe(false); // Cannot unlink: only method
-		});
-
-		it('should count 1 method: Steam only (new OIDC identity)', () => {
+	describe('Steam-only user', () => {
+		it('should count 1 method: Steam only (OIDC identity)', () => {
 			const user = {
 				id: 'user-1b',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
 				identities: [{ provider: STEAM_PROVIDER, id: 'identity-steam' }]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(1);
 			expect(result.hasGoogle).toBe(false);
@@ -45,10 +29,10 @@ describe('Sign-in Method Computation', () => {
 			const user = {
 				id: 'user-1',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
-				identities: [{ provider: 'email', id: 'identity-1' }]
+				identities: [{ provider: STEAM_PROVIDER, id: 'identity-steam' }]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			// Email identity exists but email is placeholder, so hasEmailPassword = false
 			expect(result.hasEmailPassword).toBe(false);
@@ -63,7 +47,7 @@ describe('Sign-in Method Computation', () => {
 				identities: [{ provider: 'google', id: 'identity-2' }]
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(1);
 			expect(result.hasGoogle).toBe(true);
@@ -79,7 +63,7 @@ describe('Sign-in Method Computation', () => {
 				identities: [{ provider: 'google', id: 'identity-2' }]
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			// Real email but no email identity (no password), so hasEmailPassword = false
 			expect(result.hasEmailPassword).toBe(false);
@@ -87,27 +71,7 @@ describe('Sign-in Method Computation', () => {
 	});
 
 	describe('Steam + Google user', () => {
-		it('should count 2 methods: Steam + Google (legacy)', () => {
-			const user = {
-				id: 'user-3',
-				email: 'steam_76561198012345678@users.tyrhq.invalid',
-				identities: [
-					{ provider: 'email', id: 'identity-1' },
-					{ provider: 'google', id: 'identity-2' }
-				]
-			} as User;
-
-			const result = computeSignInMethods(user, '76561198012345678');
-
-			expect(result.count).toBe(2);
-			expect(result.hasGoogle).toBe(true);
-			expect(result.hasEmailPassword).toBe(false); // Placeholder email
-			expect(result.hasSteam).toBe(true);
-			expect(result.canUnlinkGoogle).toBe(true);
-			expect(result.canUnlinkSteam).toBe(true);
-		});
-
-		it('should count 2 methods: Steam + Google (new OIDC)', () => {
+		it('should count 2 methods: Steam + Google (OIDC)', () => {
 			const user = {
 				id: 'user-3b',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
@@ -117,7 +81,7 @@ describe('Sign-in Method Computation', () => {
 				]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(2);
 			expect(result.hasGoogle).toBe(true);
@@ -139,7 +103,7 @@ describe('Sign-in Method Computation', () => {
 				]
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(2);
 			expect(result.hasGoogle).toBe(true);
@@ -159,7 +123,7 @@ describe('Sign-in Method Computation', () => {
 				]
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			expect(result.canUnlinkGoogle).toBe(true);
 			expect(result.canRemovePassword).toBe(true);
@@ -167,28 +131,7 @@ describe('Sign-in Method Computation', () => {
 	});
 
 	describe('All three methods', () => {
-		it('should count 3 methods: Google + Email+password + Steam (legacy)', () => {
-			const user = {
-				id: 'user-5',
-				email: 'user@example.com',
-				identities: [
-					{ provider: 'google', id: 'identity-2' },
-					{ provider: 'email', id: 'identity-1' }
-				]
-			} as User;
-
-			const result = computeSignInMethods(user, '76561198012345678');
-
-			expect(result.count).toBe(3);
-			expect(result.hasGoogle).toBe(true);
-			expect(result.hasEmailPassword).toBe(true);
-			expect(result.hasSteam).toBe(true);
-			expect(result.canUnlinkGoogle).toBe(true);
-			expect(result.canUnlinkSteam).toBe(true);
-			expect(result.canRemovePassword).toBe(true);
-		});
-
-		it('should count 3 methods: Google + Email+password + Steam (new OIDC)', () => {
+		it('should count 3 methods: Google + Email+password + Steam (OIDC)', () => {
 			const user = {
 				id: 'user-5b',
 				email: 'user@example.com',
@@ -199,7 +142,7 @@ describe('Sign-in Method Computation', () => {
 				]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(3);
 			expect(result.hasGoogle).toBe(true);
@@ -208,21 +151,6 @@ describe('Sign-in Method Computation', () => {
 			expect(result.canUnlinkGoogle).toBe(true);
 			expect(result.canUnlinkSteam).toBe(true);
 			expect(result.canRemovePassword).toBe(true);
-		});
-
-		it('should not double-count Steam when both identity and verified_steam_id exist', () => {
-			const user = {
-				id: 'user-5c',
-				email: 'user@example.com',
-				identities: [
-					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
-				]
-			} as User;
-
-			const result = computeSignInMethods(user, '76561198012345678');
-
-			expect(result.count).toBe(1); // Only Steam, not 2
-			expect(result.hasSteam).toBe(true);
 		});
 	});
 
@@ -234,7 +162,7 @@ describe('Sign-in Method Computation', () => {
 				identities: [{ provider: 'email', id: 'identity-1' }]
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(1);
 			expect(result.hasGoogle).toBe(false);
@@ -249,10 +177,13 @@ describe('Sign-in Method Computation', () => {
 			const user = {
 				id: 'user-7',
 				email: 'user@example.com',
-				identities: [{ provider: 'email', id: 'identity-1' }]
+				identities: [
+					{ provider: 'email', id: 'identity-1' },
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
+				]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(2);
 			expect(result.hasGoogle).toBe(false);
@@ -265,7 +196,7 @@ describe('Sign-in Method Computation', () => {
 
 	describe('Edge cases', () => {
 		it('should handle null user', () => {
-			const result = computeSignInMethods(null, null);
+			const result = computeSignInMethods(null);
 
 			expect(result.count).toBe(0);
 			expect(result.hasGoogle).toBe(false);
@@ -283,7 +214,7 @@ describe('Sign-in Method Computation', () => {
 				identities: []
 			} as User;
 
-			const result = computeSignInMethods(user, null);
+			const result = computeSignInMethods(user);
 
 			expect(result.count).toBe(0);
 			expect(result.hasEmailPassword).toBe(false); // No email identity
@@ -294,10 +225,13 @@ describe('Sign-in Method Computation', () => {
 			const user = {
 				id: 'user-9',
 				email: 'player@example.com', // Changed from steam_*@users.tyrhq.invalid
-				identities: [{ provider: 'email', id: 'identity-1' }]
+				identities: [
+					{ provider: 'email', id: 'identity-1' },
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' }
+				]
 			} as User;
 
-			const result = computeSignInMethods(user, '76561198012345678');
+			const result = computeSignInMethods(user);
 
 			// Should count both Steam and Email+password now
 			expect(result.count).toBe(2);
@@ -311,10 +245,10 @@ describe('Sign-in Method Computation', () => {
 			const steamOnly = {
 				id: 'user-1',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
-				identities: [{ provider: 'email', id: 'identity-1' }]
+				identities: [{ provider: STEAM_PROVIDER, id: 'identity-steam' }]
 			} as User;
 
-			const result = computeSignInMethods(steamOnly, '76561198012345678');
+			const result = computeSignInMethods(steamOnly);
 			expect(result.canUnlinkSteam).toBe(false);
 		});
 
@@ -323,12 +257,12 @@ describe('Sign-in Method Computation', () => {
 				id: 'user-3',
 				email: 'steam_76561198012345678@users.tyrhq.invalid',
 				identities: [
-					{ provider: 'email', id: 'identity-1' },
+					{ provider: STEAM_PROVIDER, id: 'identity-steam' },
 					{ provider: 'google', id: 'identity-2' }
 				]
 			} as User;
 
-			const result = computeSignInMethods(steamAndGoogle, '76561198012345678');
+			const result = computeSignInMethods(steamAndGoogle);
 			expect(result.canUnlinkSteam).toBe(true);
 			expect(result.canUnlinkGoogle).toBe(true);
 		});
@@ -340,7 +274,7 @@ describe('Sign-in Method Computation', () => {
 				identities: [{ provider: 'google', id: 'identity-2' }]
 			} as User;
 
-			const result = computeSignInMethods(googleOnly, null);
+			const result = computeSignInMethods(googleOnly);
 			expect(result.canRemovePassword).toBe(false); // No password to remove
 			expect(result.canUnlinkSteam).toBe(false); // No Steam to unlink
 		});
