@@ -19,6 +19,8 @@
 	let emailFormLoading = $state(false);
 	let pendingEmailChange = $state<string | null>(null);
 	let showSteamUnlinkConfirm = $state(false);
+	let splitLoading = $state(false);
+	let splitError = $state('');
 
 	const profileError = $derived(form && 'profileError' in form ? form.profileError : null);
 	const profileSuccess = $derived(form && 'profileSuccess' in form ? form.profileSuccess : null);
@@ -30,7 +32,8 @@
 		steam_linked: 'Steam account added successfully!',
 		email_confirmed: 'Email confirmed successfully!',
 		password_set: 'Password set successfully!',
-		accounts_merged: 'Accounts merged successfully! All data has been consolidated.'
+		accounts_merged: 'Accounts merged successfully! All data has been consolidated.',
+		split_complete: 'Sign-in method split successfully! Sign in with that method to access your new account.'
 	};
 	const displaySuccess = profileSuccess || (urlSuccess && successMessages[urlSuccess]);
 
@@ -258,6 +261,33 @@
 	// Google unlink is now handled by server action (see unlinkGoogle form below)
 	// No client-side handler needed
 
+	async function handleSplitSignInMethod(provider: 'google' | 'email' | 'steam') {
+		splitLoading = true;
+		splitError = '';
+
+		try {
+			const response = await fetch('/auth/split/init', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ provider })
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				splitError = error.message || 'Failed to initiate split. Please try again.';
+				splitLoading = false;
+				return;
+			}
+
+			// Redirect to confirmation page
+			goto('/auth/split/confirm');
+		} catch (err) {
+			console.error('[settings] Exception initiating split:', err);
+			splitError = 'An unexpected error occurred. Please try again.';
+			splitLoading = false;
+		}
+	}
+
 	// Check for linking errors from URL params
 	const urlError = $page.url.searchParams.get('error');
 	const errorMessages: Record<string, string> = {
@@ -270,7 +300,9 @@
 		merge_expired: 'Account merge session expired. Please try again.',
 		cannot_merge_self: 'Cannot add an account to itself. Please sign in with the other account.',
 		steam_conflict: 'Your account already has a different Steam ID linked. Cannot link a different Steam account.',
-		steam_already_linked: 'This Steam account is already linked to another TyrHQ account.'
+		steam_already_linked: 'This Steam account is already linked to another TyrHQ account.',
+		split_expired: 'Sign-in method split session expired. Please try again.',
+		split_wrong_user: 'Session mismatch during split. Please restart the process.'
 	};
 
 	const displayError = $derived(profileError || (urlError && errorMessages[urlError]));
@@ -442,35 +474,54 @@
 							<p class="mt-1 text-xs text-[var(--hud-muted)]">{data.userEmail}</p>
 							{#if !canRemovePassword}
 								<p class="mt-2 text-xs text-[var(--hud-warning)]">
-									⚠ This is your only sign-in method. Add Steam or Google before removing email+password.
+									⚠ This is your only sign-in method. Add Steam or Google before removing or splitting email+password.
 								</p>
 							{/if}
 						</div>
-						{#if canRemovePassword}
-							<form method="POST" action="?/removePassword"
-								use:enhance={() => {
-									return async ({ result, update }) => {
-										await update();
-										if (result.type === 'success') {
-											await invalidateAll();
-										}
-									};
-								}}
-							>
-								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+						<div class="flex gap-2">
+							{#if canRemovePassword}
+								<form method="POST" action="?/removePassword"
+									use:enhance={() => {
+										return async ({ result, update }) => {
+											await update();
+											if (result.type === 'success') {
+												await invalidateAll();
+											}
+										};
+									}}
+								>
+									<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+										Remove
+									</button>
+								</form>
+								<button 
+									type="button"
+									class="hud-btn-secondary px-3 py-2 text-xs"
+									onclick={() => handleSplitSignInMethod('email')}
+									disabled={splitLoading}
+									title="Move email+password sign-in to a new empty account"
+								>
+									Split Off
+								</button>
+							{:else}
+								<button 
+									type="button"
+									class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+									disabled
+									title="Add another sign-in method first"
+								>
 									Remove
 								</button>
-							</form>
-						{:else}
-							<button 
-								type="button"
-								class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
-								disabled
-								title="Add another sign-in method first"
-							>
-								Remove
-							</button>
-						{/if}
+								<button 
+									type="button"
+									class="hud-btn-secondary px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+									disabled
+									title="Add another sign-in method first"
+								>
+									Split Off
+								</button>
+							{/if}
+						</div>
 					</div>
 				</div>
 			{:else if pendingEmailChange}
@@ -620,35 +671,54 @@
 							{/if}
 							{#if !canUnlinkGoogle}
 								<p class="mt-2 text-xs text-[var(--hud-warning)]">
-									⚠ This is your only sign-in method. Add Steam or Email+Password before unlinking Google.
+									⚠ This is your only sign-in method. Add Steam or Email+Password before unlinking or splitting Google.
 								</p>
 							{/if}
 						</div>
-						{#if canUnlinkGoogle}
-							<form method="POST" action="?/unlinkGoogle"
-								use:enhance={() => {
-									return async ({ result, update }) => {
-										await update();
-										if (result.type === 'success') {
-											await invalidateAll();
-										}
-									};
-								}}
-							>
-								<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+						<div class="flex gap-2">
+							{#if canUnlinkGoogle}
+								<form method="POST" action="?/unlinkGoogle"
+									use:enhance={() => {
+										return async ({ result, update }) => {
+											await update();
+											if (result.type === 'success') {
+												await invalidateAll();
+											}
+										};
+									}}
+								>
+									<button type="submit" class="hud-cta-outline px-3 py-2 text-xs">
+										Unlink
+									</button>
+								</form>
+								<button 
+									type="button"
+									class="hud-btn-secondary px-3 py-2 text-xs"
+									onclick={() => handleSplitSignInMethod('google')}
+									disabled={splitLoading}
+									title="Move Google sign-in to a new empty account"
+								>
+									Split Off
+								</button>
+							{:else}
+								<button 
+									type="button"
+									class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+									disabled
+									title="Add another sign-in method first"
+								>
 									Unlink
 								</button>
-							</form>
-						{:else}
-							<button 
-								type="button"
-								class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
-								disabled
-								title="Add another sign-in method first"
-							>
-								Unlink
-							</button>
-						{/if}
+								<button 
+									type="button"
+									class="hud-btn-secondary px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+									disabled
+									title="Add another sign-in method first"
+								>
+									Split Off
+								</button>
+							{/if}
+						</div>
 					</div>
 				</div>
 			{:else}
@@ -686,55 +756,74 @@
 								{/if}
 								{#if !canUnlinkSteam}
 									<p class="mt-2 text-xs text-[var(--hud-warning)]">
-										⚠ This is your only sign-in method. Add Google or Email+Password before unlinking Steam.
+										⚠ This is your only sign-in method. Add Google or Email+Password before unlinking or splitting Steam.
 									</p>
 								{/if}
 							</div>
-							{#if canUnlinkSteam}
-								{#if showSteamUnlinkConfirm}
-									<div class="flex flex-col gap-2">
-										<form method="POST" action="?/unlinkSteam"
-											use:enhance={() => {
-												return async ({ result, update }) => {
-													showSteamUnlinkConfirm = false;
-													await update();
-													if (result.type === 'success') {
-														await invalidateAll();
-													}
-												};
-											}}
-										>
-											<button type="submit" class="hud-cta-outline px-3 py-2 text-xs bg-red-900/20 border-red-700/50 text-red-200 hover:bg-red-900/30">
-												Confirm Unlink
+							<div class="flex gap-2">
+								{#if canUnlinkSteam}
+									{#if showSteamUnlinkConfirm}
+										<div class="flex flex-col gap-2">
+											<form method="POST" action="?/unlinkSteam"
+												use:enhance={() => {
+													return async ({ result, update }) => {
+														showSteamUnlinkConfirm = false;
+														await update();
+														if (result.type === 'success') {
+															await invalidateAll();
+														}
+													};
+												}}
+											>
+												<button type="submit" class="hud-cta-outline px-3 py-2 text-xs bg-red-900/20 border-red-700/50 text-red-200 hover:bg-red-900/30">
+													Confirm Unlink
+												</button>
+											</form>
+											<button 
+												type="button"
+												class="hud-cta-outline px-3 py-2 text-xs"
+												onclick={() => showSteamUnlinkConfirm = false}
+											>
+												Cancel
 											</button>
-										</form>
+										</div>
+									{:else}
 										<button 
 											type="button"
 											class="hud-cta-outline px-3 py-2 text-xs"
-											onclick={() => showSteamUnlinkConfirm = false}
+											onclick={() => showSteamUnlinkConfirm = true}
 										>
-											Cancel
+											Unlink
 										</button>
-									</div>
+										<button 
+											type="button"
+											class="hud-btn-secondary px-3 py-2 text-xs"
+											onclick={() => handleSplitSignInMethod('steam')}
+											disabled={splitLoading}
+											title="Move Steam sign-in to a new empty account"
+										>
+											Split Off
+										</button>
+									{/if}
 								{:else}
 									<button 
 										type="button"
-										class="hud-cta-outline px-3 py-2 text-xs"
-										onclick={() => showSteamUnlinkConfirm = true}
+										class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+										disabled
+										title="Add another sign-in method first"
 									>
 										Unlink
 									</button>
+									<button 
+										type="button"
+										class="hud-btn-secondary px-3 py-2 text-xs opacity-50 cursor-not-allowed"
+										disabled
+										title="Add another sign-in method first"
+									>
+										Split Off
+									</button>
 								{/if}
-							{:else}
-								<button 
-									type="button"
-									class="hud-cta-outline px-3 py-2 text-xs opacity-50 cursor-not-allowed"
-									disabled
-									title="Add another sign-in method first"
-								>
-									Unlink
-								</button>
-							{/if}
+							</div>
 						</div>
 						{#if showSteamUnlinkConfirm}
 							<div class="mt-3 rounded-sm bg-[var(--hud-warning)]/10 border border-[var(--hud-warning)]/30 p-3 text-xs text-[var(--hud-muted)]">
@@ -774,6 +863,91 @@
 					<button type="submit" class="hud-cta-ghost px-5 py-3">Sign Out</button>
 		</form>
 	</div>
+
+			<!-- Merged Accounts History -->
+			{#if data.mergeHistory && data.mergeHistory.length > 0}
+				<div class="mt-8 border-t border-[var(--hud-variant)] pt-6">
+					<h2 class="text-xl font-semibold text-[var(--hud-text)]">Merged Accounts</h2>
+					<p class="mt-2 text-sm leading-6 text-[var(--hud-muted)]">
+						History of accounts you've merged into this one. You can undo recent merges.
+					</p>
+
+					<div class="mt-4 space-y-3">
+						{#each data.mergeHistory as merge}
+							<div class="rounded-sm bg-[var(--hud-panel-mid)] border border-[var(--hud-variant)] p-4">
+								<div class="flex items-start justify-between gap-4">
+									<div class="flex-1">
+										<p class="text-sm font-semibold text-[var(--hud-text)]">
+											{#if merge.status === 'undone'}
+												<span class="text-[var(--hud-muted)]">⟲ Undone Merge</span>
+											{:else}
+												Merged Account
+											{/if}
+										</p>
+										{#if merge.secondary_email}
+											<p class="mt-1 text-xs text-[var(--hud-muted)]">
+												Email: {merge.secondary_email}
+											</p>
+										{/if}
+										{#if merge.secondary_display_name}
+											<p class="mt-1 text-xs text-[var(--hud-muted)]">
+												Name: {merge.secondary_display_name}
+											</p>
+										{/if}
+										{#if merge.secondary_steam_id}
+											<p class="mt-1 text-xs text-[var(--hud-muted)]">
+												Steam: {merge.secondary_steam_id}
+											</p>
+										{/if}
+										<p class="mt-2 text-xs text-[var(--hud-dim)]">
+											Merged: {new Date(merge.merged_at).toLocaleString()}
+										</p>
+										{#if merge.undone_at}
+											<p class="mt-1 text-xs text-[var(--hud-dim)]">
+												Undone: {new Date(merge.undone_at).toLocaleString()}
+											</p>
+										{/if}
+									</div>
+									{#if merge.status === 'completed'}
+										<button 
+											type="button"
+											class="hud-cta-outline px-3 py-2 text-xs"
+											onclick={async () => {
+												if (!confirm('Are you sure you want to undo this merge? This will restore the secondary account and move data back.')) {
+													return;
+												}
+												
+												try {
+													const response = await fetch('/auth/unmerge', {
+														method: 'POST',
+														headers: { 'Content-Type': 'application/json' },
+														body: JSON.stringify({ mergeId: merge.id })
+													});
+													
+													if (!response.ok) {
+														const error = await response.json();
+														alert(error.message || 'Failed to undo merge');
+														return;
+													}
+													
+													await invalidateAll();
+													alert('Merge undone successfully!');
+												} catch (err) {
+													console.error('Error undoing merge:', err);
+													alert('Failed to undo merge. Please try again.');
+												}
+											}}
+											title="Undo this merge and restore the secondary account"
+										>
+											Undo Merge
+										</button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</div>
 

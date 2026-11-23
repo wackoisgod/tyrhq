@@ -65,6 +65,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Compute sign-in methods for unlink/remove guards
 	const signInMethods = computeSignInMethods(user, profile?.verified_steam_id ?? null);
 
+	// Fetch merge history
+	const { data: mergeHistory } = await locals.supabase
+		.from('user_merge_history')
+		.select('*')
+		.eq('primary_user_id', user.id)
+		.order('merged_at', { ascending: false });
+
 	return {
 		profile,
 		isOnboarding,
@@ -80,7 +87,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		canSetPassword,
 		canUnlinkGoogle: signInMethods.canUnlinkGoogle,
 		canUnlinkSteam: signInMethods.canUnlinkSteam,
-		canRemovePassword: signInMethods.canRemovePassword
+		canRemovePassword: signInMethods.canRemovePassword,
+		mergeHistory: mergeHistory || []
 	};
 };
 
