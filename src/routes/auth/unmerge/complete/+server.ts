@@ -31,6 +31,15 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 		throw httpError(400, 'Session mismatch. Please restart the undo process.');
 	}
 
+	// Verify recent authentication (session must be fresh)
+	// Cookie issued at init must be within 10 minutes, proving recent active use
+	// This is sufficient since user must navigate through confirm page
+	// (Secondary user is banned and cannot re-authenticate, so this MUST be primary)
+	const timeSinceInit = Date.now() - unmergeCookie.issuedAt;
+	if (timeSinceInit > 10 * 60 * 1000) { // 10 minutes
+		throw httpError(400, 'Session expired. Please restart the undo process.');
+	}
+
 	const mergeId = unmergeCookie.mergeId;
 
 	// Get admin client
@@ -79,30 +88,8 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 		throw httpError(500, 'Failed to validate undo request');
 	}
 
-	// Step 1: Restore auth user FIRST (before DB changes)
-	try {
-		const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(
-			merge.secondary_user_id,
-			{ ban_duration: 'none' }
-		);
-
-		if (unbanError) {
-			console.error('[unmerge] Failed to unban secondary user:', unbanError);
-			// Clean up nonce
-			await supabaseAdmin.from('merge_nonces').delete().eq('nonce', unmergeCookie.nonce);
-			throw httpError(500, 'Failed to restore secondary account access. Undo aborted.');
-		}
-
-		console.log('[unmerge] Secondary auth user unbanned successfully');
-	} catch (err: any) {
-		console.error('[unmerge] Auth restoration failed before DB changes:', err);
-		if (err.status) {
-			throw err;
-		}
-		throw httpError(500, 'Failed to restore auth access. Undo aborted before data changes.');
-	}
-
-	// Step 2: Call unmerge function to restore data
+	// Step 1: Call unmerge function to restore data FIRST
+	// If this fails, we haven't unbanned anyone yet (clean state)
 	try {
 		const { data: result, error: unmergeError } = await supabaseAdmin.rpc('unmerge_accounts', {
 			p_merge_id: mergeId
@@ -110,22 +97,31 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 
 		if (unmergeError) {
 			console.error('[unmerge] Failed to undo merge in DB:', unmergeError);
-			
-			// Try to re-ban user since DB undo failed
-			await supabaseAdmin.auth.admin.updateUserById(
-				merge.secondary_user_id,
-				{ ban_duration: '876000h' }
-			).catch(banErr => {
-				console.error('[unmerge] Failed to re-ban user after DB error:', banErr);
-			});
-			
 			// Clean up nonce
 			await supabaseAdmin.from('merge_nonces').delete().eq('nonce', unmergeCookie.nonce);
-			
-			throw httpError(500, 'Failed to undo merge data. Secondary account has been re-disabled.');
+			throw httpError(500, 'Failed to undo merge data. No changes made to auth status.');
 		}
 
 		console.log('[unmerge] Database undo completed successfully');
+
+		// Step 2: Unban secondary user AFTER successful data restore
+		const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(
+			merge.secondary_user_id,
+			{ ban_duration: 'none' }
+		);
+
+		if (unbanError) {
+			console.error('[unmerge] CRITICAL: Data restored but failed to unban secondary user:', unbanError);
+			// Data is restored but user still banned - this is recoverable via retry
+			// Clean up nonce and cookie
+			await supabaseAdmin.from('merge_nonces').delete().eq('nonce', unmergeCookie.nonce);
+			const { value, options } = deleteUnmergeCookie();
+			cookies.set(UNMERGE_COOKIE_NAME, value, options);
+			
+			throw httpError(500, 'Data restored successfully, but failed to restore sign-in access. Contact support to unban the secondary account.');
+		}
+
+		console.log('[unmerge] Secondary auth user unbanned successfully');
 
 		// Delete the unmerge cookie
 		const { value, options } = deleteUnmergeCookie();
@@ -140,7 +136,7 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 			dataRestored: true
 		});
 	} catch (err: any) {
-		console.error('[unmerge] Unexpected error during DB undo:', err);
+		console.error('[unmerge] Unexpected error during undo:', err);
 
 		// Clean up cookie
 		const { value, options } = deleteUnmergeCookie();
@@ -150,6 +146,6 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 			throw err;
 		}
 
-		throw httpError(500, 'Unexpected error during data restoration');
+		throw httpError(500, 'Unexpected error during undo');
 	}
 };

@@ -67,9 +67,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Fetch merge history via admin client (service_role only)
 	// SECURITY: Filter by primary_user_id = current user to prevent leaking other users' merges
-	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-	const supabaseAdmin = getSupabaseAdminClient();
-	
+	// Reuse supabaseAdmin from above (already imported)
 	let mergeHistory: any[] = [];
 	if (supabaseAdmin) {
 		const { data } = await supabaseAdmin

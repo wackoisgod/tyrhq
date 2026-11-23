@@ -473,12 +473,38 @@ BEGIN
         UPDATE public.profiles SET display_name = v_secondary_display_name WHERE id = p_primary_user_id;
     END IF;
     
-    -- 27. Delete secondary profile
+    -- 27. Move auth.identities from secondary to primary (SECURITY DEFINER allows this)
+    -- This allows signing in with secondary's Google/Steam on the primary account
+    -- Exception: Email identity stays on secondary (can't move password between users)
+    
+    -- Log identities before moving (for undo)
+    INSERT INTO public.account_merge_rows (merge_id, table_name, row_pk, operation, old_data)
+    SELECT v_merge_id, 'auth.identities',
+           jsonb_build_object('id', i.id), 
+           'UPDATE',
+           jsonb_build_object('id', i.id, 'user_id', i.user_id, 'provider', i.provider, 'identity_data', i.identity_data, 'created_at', i.created_at, 'updated_at', i.updated_at)
+    FROM auth.identities i
+    WHERE i.user_id = p_secondary_user_id
+    AND i.provider != 'email'; -- Don't move email identity (password can't be moved)
+    
+    -- Move non-email identities to primary
+    UPDATE auth.identities
+    SET user_id = p_primary_user_id,
+        updated_at = now()
+    WHERE user_id = p_secondary_user_id
+    AND provider != 'email';
+    
+    -- Email identity stays on banned secondary user
+    -- After merge: sign in with primary's email OR secondary's Google/Steam (now on primary)
+    -- After undo: identities move back to secondary
+    
+    -- 28. Delete secondary profile
     DELETE FROM public.profiles WHERE id = p_secondary_user_id;
     
-    -- 28. Note: Secondary auth user is NO LONGER deleted here
-    -- Instead, app should disable it (ban or set metadata)
-    -- This allows undo to restore the user and re-link identities
+    -- 29. Note: Secondary auth user is NO LONGER deleted here
+    -- Instead, app bans it (ban_duration set by calling code)
+    -- Email identity remains on banned secondary (password can't be moved)
+    -- Non-email identities moved to primary above
     
     -- Build result summary
     v_result := jsonb_build_object(
@@ -611,10 +637,28 @@ BEGIN
         v_rows_restored := v_rows_restored + 1;
     END LOOP;
     
-    -- 3. Revert UPDATE operations (move data back to secondary)
+    -- 3. Move auth.identities back to secondary (SECURITY DEFINER allows this)
+    -- Revert the identity move from merge
+    FOR v_row_record IN 
+        SELECT * FROM public.account_merge_rows 
+        WHERE merge_id = p_merge_id 
+        AND operation = 'UPDATE'
+        AND table_name = 'auth.identities'
+        ORDER BY created_at DESC
+    LOOP
+        -- Move identity back to secondary user
+        UPDATE auth.identities
+        SET user_id = v_merge_record.secondary_user_id,
+            updated_at = now()
+        WHERE id = (v_row_record.old_data->>'id')::uuid
+        AND user_id = v_merge_record.primary_user_id;
+    END LOOP;
+    
+    -- 4. Revert other UPDATE operations (move data back to secondary)
     FOR v_row_record IN 
         SELECT * FROM public.account_merge_rows 
         WHERE merge_id = p_merge_id AND operation = 'UPDATE'
+        AND table_name != 'auth.identities' -- Already handled above
         ORDER BY created_at DESC
     LOOP
         -- Simplified revert - production would need full table-specific logic
@@ -637,16 +681,13 @@ BEGIN
         END CASE;
     END LOOP;
     
-    -- 4. Mark merge as undone
+    -- 5. Mark merge as undone
     UPDATE public.account_merges
     SET status = 'undone', undone_at = now()
     WHERE id = p_merge_id;
     
-    -- 5. Note: Auth user restoration and identity re-linking must be done by app code
-    -- The app should:
-    -- - Restore auth.users record from snapshot
-    -- - Re-link identities (admin.linkIdentityToUser or similar)
-    -- - Remove ban/disabled status
+    -- 6. Note: Auth user unban must be done by app code AFTER this succeeds
+    -- The app unbans secondary user, allowing sign-in with restored identities
     
     v_result := jsonb_build_object(
         'success', true,
