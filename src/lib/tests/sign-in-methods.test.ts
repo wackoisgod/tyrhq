@@ -207,18 +207,22 @@ describe('Sign-in Method Computation', () => {
 			expect(result.canRemovePassword).toBe(false);
 		});
 
-		it('should handle user with no identities', () => {
-			const user = {
-				id: 'user-8',
-				email: 'user@example.com',
-				identities: []
-			} as User;
+	it('should handle user with no identities', () => {
+		const user = {
+			id: 'user-8',
+			email: 'user@example.com',
+			identities: [],
+			app_metadata: {},
+			user_metadata: {},
+			aud: 'authenticated',
+			created_at: new Date().toISOString()
+		} as User;
 
-			const result = computeSignInMethods(user);
+		const result = computeSignInMethods(user);
 
-			expect(result.count).toBe(0);
-			expect(result.hasEmailPassword).toBe(false); // No email identity
-		});
+		expect(result.count).toBe(0);
+		expect(result.hasEmailPassword).toBe(false); // No email identity
+	});
 
 		it('should handle Steam verification after email change', () => {
 			// User changed from placeholder to real email but still has Steam

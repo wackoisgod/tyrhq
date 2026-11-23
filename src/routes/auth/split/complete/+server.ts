@@ -12,6 +12,7 @@ import {
 	SPLIT_COOKIE_NAME
 } from '$lib/server/account-split';
 import { getSplitSecret } from '$lib/server/account-split';
+import { STEAM_PROVIDER } from '$lib/server/steam-oidc-provider';
 
 export const POST: RequestHandler = async ({ locals, cookies }) => {
 	const { session, user } = await locals.safeGetSession();
@@ -61,7 +62,7 @@ export const POST: RequestHandler = async ({ locals, cookies }) => {
 		const providerMap: Record<string, string> = {
 			google: 'google',
 			email: 'email',
-			steam: 'custom:steam'
+			steam: STEAM_PROVIDER
 		};
 
 		const providerKey = providerMap[splitCookie.provider];

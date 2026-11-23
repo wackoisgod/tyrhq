@@ -31,34 +31,36 @@
 		error = '';
 
 		try {
-			if (data.provider === 'google') {
-				// Redirect to Google OAuth for re-authentication
+			if (data.provider === 'google' || data.provider === 'steam') {
+				// Redirect to OAuth for re-authentication (Google or Steam)
 				const callbackUrl = getAuthCallbackUrl(window.location.origin, '/auth/split/complete');
+				const oauthProvider = data.provider === 'steam' ? 'custom:steam' : 'google';
+				
+				const oauthOptions: any = {
+					redirectTo: callbackUrl
+				};
+				
+				// Force account selection for Google
+				if (data.provider === 'google') {
+					oauthOptions.queryParams = {
+						prompt: 'select_account'
+					};
+				}
+
 				const { data: authData, error: authError } = await supabase.auth.signInWithOAuth({
-					provider: 'google',
-					options: {
-						redirectTo: callbackUrl,
-						queryParams: {
-							prompt: 'select_account' // Force account selection
-						}
-					}
+					provider: oauthProvider as any,
+					options: oauthOptions
 				});
 
 				if (authError) {
-					console.error('[split] Google auth error:', authError);
-					error = 'Failed to authenticate with Google. Please try again.';
+					console.error(`[split] ${data.provider} auth error:`, authError);
+					error = `Failed to authenticate with ${providerNames[data.provider]}. Please try again.`;
 					loading = false;
 				}
 				// OAuth will redirect away
 			} else if (data.provider === 'email') {
 				// Redirect to email login form
 				goto('/auth/split/complete?provider=email');
-			} else if (data.provider === 'steam') {
-				// Redirect to Steam OAuth for re-authentication
-				const callbackUrl = getAuthCallbackUrl(window.location.origin, '/auth/split/complete');
-				// Steam auth would need similar handling
-				// For now, redirect to complete with steam marker
-				goto('/auth/split/complete?provider=steam');
 			}
 		} catch (err) {
 			console.error('[split] Re-authentication error:', err);
