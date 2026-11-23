@@ -207,27 +207,30 @@ export const actions: Actions = {
 			});
 		}
 
-		// Find Google identity
-		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-		const supabaseAdmin = getSupabaseAdminClient();
-		if (!supabaseAdmin) {
-			return fail(500, { profileError: 'Admin client not configured' });
-		}
-
-		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
-		const googleIdentity = authUser?.user?.identities?.find((i: any) => i.provider === 'google');
+		// Find Google identity from current user's identities
+		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
 
 		if (!googleIdentity) {
 			return fail(400, { profileError: 'No Google account to unlink' });
 		}
 
-		// Unlink via admin API
-		const { error: unlinkError } = await supabaseAdmin.auth.admin.deleteIdentity(
-			googleIdentity.id
-		);
+		// Unlink via user-scoped client (requires user session)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(googleIdentity);
 
 		if (unlinkError) {
 			console.error('Error unlinking Google:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError:
+						'Cannot unlink: you must have at least one other sign-in method first.'
+				});
+			}
 			return fail(500, { profileError: 'Failed to unlink Google account' });
 		}
 
@@ -250,27 +253,29 @@ export const actions: Actions = {
 			});
 		}
 
-		// Get admin client to unlink email identity
-		const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
-		const supabaseAdmin = getSupabaseAdminClient();
-		if (!supabaseAdmin) {
-			return fail(500, { profileError: 'Admin client not configured' });
-		}
-
-		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
-		const emailIdentity = authUser?.user?.identities?.find((i: any) => i.provider === 'email');
+		// Find email identity from current user's identities
+		const emailIdentity = user.identities?.find((i) => i.provider === 'email');
 
 		if (!emailIdentity) {
 			return fail(400, { profileError: 'No email identity to remove' });
 		}
 
-		// Unlink email identity (removes password)
-		const { error: unlinkError } = await supabaseAdmin.auth.admin.deleteIdentity(
-			emailIdentity.id
-		);
+		// Unlink email identity via user-scoped client (removes password)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(emailIdentity);
 
 		if (unlinkError) {
 			console.error('Error removing password:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError: 'Cannot remove: you must have at least one other sign-in method first.'
+				});
+			}
 			return fail(500, { profileError: 'Failed to remove email+password' });
 		}
 
