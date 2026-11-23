@@ -826,8 +826,8 @@ export async function listTournaments() {
 	const rows = ((data as TournamentRow[]) ?? []).map(toTournament);
 	const liveStatuses = new Set(['open', 'in_progress']);
 	return {
-		upcoming: rows.filter((t) => new Date(t.startsAt).getTime() >= now || liveStatuses.has(t.status)),
-		past: rows.filter((t) => new Date(t.startsAt).getTime() < now && !liveStatuses.has(t.status))
+		upcoming: rows.filter((t) => t.status !== 'completed' && (new Date(t.startsAt).getTime() >= now || liveStatuses.has(t.status))),
+		past: rows.filter((t) => t.status === 'completed' || (new Date(t.startsAt).getTime() < now && !liveStatuses.has(t.status)))
 	};
 }
 
