@@ -24,6 +24,10 @@ export const changelog: ChangelogEntry[] = [
 		items: [
 			{
 				tag: 'New',
+				text: 'You get an email when an organizer application is approved or declined, including any note left on a declined application.'
+			},
+			{
+				tag: 'New',
 				text: 'You get a notification in the header when an organizer application is approved or declined, and when organizer access is removed.'
 			},
 			{
