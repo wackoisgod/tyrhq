@@ -1,3 +1,4 @@
+import { deliverOrganizerApplicantNotice } from './notifications';
 import { getSupabaseAdminClient } from './supabase-admin';
 import { setTournamentOrganizer, type ProfileRole } from './users';
 
@@ -456,6 +457,12 @@ export async function reviewOrganizerApplication(
 		}
 	}
 
+	await deliverOrganizerApplicantNotice(
+		existing.user_id,
+		decision.decision === 'approve' ? 'approved' : 'rejected',
+		note
+	);
+
 	return toRecord(updated);
 }
 
@@ -464,7 +471,9 @@ export async function reviewOrganizerApplication(
  */
 export async function revokeOrganizerAccess(targetId: string, actor: { role: ProfileRole }) {
 	assertOrganizerAdmin(actor.role);
-	return setTournamentOrganizer(targetId, false, { role: 'admin' });
+	const updated = await setTournamentOrganizer(targetId, false, { role: 'admin' });
+	await deliverOrganizerApplicantNotice(targetId, 'revoked', null);
+	return updated;
 }
 
 export interface ModerationTournament {

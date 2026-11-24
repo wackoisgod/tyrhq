@@ -24,6 +24,10 @@ export const changelog: ChangelogEntry[] = [
 		items: [
 			{
 				tag: 'New',
+				text: 'You get a notification in the header when an organizer application is approved or declined, and when organizer access is removed.'
+			},
+			{
+				tag: 'New',
 				text: 'Apply from Settings to organize tournaments. Once approved, you can publish an event right away, and your application status stays on Settings.'
 			},
 			{
