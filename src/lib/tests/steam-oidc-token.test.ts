@@ -36,9 +36,8 @@ testEnv.STEAM_OIDC_PRIVATE_KEY = privateKey;
 const { generateStatelessCode, verifyStatelessCode, steamOidcProvider } = await import(
 	'$lib/server/steam-oidc-provider'
 );
-const { POST, decodeBasicClientCredentials } = await import(
-	'../../routes/auth/steam/oidc/token/+server'
-);
+const { decodeBasicClientCredentials } = await import('$lib/server/basic-client-auth');
+const { POST } = await import('../../routes/auth/steam/oidc/token/+server');
 
 /** application/x-www-form-urlencoded, matching Go's url.QueryEscape before Basic auth. */
 function formUrlEncode(value: string): string {
