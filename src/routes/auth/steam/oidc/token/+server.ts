@@ -9,6 +9,31 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { steamOidcProvider } from '$lib/server/steam-oidc-provider';
 
+/**
+ * RFC 6749 §2.3.1: HTTP Basic credentials are form-urlencoded, then base64.
+ * Split on the first colon only so a secret may contain colons, then
+ * decode each part (application/x-www-form-urlencoded: '+' is a space).
+ */
+export function decodeBasicClientCredentials(
+	authHeader: string
+): { clientId: string; clientSecret: string } | null {
+	if (!authHeader.startsWith('Basic ')) return null;
+
+	const decoded = Buffer.from(authHeader.slice('Basic '.length).trim(), 'base64').toString('utf8');
+	const separator = decoded.indexOf(':');
+	if (separator < 0) return null;
+
+	const decodePart = (value: string) => decodeURIComponent(value.replace(/\+/g, ' '));
+	try {
+		return {
+			clientId: decodePart(decoded.slice(0, separator)),
+			clientSecret: decodePart(decoded.slice(separator + 1))
+		};
+	} catch {
+		return null;
+	}
+}
+
 export const POST: RequestHandler = async ({ request, url }) => {
 	const contentType = request.headers.get('content-type');
 	let params: any;
@@ -29,13 +54,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		throw error(400, 'Invalid content type');
 	}
 
-	// Also support Basic Auth for client credentials
+	// Also support Basic Auth for client credentials (Go tries this first)
 	const authHeader = request.headers.get('authorization');
 	if (authHeader?.startsWith('Basic ')) {
-		const decoded = atob(authHeader.slice(6));
-		const [clientId, clientSecret] = decoded.split(':');
-		params.client_id = params.client_id || clientId;
-		params.client_secret = params.client_secret || clientSecret;
+		const credentials = decodeBasicClientCredentials(authHeader);
+		if (credentials) {
+			params.client_id = params.client_id || credentials.clientId;
+			params.client_secret = params.client_secret || credentials.clientSecret;
+		}
 	}
 
 	const result = await steamOidcProvider.token(params, url.origin);
