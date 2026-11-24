@@ -29,6 +29,8 @@ export interface ReplayScoreboardRow {
 export interface ReplayUploadPayload {
 	replayGuid: string | null;
 	changelist: number | null;
+	/** Header level path, or null when the replay has no map name. */
+	levelName: string | null;
 	winnerTeam: 0 | 1 | null;
 	roster: ReplayRosterPlayer[];
 	endgameStats: ReplayScoreboardRow[];
@@ -116,9 +118,11 @@ export function toReplayUploadPayload(result: ReplayParseResult): ReplayUploadPa
 		result.changelist <= 10_000_000
 			? result.changelist
 			: null;
+	const levelName = result.levelName?.trim().slice(0, 256) || null;
 	return {
 		replayGuid: result.replayGuid && GUID_PATTERN.test(result.replayGuid) ? result.replayGuid.toLowerCase() : null,
 		changelist,
+		levelName,
 		winnerTeam: result.winnerTeam === 0 || result.winnerTeam === 1 ? result.winnerTeam : null,
 		roster,
 		endgameStats,

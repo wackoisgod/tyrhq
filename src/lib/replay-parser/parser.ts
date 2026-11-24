@@ -216,6 +216,7 @@ export function parseReplay(
 		winnerTeam: null,
 		replayGuid: null,
 		changelist: null,
+		levelName: null,
 		warnings
 	};
 
@@ -231,6 +232,7 @@ export function parseReplay(
 
 	result.replayGuid = header.guid;
 	result.changelist = header.changelist;
+	result.levelName = header.levelName;
 	report('header', 0.08);
 
 	// Walk netstream to extract player identity

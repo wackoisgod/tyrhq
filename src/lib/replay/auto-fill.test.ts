@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildReplayAutoFill, replayStatRows, type RegisteredPlayer } from './auto-fill';
+import { buildReplayAutoFill, releasedMapIdForLevelName, replayStatRows, type RegisteredPlayer } from './auto-fill';
 import type { ReplayUploadPayload } from './upload-payload';
 
 const teamA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -15,6 +15,7 @@ function payload(
 	return {
 		replayGuid: '89d31bb46e93b24b897a1749f392104a',
 		changelist: 40016,
+		levelName: null,
 		winnerTeam: 0,
 		roster: [
 			{ name: 'Alice', teamId: 0, steamId: '76561198000000001', clan: null },
@@ -66,6 +67,29 @@ const players: RegisteredPlayer[] = [
 	{ userId: bob, teamId: teamA, displayName: 'Bob', steamId: '76561198000000002' },
 	{ userId: carol, teamId: teamB, displayName: 'Carol', steamId: '76561198000000003' }
 ];
+
+describe('replay map autofill', () => {
+	it('maps the Ravine replay level onto the released Ravine map', () => {
+		expect(releasedMapIdForLevelName('/TyrMapRavine/Maps/Map_Ravine')).toBe('ravine');
+		expect(releasedMapIdForLevelName('Map_Ravine')).toBe('ravine');
+	});
+
+	it('leaves the map empty when the level is missing or not a released map', () => {
+		expect(releasedMapIdForLevelName(null)).toBeNull();
+		expect(releasedMapIdForLevelName('/TyrMapGlade/Maps/Map_Glade')).toBeNull();
+		expect(releasedMapIdForLevelName('not a map')).toBeNull();
+	});
+
+	it('suggests Ravine on the scoreboard autofill', () => {
+		const fill = buildReplayAutoFill({
+			payload: payload({ levelName: '/TyrMapRavine/Maps/Map_Ravine' }),
+			teamAId: teamA,
+			teamBId: teamB,
+			players
+		});
+		expect(fill.suggestedMapId).toBe('ravine');
+	});
+});
 
 describe('replay auto-fill', () => {
 	it('matches Steam IDs, ranks the winning side first, and maps tank codenames', () => {

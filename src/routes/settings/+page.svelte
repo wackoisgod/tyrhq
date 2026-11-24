@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import SettingsNav from '$lib/components/settings/SettingsNav.svelte';
 	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
+	import { linkEmailThenPassword } from '$lib/auth/link-email';
 
 	let { data, form } = $props();
 
@@ -136,74 +137,58 @@
 		emailFormLoading = true;
 		
 		try {
-			// Set password FIRST (works on placeholder account, avoids half-done state)
-			const { error: passwordError } = await supabase.auth.updateUser({
-				password: emailFormData.password
-			});
-			
-			if (passwordError) {
-				console.error('[settings] Failed to set password:', passwordError);
-				emailFormError = 'Failed to set password. Please try again.';
-				emailFormLoading = false;
-				return;
-			}
-			
-			// Build callback URL with link marker
+			// Ask for the email first. A taken address starts a merge and must not
+			// change this account's password. Set the password only after the email
+			// update is accepted.
 			const callbackUrl = getAuthCallbackUrl(window.location.origin, '/settings');
 			const callbackWithMarker = `${callbackUrl}&link=email`;
-			
-			// Then update email (Supabase will send confirmation email)
-			const { error: emailError } = await supabase.auth.updateUser(
-				{ email: emailFormData.email },
-				{
-					emailRedirectTo: callbackWithMarker
-				}
-			);
-			
-			if (emailError) {
-				console.error('[settings] Failed to update email:', emailError);
-				
-				// Map by error code if available, fallback to message
-				const errorCode = (emailError as any).code || (emailError as any).error_code;
-				if (errorCode === 'email_exists' || errorCode === 'email_address_taken' ||
-				    emailError.message?.toLowerCase().includes('already') || 
-				    emailError.message?.toLowerCase().includes('exists')) {
-					// Email exists on another account - initiate merge flow
-					// User will prove ownership by signing in with that account's password or magic link
-					try {
-						const response = await fetch('/auth/merge/init', {
-							method: 'POST',
-							headers: {
-								'Content-Type': 'application/json'
-							}
-						});
-						
-						if (!response.ok) {
-							emailFormError = 'Failed to initiate merge. Please try again.';
-							emailFormLoading = false;
-							return;
+			const linked = await linkEmailThenPassword(supabase.auth, {
+				email: emailFormData.email,
+				password: emailFormData.password,
+				emailRedirectTo: callbackWithMarker
+			});
+
+			if (linked.status === 'merge') {
+				try {
+					const response = await fetch('/auth/merge/init', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
 						}
-						
-						// Store email in sessionStorage to prefill on auth page
-						sessionStorage.setItem('merge_email', emailFormData.email);
-						
-						// Sign out and redirect to auth with merge marker
-						await supabase.auth.signOut();
-						goto('/auth?merge=1&provider=email');
-						return;
-					} catch (err) {
-						console.error('[settings] Exception initiating merge:', err);
+					});
+
+					if (!response.ok) {
 						emailFormError = 'Failed to initiate merge. Please try again.';
 						emailFormLoading = false;
 						return;
 					}
-				} else {
-					emailFormError = 'Failed to update email. Please try again.';
+
+					sessionStorage.setItem('merge_email', emailFormData.email);
+					await supabase.auth.signOut();
+					goto('/auth?merge=1&provider=email');
+					return;
+				} catch (err) {
+					console.error('[settings] Exception initiating merge:', err);
+					emailFormError = 'Failed to initiate merge. Please try again.';
+					emailFormLoading = false;
+					return;
 				}
+			}
+
+			if (linked.status === 'email-failed') {
+				emailFormError = 'Failed to update email. Please try again.';
 				emailFormLoading = false;
 				return;
 			}
-			
+
+			if (linked.status === 'password-failed') {
+				pendingEmailChange = emailFormData.email;
+				emailFormError = 'The confirmation email was sent, but the password was not changed. Set it after you confirm the email.';
+				emailFormLoading = false;
+				await invalidateAll();
+				return;
+			}
+
 			// Success - show pending state
 			pendingEmailChange = emailFormData.email;
 			showEmailForm = false;

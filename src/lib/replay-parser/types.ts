@@ -36,6 +36,8 @@ export interface ReplayParseResult {
 	replayGuid: string | null;
 	/** Game changelist/version */
 	changelist: number | null;
+	/** Header level path, such as /TyrMapRavine/Maps/Map_Ravine. */
+	levelName: string | null;
 	/** Warnings encountered during parse */
 	warnings: string[];
 }

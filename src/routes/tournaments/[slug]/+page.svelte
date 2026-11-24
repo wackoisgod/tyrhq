@@ -894,7 +894,7 @@
 									<p class="mt-1 text-sm text-[var(--hud-muted)]">The bracket has been generated, so its ranked list can no longer be edited.</p>
 								</div>
 							{:else}
-								{#if availableTeams.length > 0}
+								{#if data.role === 'admin' && availableTeams.length > 0}
 									<p class="mt-5 text-xs leading-5 text-[#ffd166]">Force registration bypasses captain approval and normal tournament-roster size limits.</p>
 									<form method="POST" action="?/addTeam" class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]" onsubmit={(event) => {
 										if (!confirm('Force register this team and bypass roster-size validation?')) event.preventDefault();
@@ -1084,7 +1084,7 @@
 						{#if !data.userId}
 							<a href={data.loginHref} class="inline-block hud-cta px-4 py-3">Sign In To Register</a>
 						{:else if data.captainTeams.length === 0}
-							<a href="/teams" class="inline-block hud-cta px-4 py-3">Create A Team</a>
+							<a href="/teams?create=1" class="inline-block hud-cta px-4 py-3">Create A Team</a>
 						{:else if availableCaptainTeams.length > 0}
 							<form method="POST" action="?/register" class="flex flex-col gap-3">
 								<input type="hidden" name="tournamentId" value={data.tournament.id} />

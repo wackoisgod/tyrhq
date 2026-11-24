@@ -66,7 +66,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 			) ?? 'overview',
 		loginHref: `/auth?next=${encodeURIComponent(url.pathname)}`,
 		captainTeams,
-		allTeams: tournament.canManage ? await listTeams() : [],
+		allTeams: tournament.canManage && role === 'admin' ? await listTeams() : [],
 		freeAgentContext,
 		buildContext
 	};
