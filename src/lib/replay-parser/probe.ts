@@ -15,6 +15,8 @@ import { DecodeError } from './bit-reader';
 export interface ReplayHeader {
 	guid: string; // 16-byte hex string
 	changelist: number;
+	/** First header level path, such as /TyrMapRavine/Maps/Map_Ravine. */
+	levelName: string | null;
 	headerChunkEnd: number; // Offset where first chunk after header begins
 	chunks: Array<{
 		type: number;
@@ -212,6 +214,7 @@ export function probeReplayHeader(buffer: Uint8Array): ReplayHeader | null {
 			return {
 				guid,
 				changelist,
+				levelName: readMapLevelName(buffer, chunkOffset + 16, headerChunkEnd),
 				headerChunkEnd,
 				chunks: []
 			};
@@ -222,4 +225,24 @@ export function probeReplayHeader(buffer: Uint8Array): ReplayHeader | null {
 	} catch (e) {
 		return null;
 	}
+}
+
+const MAP_LEVEL_PATH = /^\/[A-Za-z0-9_]+\/Maps\/Map_[A-Za-z0-9_]+$/;
+
+/**
+ * The header chunk lists level names after the GUID. UE 5.6 writes an engine
+ * branch before that list that is not a plain FString, so scan the remaining
+ * header bytes for the map path instead of walking every header field.
+ */
+function readMapLevelName(buffer: Uint8Array, start: number, end: number): string | null {
+	for (let offset = start; offset + 8 <= end; offset++) {
+		const length = readU32LE(buffer, offset);
+		if (length < 12 || length > 240 || offset + 4 + length > end) continue;
+		if (buffer[offset + 3 + length] !== 0) continue;
+		const text = new TextDecoder('utf-8', { fatal: false })
+			.decode(buffer.subarray(offset + 4, offset + 3 + length))
+			.replace(/\0+$/, '');
+		if (MAP_LEVEL_PATH.test(text)) return text;
+	}
+	return null;
 }

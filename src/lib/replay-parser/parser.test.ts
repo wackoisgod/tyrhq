@@ -32,6 +32,20 @@ describe('Replay Parser', () => {
 		it('returns null for too-short buffer', () => {
 			expect(probeReplayHeader(new Uint8Array(10))).toBeNull();
 		});
+
+		it('reads the Ravine level path from the header', () => {
+			const buffer = new Uint8Array(
+				readFileSync('tests/fixtures/replay-parser/ravine-40016-full.replay')
+			);
+			const header = probeReplayHeader(buffer);
+			expect(header?.changelist).toBe(40016);
+			expect(header?.levelName).toBe('/TyrMapRavine/Maps/Map_Ravine');
+		});
+
+		it('reads the Sandbox level path from the header', () => {
+			const buffer = new Uint8Array(readFileSync('tests/fixtures/replay-parser/sandbox-38646.replay'));
+			expect(probeReplayHeader(buffer)?.levelName).toBe('/TyrMapSandbox/Maps/Map_SandboxRevamp');
+		});
 	});
 
 	describe('fixture replay', () => {
@@ -63,6 +77,7 @@ describe('Replay Parser', () => {
 			);
 			const result = parseReplay(buffer);
 			expect(result.warnings).toEqual([]);
+			expect(result.levelName).toBe('/TyrMapRavine/Maps/Map_Ravine');
 			expect(result.winnerTeam).toEqual(expected.winnerTeam);
 			expect(
 				result.endgameStats.map((e) => ({

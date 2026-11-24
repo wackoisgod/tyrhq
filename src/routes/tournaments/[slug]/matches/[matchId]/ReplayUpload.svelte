@@ -97,6 +97,8 @@
 		const target = preview.existingGameNumber ?? gameNumber;
 		const row = gameFormData.find((game) => game.gameNumber === Number(target));
 		if (suggestion && row && !row.winnerTeamId) row.winnerTeamId = suggestion;
+		const mapId = preview.autoFill.suggestedMapId;
+		if (mapId && row && !row.mapId && maps.some((map) => map.id === mapId)) row.mapId = mapId;
 	});
 
 	async function onFile(event: Event) {

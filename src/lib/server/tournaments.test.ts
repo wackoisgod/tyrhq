@@ -1,12 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import {
+	addTournamentTeam,
 	buildSingleEliminationRows,
 	createTournamentSchema,
 	summarizeSingleEliminationFinish,
 	slugify,
 	listTournaments
 } from './tournaments';
+import { getSupabaseAdminClient } from './supabase-admin';
 import {
 	findBlockedTeamNameTerm,
 	normalizeTeamNameForSafety
@@ -15,6 +17,24 @@ import {
 vi.mock('./supabase-admin', () => ({
 	getSupabaseAdminClient: vi.fn()
 }));
+
+describe('force register authorization', () => {
+	it('rejects an organizer who is not a site admin before any team lookup', async () => {
+		vi.mocked(getSupabaseAdminClient).mockClear();
+		await expect(addTournamentTeam('tournament-id', 'team-id', 'organizer-id', 'user')).rejects.toMatchObject({
+			statusCode: 403,
+			message: 'Only a site admin can force register a team.'
+		});
+		expect(getSupabaseAdminClient).not.toHaveBeenCalled();
+	});
+
+	it('lets a site admin past the role check', async () => {
+		vi.mocked(getSupabaseAdminClient).mockReturnValue(null);
+		await expect(addTournamentTeam('tournament-id', 'team-id', 'admin-id', 'admin')).rejects.toMatchObject({
+			statusCode: 503
+		});
+	});
+});
 
 describe('team name safety', () => {
 	it('normalizes punctuation and leetspeak before checking blocked terms', () => {

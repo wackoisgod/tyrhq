@@ -1107,6 +1107,9 @@ export async function registerTeam(tournamentId: string, teamId: string, actorId
 }
 
 export async function addTournamentTeam(tournamentId: string, teamId: string, actorId: string, role: string) {
+	if (role !== 'admin') {
+		throw new TournamentError('Only a site admin can force register a team.', 403);
+	}
 	await assertTournamentManager(tournamentId, actorId, role);
 	await assertSeedsEditable(tournamentId);
 	const admin = requireAdminClient();

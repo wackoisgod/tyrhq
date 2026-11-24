@@ -1,3 +1,5 @@
+import { getGameDataBundle } from '$lib/data/game-data';
+
 import type { ReplayUploadPayload } from './upload-payload';
 
 export interface RegisteredPlayer {
@@ -47,6 +49,8 @@ export interface TeamPlacement {
 export interface ReplayAutoFill {
 	replayGuid: string;
 	changelist: number | null;
+	/** Released GameData map id for the replay level, when one matches. */
+	suggestedMapId: string | null;
 	suggestedWinnerTeamId: string | null;
 	teamsSwapped: boolean;
 	teamPlacements: TeamPlacement[];
@@ -160,6 +164,23 @@ function alignTeams(
 	};
 }
 
+const MAP_LEVEL_KEY = /^(?:\/[^/]+)*\/Maps\/(Map_[A-Za-z0-9_]+)$/;
+
+/**
+ * Match a replay header level path to a released GameData map.
+ * `/TyrMapRavine/Maps/Map_Ravine` matches the map whose source key is Map_Ravine.
+ */
+export function releasedMapIdForLevelName(levelName: string | null | undefined): string | null {
+	if (!levelName) return null;
+	const keyMatch = levelName.trim().match(MAP_LEVEL_KEY);
+	const key = keyMatch?.[1] ?? (/^Map_[A-Za-z0-9_]+$/.test(levelName.trim()) ? levelName.trim() : null);
+	if (!key) return null;
+	const map = getGameDataBundle().maps.find(
+		(candidate) => candidate.status === 'released' && candidate.source.key.toLowerCase() === key.toLowerCase()
+	);
+	return map?.id ?? null;
+}
+
 function vehicleFor(codename: string | null, vehicles: VehicleLookup[]) {
 	if (!codename) return { vehicleId: null, vehicleName: null };
 	const vehicle = vehicles.find((item) => item.key === `Gameplay.Vehicle.${codename}`);
@@ -269,6 +290,7 @@ export function buildReplayAutoFill(input: {
 	return {
 		replayGuid: input.payload.replayGuid,
 		changelist: input.payload.changelist,
+		suggestedMapId: releasedMapIdForLevelName(input.payload.levelName),
 		suggestedWinnerTeamId: winnerReplayTeam === null ? null : byReplay[winnerReplayTeam],
 		teamsSwapped,
 		teamPlacements: ([0, 1] as const).map((replayTeam) => ({

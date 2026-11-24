@@ -117,7 +117,7 @@
 				<div class="rounded-sm bg-[var(--hud-warning)]/10 border border-[var(--hud-warning)] p-3">
 					<p class="text-xs font-semibold text-[var(--hud-warning)]">⚠ Important</p>
 					<p class="mt-2 text-xs text-[var(--hud-muted)]">
-						This action cannot be undone. The account being added will be permanently removed after all data is transferred.
+						The account being added is not deleted. After its data is transferred, that account is banned and cannot be used to sign in. You can undo this from Settings. Starting an undo gives you 10 minutes to finish restoring the account.
 					</p>
 				</div>
 				

@@ -10,6 +10,7 @@ export const replayUploadPayloadSchema = z
 			.regex(/^[0-9a-f]{32}$/i, 'Replay id is invalid.')
 			.transform((value) => value.toLowerCase()),
 		changelist: z.number().int().min(0).max(10_000_000).nullable(),
+		levelName: z.string().trim().min(1).max(256).nullable(),
 		winnerTeam: teamSchema.nullable(),
 		roster: z
 			.array(

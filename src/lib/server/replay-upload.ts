@@ -6,6 +6,7 @@ import {
 	type RegisteredPlayer,
 	type ReplayAutoFill
 } from '$lib/replay/auto-fill';
+import { replaySavedMessage } from '$lib/replay/saved-message';
 import { replayUploadPayloadSchema } from '$lib/replay/upload-payload.schema';
 import type { ReplayPreview } from '$lib/replay/upload-payload';
 import { getGameDataBundle } from '$lib/data/game-data';
@@ -83,6 +84,9 @@ export async function confirmReplayUpload(input: {
 		throw new TournamentError(`This series is best-of-${detail.match.bestOf}.`, 400);
 	}
 
+	const seriesScoreLocked = detail.match.status === 'completed';
+	const lockedScoreA = detail.match.scoreA;
+	const lockedScoreB = detail.match.scoreB;
 	const players = await loadRegisteredPlayers(detail);
 	const autoFill = buildReplayAutoFill({
 		payload: parsed,
@@ -160,9 +164,14 @@ export async function confirmReplayUpload(input: {
 		if (insertError) throw new TournamentError('Could not save replay stats.', 500);
 	}
 
-	return state.isComplete
-		? 'Replay saved and the series is complete.'
-		: `Replay saved. Series score is ${state.scoreA}-${state.scoreB}.`;
+	return replaySavedMessage({
+		seriesScoreLocked,
+		storedScoreA: seriesScoreLocked ? lockedScoreA : state.scoreA,
+		storedScoreB: seriesScoreLocked ? lockedScoreB : state.scoreB,
+		derivedScoreA: state.scoreA,
+		derivedScoreB: state.scoreB,
+		derivedComplete: state.isComplete
+	});
 }
 
 function parsePayload(payload: unknown) {
