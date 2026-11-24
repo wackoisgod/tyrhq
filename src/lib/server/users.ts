@@ -8,6 +8,7 @@ export interface AdminUserRow {
 	email: string | null;
 	displayName: string;
 	role: ProfileRole;
+	isTournamentOrganizer: boolean;
 	createdAt: string;
 	lastSignInAt: string | null;
 }
@@ -36,6 +37,7 @@ interface ProfileRow {
 	id: string;
 	display_name: string;
 	role: ProfileRole;
+	is_tournament_organizer?: boolean | null;
 }
 
 const ROLE_PRIORITY: Record<ProfileRole, number> = { admin: 0, contributor: 1, user: 2 };
@@ -52,7 +54,7 @@ const AUTH_SCAN_PAGES = 5;
 const AUTH_SCAN_PER_PAGE = 1000;
 
 /**
- * Returns the full set of users with elevated roles (contributor + admin).
+ * Returns the full set of users with elevated roles or tournament organizer access.
  * Always small (no pagination needed) and avoids exposing the entire user
  * table on every admin page load. The "promote a new user" path uses the
  * search endpoint instead.
@@ -62,8 +64,8 @@ export async function listElevatedUsers(): Promise<AdminUserRow[]> {
 
 	const { data: profiles, error: profileError } = await admin
 		.from('profiles')
-		.select('id, display_name, role')
-		.in('role', ['contributor', 'admin']);
+		.select('id, display_name, role, is_tournament_organizer')
+		.or('role.in.(contributor,admin),is_tournament_organizer.eq.true');
 	if (profileError) {
 		console.error('[users] listElevatedUsers profiles failed', profileError);
 		throw new UserAdminError('Could not load elevated profiles.', 500);
@@ -116,7 +118,7 @@ export async function searchUsers(rawQuery: string): Promise<AdminUserRow[]> {
 	const safe = query.replace(/[%_,]/g, (c) => `\\${c}`);
 	const { data: nameMatches, error: nameError } = await admin
 		.from('profiles')
-		.select('id, display_name, role')
+		.select('id, display_name, role, is_tournament_organizer')
 		.ilike('display_name', `%${safe}%`)
 		.limit(SEARCH_RESULT_LIMIT);
 	if (nameError) {
@@ -180,6 +182,7 @@ export async function searchUsers(rawQuery: string): Promise<AdminUserRow[]> {
 					email: authMatch.email,
 					displayName: profile.display_name,
 					role: profile.role,
+					isTournamentOrganizer: Boolean(profile.is_tournament_organizer),
 					createdAt: authMatch.created_at,
 					lastSignInAt: authMatch.last_sign_in_at
 				});
@@ -191,7 +194,7 @@ export async function searchUsers(rawQuery: string): Promise<AdminUserRow[]> {
 			// to get role; default to 'user' if absent.
 			const { data: profileRow } = await admin
 				.from('profiles')
-				.select('id, display_name, role')
+				.select('id, display_name, role, is_tournament_organizer')
 				.eq('id', id)
 				.maybeSingle<ProfileRow>();
 			rows.push({
@@ -199,6 +202,7 @@ export async function searchUsers(rawQuery: string): Promise<AdminUserRow[]> {
 				email: authMatch.email,
 				displayName: profileRow?.display_name ?? '',
 				role: profileRow?.role ?? 'user',
+				isTournamentOrganizer: Boolean(profileRow?.is_tournament_organizer),
 				createdAt: authMatch.created_at,
 				lastSignInAt: authMatch.last_sign_in_at
 			});
@@ -237,7 +241,7 @@ export async function setUserRole(
 
 	const { data: target, error: targetError } = await admin
 		.from('profiles')
-		.select('id, display_name, role')
+		.select('id, display_name, role, is_tournament_organizer')
 		.eq('id', targetId)
 		.maybeSingle<ProfileRow>();
 	if (targetError) {
@@ -269,12 +273,37 @@ export async function setUserRole(
 		.from('profiles')
 		.update({ role: newRole, updated_at: new Date().toISOString() })
 		.eq('id', targetId)
-		.select('id, display_name, role')
+		.select('id, display_name, role, is_tournament_organizer')
 		.single<ProfileRow>();
 
 	if (updateError || !updated) {
 		console.error('[users] setUserRole update failed', updateError);
 		throw new UserAdminError('Could not update role.', 500);
+	}
+
+	return enrich(updated);
+}
+
+export async function setTournamentOrganizer(
+	targetId: string,
+	enabled: boolean,
+	actor: { role: ProfileRole }
+): Promise<AdminUserRow> {
+	if (actor.role !== 'admin' && actor.role !== 'contributor') {
+		throw new UserAdminError('Reviewer or admin role required.', 403);
+	}
+
+	const admin = requireAdminClient();
+	const { data: updated, error } = await admin
+		.from('profiles')
+		.update({ is_tournament_organizer: enabled, updated_at: new Date().toISOString() })
+		.eq('id', targetId)
+		.select('id, display_name, role, is_tournament_organizer')
+		.single<ProfileRow>();
+
+	if (error || !updated) {
+		console.error('[users] setTournamentOrganizer failed', error);
+		throw new UserAdminError('Could not update organizer access.', 500);
 	}
 
 	return enrich(updated);
@@ -289,6 +318,7 @@ async function enrich(profile: ProfileRow): Promise<AdminUserRow> {
 		email: u?.email ?? null,
 		displayName: profile.display_name,
 		role: profile.role,
+		isTournamentOrganizer: Boolean(profile.is_tournament_organizer),
 		createdAt: u?.created_at ?? '',
 		lastSignInAt: u?.last_sign_in_at ?? null
 	};

@@ -22,6 +22,7 @@ export const navigation: NavItem[] = [
 	{ href: '/game', label: 'Game' },
 	{ href: '/articles', label: 'Articles' },
 	{ href: '/guides', label: 'Guides' },
+	{ href: '/tournaments', label: 'Tournaments' },
 	{ href: '/tools/tanks', label: 'Tanks' },
 	{
 		label: 'Resources',
@@ -34,7 +35,13 @@ export const navigation: NavItem[] = [
 				]
 			},
 			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] },
-			{ heading: 'Updates', items: [{ href: '/patch-notes', label: 'Patch Notes' }] }
+			{
+				heading: 'Updates',
+				items: [
+					{ href: '/patch-notes', label: 'Patch Notes' },
+					{ href: '/changelog', label: 'Changelog' }
+				]
+			}
 		]
 	},
 	{ href: '/community', label: 'Community' }
@@ -94,8 +101,11 @@ export const footerSections = [
 			{ href: '/community', label: 'Community Hub' },
 			{ href: '/auth', label: 'Accounts' },
 			{ href: '/builds', label: 'My Builds' },
+			{ href: '/teams', label: 'Teams' },
+			{ href: '/tournaments', label: 'Tournaments' },
 			{ href: '/contribute', label: 'Contribute' },
 			{ href: '/patch-notes', label: 'Patch Notes' },
+			{ href: '/changelog', label: 'Changelog' },
 			{ href: '/settings', label: 'Settings' }
 		]
 	},

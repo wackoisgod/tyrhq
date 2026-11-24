@@ -23,3 +23,10 @@ export function getAbsoluteUrl(path: string, fallbackOrigin?: string | null) {
 	if (!baseOrigin) return path;
 	return new URL(path, `${baseOrigin}/`).toString();
 }
+
+export function getAuthCallbackUrl(origin: string, next?: string) {
+	// Auth must return to the origin holding the login cookies, including previews.
+	const callback = new URL('/auth/callback', origin);
+	if (next) callback.searchParams.set('next', next);
+	return callback.toString();
+}

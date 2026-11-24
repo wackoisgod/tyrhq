@@ -8,6 +8,7 @@
 		email: string | null;
 		displayName: string;
 		role: 'user' | 'contributor' | 'admin';
+		isTournamentOrganizer: boolean;
 		createdAt: string;
 		lastSignInAt: string | null;
 	};
@@ -47,6 +48,29 @@
 			if (searchQuery.trim().length >= 3) await runSearch();
 		} catch (err) {
 			actionError = err instanceof Error ? err.message : 'Role update failed.';
+		} finally {
+			busyId = null;
+		}
+	}
+
+	async function setOrganizer(id: string, enabled: boolean) {
+		if (busyId) return;
+		busyId = id;
+		actionError = '';
+		try {
+			const res = await fetch(`/api/admin/users/${id}/organizer`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ enabled })
+			});
+			if (!res.ok) {
+				actionError = await res.text();
+				return;
+			}
+			await invalidateAll();
+			if (searchQuery.trim().length >= 3) await runSearch();
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Organizer update failed.';
 		} finally {
 			busyId = null;
 		}
@@ -101,14 +125,6 @@
 		searchInfo = '';
 	}
 
-	function formatDate(iso: string | null): string {
-		if (!iso) return '—';
-		return new Date(iso).toLocaleDateString();
-	}
-
-	function isElevated(role: string) {
-		return role === 'contributor' || role === 'admin';
-	}
 </script>
 
 <svelte:head>
@@ -122,14 +138,14 @@
 	<h1
 		class="mt-2 font-[var(--font-display)] text-4xl font-bold uppercase tracking-[0.08em] text-[var(--hud-text)]"
 	>
-		User roles
+		User access
 	</h1>
 	<p class="mt-3 max-w-3xl text-sm leading-6 text-[var(--hud-muted)]">
 		<strong class="text-[var(--hud-text)]">User</strong> can read everything and submit
 		drafts. <strong class="text-[var(--hud-text)]">Reviewer</strong> can additionally approve
 		submissions and withdraw / restore articles.
 		<strong class="text-[var(--hud-text)]">Admin</strong> can additionally manage roles and is
-		exempt from the no-self-approval rule.
+		exempt from the no-self-approval rule. Tournament organizer access is a separate flag.
 	</p>
 
 	{#if actionError}
@@ -143,7 +159,7 @@
 		<h2
 			class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-dim)]"
 		>
-			Reviewers and admins ({data.elevated.length})
+			Elevated users and organizers ({data.elevated.length})
 		</h2>
 		<div
 			class="mt-3 overflow-hidden rounded-sm bg-[var(--hud-panel)]"
@@ -162,7 +178,7 @@
 							<th class="px-4 py-3">User</th>
 							<th class="px-4 py-3">Email</th>
 							<th class="px-4 py-3">Role</th>
-							<th class="px-4 py-3">Last sign in</th>
+							<th class="px-4 py-3">Organizer</th>
 							<th class="px-4 py-3 text-right">Change</th>
 						</tr>
 					</thead>
@@ -187,12 +203,20 @@
 									</span>
 								</td>
 								<td class="px-4 py-3 text-xs text-[var(--hud-dim)]">
-									{formatDate(u.lastSignInAt)}
+									<label class="inline-flex items-center gap-2">
+										<input
+											type="checkbox"
+											checked={u.isTournamentOrganizer}
+											disabled={busyId === u.id}
+											onchange={(e) => setOrganizer(u.id, e.currentTarget.checked)}
+										/>
+										<span>{u.isTournamentOrganizer ? 'Yes' : 'No'}</span>
+									</label>
 								</td>
 								<td class="px-4 py-3 text-right">
 									<select
 										value={u.role}
-										disabled={busyId === u.id}
+										disabled={busyId === u.id || data.role !== 'admin'}
 										onchange={(e) =>
 											setRole(
 												u.id,
@@ -279,6 +303,7 @@
 							<th class="px-4 py-3">User</th>
 							<th class="px-4 py-3">Email</th>
 							<th class="px-4 py-3">Role</th>
+							<th class="px-4 py-3">Organizer</th>
 							<th class="px-4 py-3 text-right">Change</th>
 						</tr>
 					</thead>
@@ -302,10 +327,21 @@
 										{u.role}
 									</span>
 								</td>
+								<td class="px-4 py-3 text-xs text-[var(--hud-dim)]">
+									<label class="inline-flex items-center gap-2">
+										<input
+											type="checkbox"
+											checked={u.isTournamentOrganizer}
+											disabled={busyId === u.id}
+											onchange={(e) => setOrganizer(u.id, e.currentTarget.checked)}
+										/>
+										<span>{u.isTournamentOrganizer ? 'Yes' : 'No'}</span>
+									</label>
+								</td>
 								<td class="px-4 py-3 text-right">
 									<select
 										value={u.role}
-										disabled={busyId === u.id}
+										disabled={busyId === u.id || data.role !== 'admin'}
 										onchange={(e) =>
 											setRole(
 												u.id,

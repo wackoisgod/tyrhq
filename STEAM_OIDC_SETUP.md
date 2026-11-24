@@ -1,0 +1,508 @@
+# Steam OIDC Provider Setup
+
+This document explains how to configure Steam as a **real Supabase auth provider** using the built-in OIDC bridge.
+
+## Overview
+
+Steam only supports OpenID 2.0, but Supabase requires OpenID Connect (OIDC). This application includes an OIDC bridge that wraps Steam OpenID 2.0 as a standards-compliant OIDC provider.
+
+**Benefits:**
+- Steam becomes a first-class identity provider in Supabase
+- Users can link/unlink Steam like any OAuth provider
+- Account merge/split works automatically with Steam identities
+- `verified_steam_id` stays in sync with the identity
+- No special callback paths needed
+
+## Prerequisites
+
+1. **Steam Web API Key** (optional but recommended for persona names/avatars)
+   - Get one at https://steamcommunity.com/dev/apikey
+   - Set `STEAM_WEB_API_KEY` in your `.env`
+
+2. **RSA Key Pair for JWT Signing**
+   - Generate using the commands below
+
+## Step 1: Generate RSA Keys
+
+You need an RS256 key pair for signing OIDC tokens.
+
+### On Windows (PowerShell) - No OpenSSL Required
+
+**Generate RSA Private Key:**
+
+Create a file named `generate-steam-keys.js`:
+
+```javascript
+// generate-steam-keys.js
+const crypto = require('crypto');
+
+// Generate RSA key pair
+const { privateKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  privateKeyEncoding: {
+    type: 'pkcs8',
+    format: 'pem'
+  }
+});
+
+console.log('=== PRIVATE KEY (copy entire block to .env) ===');
+console.log(privateKey);
+console.log('');
+console.log('In your .env file, set:');
+console.log('STEAM_OIDC_PRIVATE_KEY="' + privateKey.trim().replace(/\n/g, '\\n') + '"');
+```
+
+Run in PowerShell:
+
+```powershell
+node generate-steam-keys.js
+```
+
+**Generate Client Secret:**
+
+```powershell
+# Generate a secure 32-byte random secret
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+Copy the output and use it as `STEAM_OIDC_CLIENT_SECRET`.
+
+### How to Set Multi-Line PEM in Vercel
+
+**Option 1: Keep newlines (recommended)**
+```bash
+STEAM_OIDC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+...more lines...
+-----END PRIVATE KEY-----"
+```
+
+Vercel handles multi-line environment variables correctly when pasted directly into the dashboard.
+
+**Option 2: Escape newlines**
+```bash
+STEAM_OIDC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----"
+```
+
+Both work in Vercel. Use whichever is easier to paste.
+
+## Step 2: Configure Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# Steam Web API Key (optional but recommended)
+STEAM_WEB_API_KEY=YOUR_STEAM_API_KEY_HERE
+
+# OIDC Provider Config
+STEAM_OIDC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+...paste the entire key including BEGIN/END lines...
+-----END PRIVATE KEY-----"
+
+# Client credentials (make these up - use strong random values)
+STEAM_OIDC_CLIENT_ID=tyrhq-steam-oidc
+STEAM_OIDC_CLIENT_SECRET=<generate a long random string>
+
+# Issuer URL (your app's public URL)
+STEAM_OIDC_ISSUER=https://www.tyrhq.com
+
+# Redirect URI allowlist (comma-separated, supports wildcards)
+# Include your Supabase callback URL
+STEAM_OIDC_REDIRECT_ALLOWLIST=https://your-project.supabase.co/auth/v1/callback,https://custom-domain.example.com/auth/v1/callback
+```
+
+**Generate CLIENT_SECRET on Windows:**
+```powershell
+# Generate a secure random string
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+**Generate CLIENT_SECRET on Linux/Mac:**
+```bash
+openssl rand -base64 32
+```
+
+## Step 3: Register Custom Provider in Supabase
+
+1. Go to your Supabase Dashboard
+2. Navigate to **Authentication > Providers**
+3. Scroll down to **Custom Providers** section
+4. Click **+ New Provider**
+
+### Provider Settings
+
+**Provider Name:** `Steam`
+
+**IMPORTANT: Provider Identifier**
+
+The Supabase provider identifier MUST be set to `custom:steam` (not just `steam`). This is the full identifier including the `custom:` prefix.
+
+**Issuer URL:**
+```
+https://www.tyrhq.com
+```
+*(Replace with your actual public domain)*
+
+**Client ID:**
+```
+tyrhq-steam-oidc
+```
+*(Must match STEAM_OIDC_CLIENT_ID)*
+
+**Client Secret:**
+```
+<paste your STEAM_OIDC_CLIENT_SECRET>
+```
+
+**IMPORTANT: Paste client secret and private key as multi-line text**
+
+When pasting the `STEAM_OIDC_PRIVATE_KEY` PEM in Vercel or Supabase, paste it with actual newlines (multi-line), NOT escaped as `\n`. The PEM format requires actual line breaks:
+
+```
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+...more lines...
+-----END PRIVATE KEY-----
+```
+
+Do NOT paste as: `-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----`
+
+**Discovery URL:**
+```
+https://www.tyrhq.com/.well-known/openid-configuration
+```
+*(Replace with your actual public domain)*
+
+**Scopes:**
+```
+openid profile email
+```
+
+**Additional Scopes:** *(leave empty)*
+
+**Redirect URL:** *(auto-generated by Supabase, leave as is)*
+
+**PKCE Method:** `S256` *(optional - enforced when present)*
+
+**Note on PKCE:** Supabase's custom OIDC provider implementation may not forward PKCE parameters to upstream providers. This bridge enforces PKCE when present but doesn't require it, relying on `client_secret` for security instead.
+
+**Attribute Mapping** *(optional but recommended)*
+- **User ID:** `sub`
+- **Name:** `name`
+- **Avatar URL:** `picture`
+- **Email:** `email` *(will be a placeholder steam_*@users.tyrhq.invalid)*
+
+5. Click **Save**
+
+## Step 4: Update Frontend Sign-In Code
+
+Replace the custom Steam callback flow with standard Supabase OAuth:
+
+### Before (Custom Flow)
+```typescript
+function handleSteamLogin() {
+  const steamUrl = new URL('/auth/steam/login', window.location.origin);
+  if (next) steamUrl.searchParams.set('next', next);
+  window.location.href = steamUrl.toString();
+}
+```
+
+### After (Supabase OAuth)
+```typescript
+function handleSteamLogin() {
+  if (!supabase) return;
+  supabase.auth.signInWithOAuth({
+    provider: 'custom:steam',  // Supabase custom provider identifier
+    options: {
+      redirectTo: getAuthCallbackUrl(window.location.origin)
+    }
+  });
+}
+```
+
+### Linking Steam to Existing Account
+
+```typescript
+async function linkSteam() {
+  if (!supabase) return;
+  
+  const { error } = await supabase.auth.linkIdentity({
+    provider: 'custom:steam'
+  });
+  
+  if (error) {
+    console.error('Failed to link Steam:', error);
+  }
+}
+```
+
+### Unlinking Steam
+
+```typescript
+async function unlinkSteam() {
+  if (!supabase) return;
+  
+  // Find Steam identity
+  const { data: { user } } = await supabase.auth.getUser();
+  const steamIdentity = user?.identities?.find(i => i.provider === 'custom:steam');
+  
+  if (!steamIdentity) return;
+  
+  const { error } = await supabase.auth.unlinkIdentity(steamIdentity);
+  
+  if (error) {
+    console.error('Failed to unlink Steam:', error);
+  }
+}
+```
+
+## Step 5: Sync verified_steam_id with Identity
+
+The `verified_steam_id` column should stay in sync with the Steam identity. Add a database trigger:
+
+```sql
+-- supabase/migrations/032_steam_identity_sync.sql
+
+-- Function to sync verified_steam_id when Steam identity changes
+CREATE OR REPLACE FUNCTION public.sync_steam_identity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+    v_steam_id text;
+BEGIN
+    -- Extract Steam ID from identity subject (format: steam:<steamid64>)
+    IF NEW.provider = 'steam' THEN
+        v_steam_id := regexp_replace(
+            NEW.identity_data->>'sub',
+            '^steam:',
+            ''
+        );
+        
+        -- Update profile with Steam ID
+        UPDATE public.profiles
+        SET verified_steam_id = v_steam_id,
+            steam_verified_at = now(),
+            steam_display_name = NEW.identity_data->>'name'
+        WHERE id = NEW.user_id;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- Trigger on identity insert/update
+DROP TRIGGER IF EXISTS on_steam_identity_change ON auth.identities;
+CREATE TRIGGER on_steam_identity_change
+    AFTER INSERT OR UPDATE ON auth.identities
+    FOR EACH ROW
+    WHEN (NEW.provider = 'steam')
+    EXECUTE FUNCTION public.sync_steam_identity();
+
+-- Cleanup verified_steam_id when Steam identity is removed
+CREATE OR REPLACE FUNCTION public.cleanup_steam_identity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+BEGIN
+    IF OLD.provider = 'steam' THEN
+        UPDATE public.profiles
+        SET verified_steam_id = NULL,
+            steam_verified_at = NULL
+        WHERE id = OLD.user_id
+        AND verified_steam_id = regexp_replace(OLD.identity_data->>'sub', '^steam:', '');
+    END IF;
+    
+    RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_steam_identity_delete ON auth.identities;
+CREATE TRIGGER on_steam_identity_delete
+    AFTER DELETE ON auth.identities
+    FOR EACH ROW
+    WHEN (OLD.provider = 'steam')
+    EXECUTE FUNCTION public.cleanup_steam_identity();
+```
+
+## Step 6: Update Sign-In Methods Logic
+
+The `computeSignInMethods` function should check for Steam identity instead of `verified_steam_id` only:
+
+```typescript
+export function computeSignInMethods(
+  user: User | null,
+  verifiedSteamId: string | null
+): SignInMethodsResult {
+  if (!user) {
+    return {
+      count: 0,
+      hasGoogle: false,
+      hasEmailPassword: false,
+      hasSteam: false,
+      canUnlinkGoogle: false,
+      canUnlinkSteam: false,
+      canRemovePassword: false
+    };
+  }
+
+  const identities = user.identities || [];
+
+  const hasGoogle = identities.some((i) => i.provider === 'google');
+  const hasSteam = identities.some((i) => i.provider === 'custom:steam');
+  
+  const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
+  const hasEmailIdentity = identities.some((i) => i.provider === 'email');
+  const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+
+  let count = 0;
+  if (hasGoogle) count += 1;
+  if (hasEmailPassword) count += 1;
+  if (hasSteam) count += 1;
+
+  const canUnlinkGoogle = !!(count >= 2 && hasGoogle);
+  const canUnlinkSteam = !!(count >= 2 && hasSteam);
+  const canRemovePassword = !!(count >= 2 && hasEmailPassword);
+
+  return {
+    count,
+    hasGoogle,
+    hasEmailPassword,
+    hasSteam,
+    canUnlinkGoogle,
+    canUnlinkSteam,
+    canRemovePassword
+  };
+}
+```
+
+## Migration Notes
+
+**Legacy OpenID 2.0 routes removed:** The old `/auth/steam/login` and `/auth/steam/callback` routes have been removed in favor of the unified Supabase OAuth flow. All Steam authentication now goes through the OIDC bridge at `/auth/steam/oidc/*`.
+
+**Database trigger syncs verified_steam_id:** Migration 032 added a trigger that automatically syncs `profiles.verified_steam_id` from `auth.identities` when a Steam identity is added or removed. No manual writes to `verified_steam_id` are needed in application code.
+
+## Security Notes
+
+- **PKCE is optional but enforced when present** (Supabase may not forward it)
+- **State parameter required** for CSRF protection
+- **Stateless authorization codes** (60-second TTL, work across serverless instances)
+- **Tokens are RS256-signed** and verifiable via JWKS
+- **JWKS exposes only public key** (n, e, kty) - no private components
+- **Constant-time secret comparison** prevents timing attacks
+- **Strict Steam callback validation:**
+  - `openid.op_endpoint` must be exact Steam URL
+  - `openid.return_to` must match our callback prefix
+  - `openid.claimed_id` must equal `openid.identity`
+  - Server-side `check_authentication` must return exactly `is_valid:true`
+- **Redirect URIs are strictly allowlisted**
+- **Subject format:** `steam:<steamid64>` for namespacing
+
+## Testing
+
+1. Visit `/.well-known/openid-configuration` to verify discovery document
+2. Visit `/auth/steam/oidc/jwks` to verify public keys are exposed
+3. Try signing in with Steam through Supabase OAuth
+4. Check that `auth.identities` has a row with `provider = 'steam'`
+5. Verify `profiles.verified_steam_id` is populated
+6. Test unlinking and re-linking Steam
+
+## Troubleshooting
+
+### "Invalid client" error
+- Check that `STEAM_OIDC_CLIENT_ID` matches the value in Supabase dashboard
+- Verify `STEAM_OIDC_CLIENT_SECRET` is set correctly
+
+### "Invalid redirect_uri" error
+- Add your Supabase callback URL to `STEAM_OIDC_REDIRECT_ALLOWLIST`
+- Format: `https://your-project.supabase.co/auth/v1/callback`
+
+### "Signature verification failed" error
+- Check that `STEAM_OIDC_PRIVATE_KEY` is valid PKCS#8 format
+- Ensure the key includes BEGIN/END markers
+- Verify the key is properly quoted in .env
+
+### "Invalid token" on userinfo endpoint
+- Check that JWKS endpoint is accessible
+- Verify issuer URL matches `STEAM_OIDC_ISSUER`
+- Ensure tokens haven't expired (1 hour TTL)
+
+### Discovery URL not loading
+- Verify your app is accessible at the public URL
+- Check CSP headers allow the discovery endpoint
+- Ensure `.well-known` route is not blocked by middleware
+
+## Vercel Deployment Notes
+
+When deploying to Vercel:
+
+1. **Environment Variables:** Set all `STEAM_OIDC_*` variables in Vercel dashboard
+2. **Multi-line Private Key:** Vercel handles multi-line env vars correctly - paste the entire key including BEGIN/END lines
+3. **Custom Domain:** Use your custom domain as `STEAM_OIDC_ISSUER`, not the .vercel.app domain
+4. **Cold Starts:** First request may be slow due to key import - consider using Vercel's warming if needed
+
+## Production Considerations
+
+### Key Management
+- Store `STEAM_OIDC_PRIVATE_KEY` securely (env vars or secret manager)
+- Rotate keys periodically
+- Use separate keys per environment (dev/staging/prod)
+
+### Code Storage
+- Current implementation uses in-memory Map for authorization codes
+- For multi-instance deployments, use Redis or similar:
+  ```typescript
+  // Example: Redis-backed code storage
+  import { Redis } from '@upstash/redis';
+  
+  const redis = new Redis({
+    url: process.env.REDIS_URL,
+    token: process.env.REDIS_TOKEN
+  });
+  
+  async function storePendingCode(code: string, data: PendingAuthCode) {
+    await redis.setex(`steam:code:${code}`, 300, JSON.stringify(data));
+  }
+  
+  async function getPendingCode(code: string): Promise<PendingAuthCode | null> {
+    const data = await redis.get(`steam:code:${code}`);
+    return data ? JSON.parse(data as string) : null;
+  }
+  ```
+
+### Monitoring
+- Log OIDC flow steps for debugging
+- Track token issuance and verification failures
+- Monitor Steam API availability
+- Alert on excessive invalid_grant errors
+
+## Comparison: Option (a) vs Option (b)
+
+This implementation uses **Option (b): In-app OIDC bridge** because:
+
+✅ **Pros:**
+- No external service to manage
+- Runs on same infrastructure (Vercel)
+- Full control over customization
+- Simple deployment (just env vars)
+- No additional costs
+
+❌ **Cons:**
+- Requires RSA key management
+- In-memory code storage needs Redis for scale
+- Need to maintain OIDC protocol compliance
+
+**Option (a)** (self-hosted bridge like `steam-openid-connect`) would be better if:
+- You need multi-tenant isolation
+- You want to separate auth infrastructure
+- You already have a Redis/database cluster
+- You need advanced features like refresh tokens
+
+For TyrHQ's scale and Vercel deployment, **Option (b) is recommended** as the simpler, more integrated solution.

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { env } from '$env/dynamic/public';
-	import { getAbsoluteUrl } from '$lib/site-url';
+	import { page } from '$app/stores';
+	import { getAuthCallbackUrl } from '$lib/site-url';
 	import { createBrowserClient } from '@supabase/ssr';
 	import { onMount } from 'svelte';
 
@@ -27,7 +28,28 @@
 		supabase.auth.signInWithOAuth({
 			provider,
 			options: {
-				redirectTo: getAbsoluteUrl('/auth/callback', window.location.origin)
+				redirectTo: getAuthCallbackUrl(window.location.origin)
+			}
+		});
+	}
+
+	function handleSteamLogin() {
+		if (!supabase) return;
+		
+		const next = $page.url.searchParams.get('next') || $page.url.searchParams.get('redirectTo');
+		let redirectTo = getAuthCallbackUrl(window.location.origin);
+		
+		// Append next path if provided
+		if (next) {
+			redirectTo += `?next=${encodeURIComponent(next)}`;
+		}
+		
+		// Use Supabase OAuth with custom Steam provider
+		// Supabase custom providers use 'custom:' prefix
+		supabase.auth.signInWithOAuth({
+			provider: 'custom:steam' as any,
+			options: {
+				redirectTo
 			}
 		});
 	}
@@ -37,6 +59,31 @@
 		signup: { eyebrow: 'Authentication', title: 'Create Account' },
 		forgot: { eyebrow: 'Recovery', title: 'Reset Password' }
 	};
+
+	const urlError = $page.url.searchParams.get('error');
+	const errorMessages: Record<string, string> = {
+		steam_cancelled: 'Steam authentication was cancelled.',
+		auth_callback_failed: 'Authentication failed. Please try again.'
+	};
+
+	const displayError = form?.error || (urlError && errorMessages[urlError]);
+	
+	// Check if this is a merge flow
+	const isMergeFlow = $page.url.searchParams.get('merge') === '1';
+	const suggestedProvider = $page.url.searchParams.get('provider'); // 'google', 'email' hint for merge
+	
+	// Prefill email if coming from email merge flow
+	let prefilledEmail = $state('');
+	
+	onMount(() => {
+		if (isMergeFlow && suggestedProvider === 'email') {
+			const storedEmail = sessionStorage.getItem('merge_email');
+			if (storedEmail) {
+				prefilledEmail = storedEmail;
+				sessionStorage.removeItem('merge_email');
+			}
+		}
+	});
 </script>
 
 <svelte:head>
@@ -65,6 +112,25 @@
 		</div>
 	{:else}
 		<div class="hud-panel p-8">
+			{#if isMergeFlow}
+				<div class="mb-6 rounded-sm bg-[var(--hud-teal)]/10 border border-[var(--hud-teal)] p-4">
+					<p class="text-sm font-semibold text-[var(--hud-teal)]">📋 Adding Account</p>
+					<p class="mt-2 text-xs text-[var(--hud-text)]">
+						{#if suggestedProvider === 'google'}
+							Sign in with the <strong>Google account</strong> you want to add to your primary account.
+						{:else if suggestedProvider === 'email'}
+							Sign in with the <strong>email account</strong> you want to add to your primary account.
+						{:else}
+							Sign in with the account you want to <strong>add to your primary account</strong>.
+						{/if}
+						After signing in, you'll be prompted to confirm.
+					</p>
+					<p class="mt-2 text-xs text-[var(--hud-muted)]">
+						The account you sign in with here will be permanently merged.
+					</p>
+				</div>
+			{/if}
+			
 			<p class="hud-eyebrow tracking-[0.35em]">{headings[mode].eyebrow}</p>
 			<h1
 				class="mt-4 font-[var(--font-display)] text-4xl font-bold uppercase text-[var(--hud-text)]"
@@ -72,11 +138,11 @@
 				{headings[mode].title}
 			</h1>
 
-			{#if form?.error}
+			{#if displayError}
 				<div
 					class="mt-4 border-l-2 border-[var(--hud-warning,#ffd166)] bg-[var(--hud-inset)] px-4 py-3 text-sm text-[#ffd166]"
 				>
-					{form.error}
+					{displayError}
 				</div>
 			{/if}
 
@@ -150,7 +216,7 @@
 							type="email"
 							name="email"
 							required
-							value={form?.email ?? ''}
+							value={prefilledEmail || form?.email || ''}
 							class="hud-input w-full px-3 py-2.5 text-sm text-[var(--hud-text)]"
 							placeholder="pilot@tyr.gg"
 						/>
@@ -212,11 +278,10 @@
 
 					<button
 						type="button"
-						class="hud-cta-ghost w-full px-5 py-3 opacity-40 cursor-not-allowed"
-						disabled
-						title="Steam authentication coming soon"
+						class="hud-cta-ghost w-full px-5 py-3"
+						onclick={handleSteamLogin}
 					>
-						Continue with Steam (Soon)
+						Continue with Steam
 					</button>
 				</div>
 

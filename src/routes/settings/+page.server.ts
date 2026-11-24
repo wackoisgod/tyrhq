@@ -9,6 +9,7 @@ import {
 	type CommunityEventRecord
 } from '$lib/server/events';
 import { isSupabaseAdminConfigured } from '$lib/server/supabase-admin';
+import { computeSignInMethods } from '$lib/server/sign-in-methods';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const { session, user, role } = await locals.safeGetSession();
@@ -32,13 +33,80 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const events = await listEventsForUser(user.id);
 
+	// Get linked identities from admin client
+	const { getSupabaseAdminClient } = await import('$lib/server/supabase-admin');
+	const supabaseAdmin = getSupabaseAdminClient();
+	let linkedIdentities: { provider: string; email?: string }[] = [];
+
+	if (supabaseAdmin) {
+		const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id);
+		linkedIdentities = (authUser?.user?.identities || []).map((identity: any) => ({
+			provider: identity.provider,
+			email: identity.identity_data?.email
+		}));
+	}
+
+	// Determine if user has a real email (not placeholder)
+	const hasRealEmail = user.email && !user.email.endsWith('@users.tyrhq.invalid');
+	
+	// Check if user has email provider identity
+	const hasEmailIdentity = linkedIdentities.some((i) => i.provider === 'email');
+	
+	// Email+password counts as a usable sign-in method ONLY when:
+	// - Email is real (not placeholder) AND
+	// - Email identity exists (password is set)
+	const hasEmailPassword = hasRealEmail && hasEmailIdentity;
+	
+	// User can set a password if they have real email (from OAuth or confirmed)
+	// Note: After updateUser({password}), Supabase doesn't create a new identity for OAuth users
+	// The password is added to their existing account, so we show "Set password" for any real-email user
+	const canSetPassword = hasRealEmail;
+
+	// Compute sign-in methods for unlink/remove guards
+	const signInMethods = computeSignInMethods(user);
+
+	// Fetch merge history via admin client (service_role only)
+	// SECURITY: Filter by primary_user_id = current user to prevent leaking other users' merges
+	// Reuse supabaseAdmin from above (already imported)
+	let mergeHistory: any[] = [];
+	if (supabaseAdmin) {
+		const { data } = await supabaseAdmin
+			.from('account_merges')
+			.select('id, primary_user_id, secondary_user_id, merged_at, undone_at, status, secondary_snapshot')
+			.eq('primary_user_id', user.id)
+			.order('merged_at', { ascending: false });
+		
+		// Transform to safe format (extract email/name from snapshot)
+		mergeHistory = (data || []).map(merge => ({
+			id: merge.id,
+			primary_user_id: merge.primary_user_id,
+			secondary_user_id: merge.secondary_user_id,
+			merged_at: merge.merged_at,
+			undone_at: merge.undone_at,
+			status: merge.status,
+			secondary_email: merge.secondary_snapshot?.user?.email || null,
+			secondary_display_name: merge.secondary_snapshot?.profile?.display_name || null,
+			secondary_steam_id: merge.secondary_snapshot?.profile?.verified_steam_id || null
+		}));
+	}
+
 	return {
 		profile,
 		isOnboarding,
 		role,
 		events,
 		editEvent,
-		eventsEnabled: isSupabaseAdminConfigured()
+		eventsEnabled: isSupabaseAdminConfigured(),
+		linkedIdentities,
+		hasRealEmail,
+		userEmail: user.email,
+		hasEmailIdentity,
+		hasEmailPassword,
+		canSetPassword,
+		canUnlinkGoogle: signInMethods.canUnlinkGoogle,
+		canUnlinkSteam: signInMethods.canUnlinkSteam,
+		canRemovePassword: signInMethods.canRemovePassword,
+		mergeHistory
 	};
 };
 
@@ -49,31 +117,188 @@ export const actions: Actions = {
 
 		const formData = await request.formData();
 		const displayName = (formData.get('display_name') as string)?.trim() ?? '';
+		const discordHandle = (formData.get('discord_handle') as string)?.trim() ?? '';
+		const steamProfile = (formData.get('steam_profile') as string)?.trim() ?? '';
 
 		if (!displayName) {
-			return fail(400, { profileError: 'Display name is required', displayName });
+			return fail(400, { profileError: 'Display name is required', displayName, discordHandle, steamProfile });
 		}
 
 		if (displayName.length > 32) {
 			return fail(400, {
 				profileError: 'Display name must be 32 characters or less',
-				displayName
+				displayName,
+				discordHandle,
+				steamProfile
+			});
+		}
+
+		if (discordHandle.length > 100) {
+			return fail(400, {
+				profileError: 'Discord handle must be 100 characters or less',
+				displayName,
+				discordHandle,
+				steamProfile
+			});
+		}
+
+		if (steamProfile.length > 200) {
+			return fail(400, {
+				profileError: 'Steam profile must be 200 characters or less',
+				displayName,
+				discordHandle,
+				steamProfile
 			});
 		}
 
 		const { error } = await locals.supabase
 			.from('profiles')
-			.update({ display_name: displayName, updated_at: new Date().toISOString() })
+			.update({ 
+				display_name: displayName,
+				discord_handle: discordHandle || null,
+				steam_profile: steamProfile || null,
+				updated_at: new Date().toISOString() 
+			})
 			.eq('id', user.id);
 
 		if (error) {
 			console.error('[settings] Failed to update profile', error);
 			return fail(500, {
 				profileError: 'Unable to update profile right now.',
-				displayName
+				displayName,
+				discordHandle,
+				steamProfile
 			});
 		}
 
-		return { profileSuccess: 'Callsign updated.' };
+		return { profileSuccess: 'Profile updated.' };
+	},
+
+	unlinkSteam: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user);
+		if (!signInMethods.canUnlinkSteam) {
+			return fail(400, {
+				profileError:
+					'Cannot unlink Steam: you must have at least one other sign-in method (Google or Email+Password) before unlinking Steam.'
+			});
+		}
+
+		// Find Steam identity from current user's identities
+		const { STEAM_PROVIDER } = await import('$lib/server/steam-oidc-provider');
+		const steamIdentity = user.identities?.find((i) => i.provider === STEAM_PROVIDER);
+
+		if (!steamIdentity) {
+			return fail(400, { profileError: 'No Steam account to unlink' });
+		}
+
+		// Unlink via user-scoped client (triggers cleanup via database trigger)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(steamIdentity);
+
+		if (unlinkError) {
+			console.error('Error unlinking Steam:', unlinkError);
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError:
+						'Cannot unlink: you must have at least one other sign-in method first.'
+				});
+			}
+			return fail(500, { profileError: 'Failed to unlink Steam account' });
+		}
+
+		return { profileSuccess: 'Steam account unlinked' };
+	},
+
+	unlinkGoogle: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user);
+		if (!signInMethods.canUnlinkGoogle) {
+			return fail(400, {
+				profileError:
+					'Cannot unlink Google: you must have at least one other sign-in method (Steam or Email+Password) before unlinking Google.'
+			});
+		}
+
+		// Find Google identity from current user's identities
+		const googleIdentity = user.identities?.find((i) => i.provider === 'google');
+
+		if (!googleIdentity) {
+			return fail(400, { profileError: 'No Google account to unlink' });
+		}
+
+		// Unlink via user-scoped client (requires user session)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(googleIdentity);
+
+		if (unlinkError) {
+			console.error('Error unlinking Google:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError:
+						'Cannot unlink: you must have at least one other sign-in method first.'
+				});
+			}
+			return fail(500, { profileError: 'Failed to unlink Google account' });
+		}
+
+		return { profileSuccess: 'Google account unlinked' };
+	},
+
+	removePassword: async ({ locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { error: 'Not authenticated' });
+
+		// Server-side guard: Check if user has at least one other sign-in method
+		const signInMethods = computeSignInMethods(user);
+		if (!signInMethods.canRemovePassword) {
+			return fail(400, {
+				profileError:
+					'Cannot remove email+password: you must have at least one other sign-in method (Steam or Google) before removing email+password.'
+			});
+		}
+
+		// Find email identity from current user's identities
+		const emailIdentity = user.identities?.find((i) => i.provider === 'email');
+
+		if (!emailIdentity) {
+			return fail(400, { profileError: 'No email identity to remove' });
+		}
+
+		// Unlink email identity via user-scoped client (removes password)
+		const { error: unlinkError } = await locals.supabase.auth.unlinkIdentity(emailIdentity);
+
+		if (unlinkError) {
+			console.error('Error removing password:', unlinkError);
+			// Map specific Supabase errors to friendly messages
+			if (unlinkError.message?.includes('manual linking')) {
+				return fail(400, {
+					profileError: 'Manual linking is not enabled. Contact your administrator.'
+				});
+			}
+			if (unlinkError.message?.includes('at least')) {
+				return fail(400, {
+					profileError: 'Cannot remove: you must have at least one other sign-in method first.'
+				});
+			}
+			return fail(500, { profileError: 'Failed to remove email+password' });
+		}
+
+		return { profileSuccess: 'Email+password removed' };
 	}
 };

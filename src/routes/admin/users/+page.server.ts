@@ -7,13 +7,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!session || !user) {
 		throw redirect(303, `/auth?next=${encodeURIComponent(url.pathname)}`);
 	}
-	if (role !== 'admin') {
-		throw error(403, 'Admin role required');
+	if (role !== 'admin' && role !== 'contributor') {
+		throw error(403, 'Reviewer or admin role required');
 	}
 
 	try {
 		const elevated = await listElevatedUsers();
-		return { elevated, currentUserId: user.id };
+		return { elevated, currentUserId: user.id, role };
 	} catch (err) {
 		if (err instanceof UserAdminError) error(err.statusCode, err.message);
 		throw err;
