@@ -106,7 +106,7 @@
 					{cta.label}
 				</a>
 			{/each}
-
+			<a href="/changelog" class="hud-cta-outline px-5 py-3">What's New</a>
 		</div>
 	</section>
 

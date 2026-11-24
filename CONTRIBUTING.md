@@ -98,6 +98,7 @@ If you change the Python export pipeline or how generated data lands in the site
 A solid PR should include:
 
 - A short description of what changed
+- A changelog entry when players will notice the change (see the Changelog section in [AGENTS.md](./AGENTS.md))
 - Why the change was needed
 - Screenshots or video for visible UI changes
 - Notes about schema, env, or data updates when relevant
