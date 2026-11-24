@@ -35,7 +35,13 @@ export const navigation: NavItem[] = [
 				]
 			},
 			{ heading: 'World', items: [{ href: '/maps', label: 'Maps' }] },
-			{ heading: 'Updates', items: [{ href: '/patch-notes', label: 'Patch Notes' }] }
+			{
+				heading: 'Updates',
+				items: [
+					{ href: '/patch-notes', label: 'Patch Notes' },
+					{ href: '/changelog', label: 'Changelog' }
+				]
+			}
 		]
 	},
 	{ href: '/community', label: 'Community' }
@@ -99,6 +105,7 @@ export const footerSections = [
 			{ href: '/tournaments', label: 'Tournaments' },
 			{ href: '/contribute', label: 'Contribute' },
 			{ href: '/patch-notes', label: 'Patch Notes' },
+			{ href: '/changelog', label: 'Changelog' },
 			{ href: '/settings', label: 'Settings' }
 		]
 	},
