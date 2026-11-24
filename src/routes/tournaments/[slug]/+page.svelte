@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 
 	import { getSnakeFirstRoundSeeds } from '$lib/tournaments/bracket';
+	import { formatDate } from '$lib/utils/format-date';
 
 	let { data, form } = $props();
 
@@ -103,10 +104,6 @@
 			.split('_')
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
-	}
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short' });
 	}
 
 	function getTeamColor(teamId: string) {
