@@ -2,10 +2,16 @@ import { createServerClient } from '@supabase/ssr';
 import { redirect, type Handle } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/public';
+import { crossSiteFormRejection } from '$lib/server/csrf-origin';
 import { getConfiguredSiteOrigin } from '$lib/site-url';
 import { applySecurityHeaders, isAuthCallbackPath } from '$lib/server/security';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Owns the origin check that `kit.csrf.checkOrigin: false` turns off.
+	// Runs before any other handling, matching SvelteKit's built-in check.
+	const csrfRejection = crossSiteFormRejection(event.request, event.url);
+	if (csrfRejection) return csrfRejection;
+
 	const supabaseUrl = env.PUBLIC_SUPABASE_URL;
 	const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 	const configuredSiteOrigin = getConfiguredSiteOrigin();
