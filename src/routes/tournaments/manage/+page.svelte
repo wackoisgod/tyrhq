@@ -34,7 +34,9 @@
 
 	{#if data.accessDenied}
 		<div class="mt-6 hud-panel p-6 text-sm leading-6 text-[var(--hud-muted)]">
-			Tournament organizer access is required. Ask an admin to flag your account as an organizer.
+			Tournament organizer access is required. Apply from
+			<a href="/settings#organizer-application" class="text-[var(--hud-teal)] hover:underline">Settings</a>
+			once Steam is linked.
 		</div>
 	{:else}
 		{#if form?.error}
@@ -130,7 +132,9 @@
 							class="rounded-sm bg-[var(--hud-panel)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
 							style="box-shadow: var(--hud-surface-ghost);"
 						>
-							<p class="hud-eyebrow">{tournament.status}</p>
+							<p class="hud-eyebrow">
+								{tournament.status}{tournament.unlistedAt ? ' · off the public list' : ''}
+							</p>
 							<h2 class="mt-1 text-lg font-semibold uppercase text-[var(--hud-text)]">
 								{tournament.name}
 							</h2>

@@ -3,6 +3,7 @@ import type { LayoutServerLoad } from './$types';
 import { listFlyoutEntries } from '$lib/server/articles';
 import { countPendingReviewSubmissions } from '$lib/server/submissions';
 import { countPendingEvents } from '$lib/server/events';
+import { countPendingOrganizerApplications } from '$lib/server/organizer-applications';
 
 export const load: LayoutServerLoad = async ({ locals, depends, url, untrack }) => {
 	depends('supabase:auth');
@@ -49,9 +50,11 @@ export const load: LayoutServerLoad = async ({ locals, depends, url, untrack }) 
 
 	const flyoutEntries = await listFlyoutEntries();
 
-	const [pendingReviewCount, pendingEventCount] = isReviewer
-		? await Promise.all([countPendingReviewSubmissions(), countPendingEvents()])
-		: [0, 0];
+	const [pendingReviewCount, pendingEventCount, pendingOrganizerApplicationCount] = await Promise.all([
+		isReviewer ? countPendingReviewSubmissions() : Promise.resolve(0),
+		isReviewer ? countPendingEvents() : Promise.resolve(0),
+		role === 'admin' ? countPendingOrganizerApplications() : Promise.resolve(0)
+	]);
 
 	return {
 		session,
@@ -61,6 +64,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url, untrack }) 
 		isTournamentOrganizer: Boolean(profile?.is_tournament_organizer),
 		flyoutEntries,
 		pendingReviewCount,
-		pendingEventCount
+		pendingEventCount,
+		pendingOrganizerApplicationCount
 	};
 };

@@ -6,6 +6,7 @@ import {
 	createTournamentSchema,
 	summarizeSingleEliminationFinish,
 	slugify,
+	canViewTournament,
 	listTournaments
 } from './tournaments';
 import { getSupabaseAdminClient } from './supabase-admin';
@@ -228,9 +229,11 @@ describe('listTournaments status classification', () => {
 				select: vi.fn(() => ({
 					neq: vi.fn(() => ({
 						neq: vi.fn(() => ({
-							order: vi.fn(() => Promise.resolve({
-								data: [],
-								error: null
+							is: vi.fn(() => ({
+								order: vi.fn(() => Promise.resolve({
+									data: [],
+									error: null
+								}))
 							}))
 						}))
 					}))
@@ -275,9 +278,11 @@ describe('listTournaments status classification', () => {
 			select: vi.fn(() => ({
 				neq: vi.fn(() => ({
 					neq: vi.fn(() => ({
-						order: vi.fn(() => Promise.resolve({
-							data: mockTournaments,
-							error: null
+						is: vi.fn(() => ({
+							order: vi.fn(() => Promise.resolve({
+								data: mockTournaments,
+								error: null
+							}))
 						}))
 					}))
 				}))
@@ -319,9 +324,11 @@ describe('listTournaments status classification', () => {
 			select: vi.fn(() => ({
 				neq: vi.fn(() => ({
 					neq: vi.fn(() => ({
-						order: vi.fn(() => Promise.resolve({
-							data: mockTournaments,
-							error: null
+						is: vi.fn(() => ({
+							order: vi.fn(() => Promise.resolve({
+								data: mockTournaments,
+								error: null
+							}))
 						}))
 					}))
 				}))
@@ -363,9 +370,11 @@ describe('listTournaments status classification', () => {
 			select: vi.fn(() => ({
 				neq: vi.fn(() => ({
 					neq: vi.fn(() => ({
-						order: vi.fn(() => Promise.resolve({
-							data: mockTournaments,
-							error: null
+						is: vi.fn(() => ({
+							order: vi.fn(() => Promise.resolve({
+								data: mockTournaments,
+								error: null
+							}))
 						}))
 					}))
 				}))
@@ -410,9 +419,11 @@ describe('listTournaments status classification', () => {
 			select: vi.fn(() => ({
 				neq: vi.fn(() => ({
 					neq: vi.fn(() => ({
-						order: vi.fn(() => Promise.resolve({
-							data: mockTournaments,
-							error: null
+						is: vi.fn(() => ({
+							order: vi.fn(() => Promise.resolve({
+								data: mockTournaments,
+								error: null
+							}))
 						}))
 					}))
 				}))
@@ -422,5 +433,67 @@ describe('listTournaments status classification', () => {
 		const result = await listTournaments();
 		expect(result.upcoming.length + result.past.length).toBe(1);
 		expect(result.upcoming.concat(result.past).every(t => t.status !== 'cancelled')).toBe(true);
+	});
+
+	it('drops an unlisted tournament if one is returned', async () => {
+		const mockTournaments = [
+			{
+				id: '5',
+				slug: 'hidden',
+				name: 'Hidden',
+				summary: null,
+				logo_url: null,
+				organizer_id: 'org1',
+				starts_at: '2026-06-02T14:00:00.000Z',
+				registration_closes_at: null,
+				registration_mode: 'open' as const,
+				status: 'open' as const,
+				team_size: 8,
+				substitute_count: 1,
+				max_teams: 16,
+				prize_info: null,
+				rules_url: null,
+				discord_url: null,
+				unlisted_at: '2026-06-01T00:00:00.000Z',
+				created_at: '2026-05-01T00:00:00.000Z',
+				updated_at: '2026-06-01T10:00:00.000Z',
+				organizer: { id: 'org1', display_name: 'Organizer' }
+			}
+		];
+
+		mockAdmin.from = vi.fn(() => ({
+			select: vi.fn(() => ({
+				neq: vi.fn(() => ({
+					neq: vi.fn(() => ({
+						is: vi.fn(() => ({
+							order: vi.fn(() => Promise.resolve({
+								data: mockTournaments,
+								error: null
+							}))
+						}))
+					}))
+				}))
+			}))
+		}));
+
+		const result = await listTournaments();
+		expect(result.upcoming).toHaveLength(0);
+		expect(result.past).toHaveLength(0);
+	});
+});
+
+describe('canViewTournament', () => {
+	const listed = { status: 'open', unlistedAt: null, organizerId: 'org' };
+
+	it('hides an unlisted tournament from the public and from other players', () => {
+		const unlisted = { ...listed, unlistedAt: '2026-11-01T00:00:00.000Z' };
+		expect(canViewTournament(unlisted, null, 'user')).toBe(false);
+		expect(canViewTournament(unlisted, 'someone-else', 'user')).toBe(false);
+		expect(canViewTournament(unlisted, 'org', 'user')).toBe(true);
+		expect(canViewTournament(unlisted, 'admin-id', 'admin')).toBe(true);
+	});
+
+	it('keeps a listed tournament public', () => {
+		expect(canViewTournament(listed, null, 'user')).toBe(true);
 	});
 });
