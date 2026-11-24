@@ -98,6 +98,8 @@ The site can run in a reduced read-only mode without Supabase, but auth, builds,
 | `PUBLIC_SUPABASE_URL` | For auth and community features | Supabase project URL used by both server and client |
 | `PUBLIC_SUPABASE_ANON_KEY` | For auth and community features | Public anon key used for browser/server auth flows |
 | `SUPABASE_SERVICE_ROLE_KEY` | For the contribution system, API key management, and the migration script | Service-role key used by server-only code paths that bypass RLS |
+| `RESEND_API_KEY` | Optional | Send-only key for organizer application emails. Mail stays off unless `EMAIL_FROM` is set too |
+| `EMAIL_FROM` | Optional | Verified sender address for those emails |
 | `PUBLIC_SITE_URL` | Optional | Canonical public site origin used for auth redirects, share links, and canonical metadata |
 | `PUBLIC_REPO_URL` | Optional | Public source repository URL surfaced in the footer |
 
