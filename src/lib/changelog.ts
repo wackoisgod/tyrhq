@@ -1,6 +1,7 @@
 // Public Tyr HQ changelog. Newest first.
 // Adding a release is a one-file edit: put a new entry at the top.
 // Write for players. Game balance notes belong on Patch Notes, not here.
+// Full rules: AGENTS.md (Changelog).
 
 export type ChangelogTag = 'New' | 'Improved' | 'Fixed';
 
