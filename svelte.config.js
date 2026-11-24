@@ -88,6 +88,15 @@ const config = {
 		adapter: adapter({
 			runtime: 'nodejs22.x'
 		}),
+		// Supabase's token POST is server-to-server and has no Origin header.
+		// trustedOrigins cannot allow that while this check stays on, so the
+		// check moves to src/hooks.server.ts, which exempts only
+		// POST /auth/steam/oidc/token. 2.58 warns that checkOrigin is
+		// deprecated; leave it false. Removing it turns the built-in check
+		// back on before the hook runs, and Steam linking breaks again.
+		csrf: {
+			checkOrigin: false
+		},
 		csp: {
 			// Hashes rather than nonces: server-rendered pages are CDN-cached,
 			// and a cached page would otherwise replay one nonce to everyone.

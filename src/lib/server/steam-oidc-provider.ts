@@ -542,41 +542,46 @@ export const steamOidcProvider = {
 		client_id: string;
 		client_secret: string;
 	}, origin: string): Promise<{ access_token: string; token_type: string; expires_in: number; id_token: string } | { error: string }> {
+		const reject = (error: string, reason: string) => {
+			console.warn('[steam-oidc] token rejected:', reason);
+			return { error };
+		};
+
 		// Validate grant_type
 		if (params.grant_type !== 'authorization_code') {
-			return { error: 'unsupported_grant_type' };
+			return reject('unsupported_grant_type', 'unsupported_grant_type');
 		}
 
 		// SECURITY: Verify client with constant-time comparison
 		if (params.client_id !== getClientId() || !verifyClientSecret(params.client_secret)) {
-			return { error: 'invalid_client' };
+			return reject('invalid_client', 'invalid_client');
 		}
 
 		// Verify and decode stateless authorization code
 		const codeData = await verifyStatelessCode(params.code, origin);
 		if (!codeData) {
-			return { error: 'invalid_grant' };
+			return reject('invalid_grant', 'invalid_code');
 		}
 
 		// Verify client_id matches code
 		if (codeData.clientId !== params.client_id) {
-			return { error: 'invalid_grant' };
+			return reject('invalid_grant', 'client_id_mismatch');
 		}
 
 		// Verify redirect_uri matches
 		if (params.redirect_uri !== codeData.redirectUri) {
-			return { error: 'invalid_grant' };
+			return reject('invalid_grant', 'redirect_uri_mismatch');
 		}
 
 		// SECURITY: Verify PKCE if code has code_challenge
 		// PKCE is optional because Supabase may not forward it
 		if (codeData.codeChallenge) {
 			if (!params.code_verifier) {
-				return { error: 'invalid_grant' };
+				return reject('invalid_grant', 'missing_code_verifier');
 			}
 			const computedChallenge = await hashCodeVerifier(params.code_verifier);
 			if (computedChallenge !== codeData.codeChallenge) {
-				return { error: 'invalid_grant' };
+				return reject('invalid_grant', 'pkce_mismatch');
 			}
 		}
 

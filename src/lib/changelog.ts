@@ -20,6 +20,16 @@ export type ChangelogEntry = {
 export const changelog: ChangelogEntry[] = [
 	{
 		date: '2026-11-24',
+		title: 'Sign-in',
+		items: [
+			{
+				tag: 'Fixed',
+				text: 'Linking Steam now works.'
+			}
+		]
+	},
+	{
+		date: '2026-11-24',
 		title: 'Tournaments',
 		items: [
 			{
