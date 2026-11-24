@@ -21,7 +21,7 @@
  */
 
 import { env } from '$env/dynamic/private';
-import { SignJWT, jwtVerify, importPKCS8, exportJWK, EncryptJWT, jwtDecrypt, importSPKI } from 'jose';
+import { SignJWT, jwtVerify, importPKCS8, exportJWK, EncryptJWT, jwtDecrypt, importSPKI, importJWK } from 'jose';
 import type { JWK } from 'jose';
 import { createPublicKey } from 'node:crypto';
 import { timingSafeEqual } from 'node:crypto';
@@ -40,11 +40,12 @@ const TOKEN_TTL_SECONDS = 3600; // 1 hour
  * SECURITY: Only exports PUBLIC key for JWKS
  */
 let cachedPrivateKey: CryptoKey | null = null;
+let cachedPublicKey: CryptoKey | null = null;
 let cachedPublicJWK: JWK | null = null;
 
-async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicJWK: JWK }> {
-	if (cachedPrivateKey && cachedPublicJWK) {
-		return { privateKey: cachedPrivateKey, publicJWK: cachedPublicJWK };
+async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicKey: CryptoKey; publicJWK: JWK }> {
+	if (cachedPrivateKey && cachedPublicKey && cachedPublicJWK) {
+		return { privateKey: cachedPrivateKey, publicKey: cachedPublicKey, publicJWK: cachedPublicJWK };
 	}
 
 	const privateKeyPem = env.STEAM_OIDC_PRIVATE_KEY;
@@ -80,11 +81,19 @@ async function getOrGenerateKeys(): Promise<{ privateKey: CryptoKey; publicJWK: 
 	if (publicJWK.d || publicJWK.p || publicJWK.q || publicJWK.dp || publicJWK.dq || publicJWK.qi) {
 		throw new Error('SECURITY: Private key components leaked into public JWK');
 	}
+
+	// jwtVerify requires a public CryptoKey for RS256. The signing key is private
+	// and jose rejects it. Import the public JWK we just derived and cache that.
+	const importedPublicKey = await importJWK(publicJWK, 'RS256');
+	if (!(importedPublicKey instanceof CryptoKey) || importedPublicKey.type !== 'public') {
+		throw new Error('Steam OIDC public key import did not produce a public CryptoKey');
+	}
 	
 	cachedPrivateKey = privateKey;
+	cachedPublicKey = importedPublicKey;
 	cachedPublicJWK = publicJWK;
 	
-	return { privateKey, publicJWK };
+	return { privateKey, publicKey: importedPublicKey, publicJWK };
 }
 
 /**
@@ -124,7 +133,7 @@ async function getCodeEncryptionKey(): Promise<CryptoKey> {
  * Generate stateless authorization code (encrypted JWT)
  * SECURITY FIX: Stateless codes work across serverless instances
  */
-async function generateStatelessCode(payload: {
+export async function generateStatelessCode(payload: {
 	steamId: string;
 	redirectUri: string;
 	codeChallenge?: string;
@@ -154,7 +163,7 @@ async function generateStatelessCode(payload: {
 /**
  * Verify and decode stateless authorization code
  */
-async function verifyStatelessCode(code: string, origin: string): Promise<{
+export async function verifyStatelessCode(code: string, origin: string): Promise<{
 	steamId: string;
 	redirectUri: string;
 	codeChallenge?: string;
@@ -162,11 +171,12 @@ async function verifyStatelessCode(code: string, origin: string): Promise<{
 	jti: string;
 } | null> {
 	try {
-		const { privateKey } = await getOrGenerateKeys();
+		const { publicKey } = await getOrGenerateKeys();
 		const issuer = getIssuer(origin);
 		
-		// Verify signature and expiration
-		const { payload } = await jwtVerify(code, privateKey, {
+		// Verify signature and expiration with the public key. A private
+		// CryptoKey is rejected for RS256 and would fail every code.
+		const { payload } = await jwtVerify(code, publicKey, {
 			issuer,
 			maxTokenAge: `${CODE_TTL_SECONDS}s`
 		});
@@ -634,16 +644,10 @@ export const steamOidcProvider = {
 	async userinfo(accessToken: string, origin: string): Promise<{ sub: string; name: string; picture: string; email: string; steam_id: string } | { error: string }> {
 		try {
 			const issuer = getIssuer(origin);
-			const { publicJWK } = await getOrGenerateKeys();
+			const { publicKey } = await getOrGenerateKeys();
 			
-			// Verify access token
-			const { payload } = await jwtVerify(accessToken, await crypto.subtle.importKey(
-				'jwk',
-				publicJWK,
-				{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-				false,
-				['verify']
-			), {
+			// Verify access token with the cached public key
+			const { payload } = await jwtVerify(accessToken, publicKey, {
 				issuer,
 				audience: getClientId()
 			});

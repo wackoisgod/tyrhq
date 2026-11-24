@@ -24,6 +24,10 @@ export const changelog: ChangelogEntry[] = [
 		items: [
 			{
 				tag: 'Fixed',
+				text: 'Linking Steam works now (for real this time).'
+			},
+			{
+				tag: 'Fixed',
 				text: 'Linking Steam now works.'
 			}
 		]
