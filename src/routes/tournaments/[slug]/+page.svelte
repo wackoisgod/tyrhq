@@ -335,6 +335,9 @@
 				<h1 class="mt-3 font-[var(--font-display)] text-4xl font-bold uppercase text-[var(--hud-text)] md:text-5xl">
 					{data.tournament.name}
 				</h1>
+				{#if data.tournament.unlistedAt}
+					<p class="mt-3 text-sm text-[var(--hud-warning)]">This tournament is off the public list.</p>
+				{/if}
 				<div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[var(--hud-text)]">
 					<span>{formatDate(data.tournament.startsAt)}</span>
 					<span class="text-[var(--hud-dim)]">Organizer: <a href="/players/{data.tournament.organizerId}" class="text-[var(--hud-teal)] hover:text-[var(--hud-text)]">{data.tournament.organizerName || 'Unknown'}</a></span>

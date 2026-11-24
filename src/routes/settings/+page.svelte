@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import SettingsNav from '$lib/components/settings/SettingsNav.svelte';
 	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
+	import OrganizerApplicationPanel from '$lib/components/settings/OrganizerApplicationPanel.svelte';
 	import { linkEmailThenPassword } from '$lib/auth/link-email';
 
 	let { data, form } = $props();
@@ -971,6 +972,12 @@
 	</div>
 
 	{#if !data.isOnboarding}
+		<OrganizerApplicationPanel
+			state={data.organizerApplication}
+			discordDefault={data.profile?.discord_handle}
+			{form}
+		/>
+
 		<div class="mt-6 hud-panel p-8">
 			<div class="flex flex-wrap items-start justify-between gap-4">
 				<div>
@@ -1145,6 +1152,27 @@
 						</p>
 						<p class="mt-2 text-sm text-[var(--hud-text)]">
 							Curate the Discords, fan sites, and tools listed on the community page.
+						</p>
+					</a>
+				{/if}
+
+				{#if data.role === 'admin'}
+					<a
+						href="/admin/organizers"
+						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"
+					>
+						<p
+							class="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--hud-teal)]"
+						>
+							Organizer review
+							<span
+								class="ml-2 rounded-sm bg-[var(--hud-teal)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--hud-on-teal)]"
+							>
+								ADMIN
+							</span>
+						</p>
+						<p class="mt-2 text-sm text-[var(--hud-text)]">
+							Review organizer applications, unlist a tournament, or remove organizer access.
 						</p>
 					</a>
 				{/if}

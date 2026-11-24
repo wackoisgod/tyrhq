@@ -3,6 +3,11 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { loadProfile } from '$lib/server/settings';
 import {
+	loadOrganizerApplicationState,
+	OrganizerApplicationError,
+	submitOrganizerApplication
+} from '$lib/server/organizer-applications';
+import {
 	CommunityEventError,
 	getEventForActor,
 	listEventsForUser,
@@ -90,8 +95,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}));
 	}
 
+	const organizerApplication = await loadOrganizerApplicationState(user.id);
+
 	return {
 		profile,
+		organizerApplication,
 		isOnboarding,
 		role,
 		events,
@@ -300,5 +308,43 @@ export const actions: Actions = {
 		}
 
 		return { profileSuccess: 'Email+password removed' };
+	},
+
+	applyOrganizer: async ({ request, locals }) => {
+		const { session, user } = await locals.safeGetSession();
+		if (!session || !user) return fail(401, { organizerError: 'Not authenticated' });
+
+		const formData = await request.formData();
+		const discordHandle = String(formData.get('discord_handle') ?? '');
+		const pastEvents = String(formData.get('past_events') ?? '');
+		const format = String(formData.get('format') ?? '');
+		const region = String(formData.get('region') ?? '');
+		const frequency = String(formData.get('frequency') ?? '');
+		const expectedPlayerCount = Number(formData.get('expected_player_count'));
+		const fields = {
+			organizerDiscord: discordHandle,
+			organizerPastEvents: pastEvents,
+			organizerFormat: format,
+			organizerRegion: region,
+			organizerFrequency: frequency,
+			organizerPlayerCount: String(formData.get('expected_player_count') ?? '')
+		};
+
+		try {
+			await submitOrganizerApplication(user.id, {
+				discordHandle,
+				pastEvents,
+				format,
+				region,
+				frequency,
+				expectedPlayerCount
+			});
+		} catch (err) {
+			const message = err instanceof OrganizerApplicationError ? err.message : 'Could not submit the application.';
+			const status = err instanceof OrganizerApplicationError ? err.statusCode : 500;
+			return fail(status, { organizerError: message, ...fields });
+		}
+
+		return { organizerSuccess: 'Application submitted. An admin will review it.' };
 	}
 };
