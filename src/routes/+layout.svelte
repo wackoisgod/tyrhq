@@ -10,6 +10,7 @@
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
 	import { env } from '$env/dynamic/public';
 	import NavFlyout from '$lib/components/nav/NavFlyout.svelte';
+	import NotificationBell from '$lib/components/nav/NotificationBell.svelte';
 
 	injectAnalytics({ mode: dev ? 'development' : 'production' });
 
@@ -69,6 +70,16 @@
 							<span class="tyr-review-pill__count">{data.pendingReviewCount}</span>
 						</a>
 					{/if}
+					{#if data.pendingOrganizerApplicationCount > 0}
+						<a
+							href="/admin/organizers"
+							class="tyr-review-pill"
+							aria-label="{data.pendingOrganizerApplicationCount} organizer application{data.pendingOrganizerApplicationCount === 1 ? '' : 's'} awaiting review"
+						>
+							<span class="tyr-review-pill__label">Organizers</span>
+							<span class="tyr-review-pill__count">{data.pendingOrganizerApplicationCount}</span>
+						</a>
+					{/if}
 					{#if data.pendingEventCount > 0}
 						<a
 							href="/admin/events"
@@ -78,6 +89,12 @@
 							<span class="tyr-review-pill__label">Events</span>
 							<span class="tyr-review-pill__count">{data.pendingEventCount}</span>
 						</a>
+					{/if}
+					{#if data.user && data.notificationsEnabled}
+						<NotificationBell
+							unreadCount={data.unreadNotificationCount}
+							notifications={data.recentNotifications}
+						/>
 					{/if}
 					<a
 						href={data.user ? '/settings' : '/auth'}

@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { canManageTournaments } from '$lib/tournament-access';
 import {
 	createTournament,
 	createTournamentSchema,
@@ -20,7 +21,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!session || !user) redirect(303, `/auth?next=${encodeURIComponent(url.pathname)}`);
 
 	const isOrganizer = await loadOrganizerFlag(locals, user.id);
-	if (role !== 'admin' && !isOrganizer) {
+	if (!canManageTournaments({ role, isOrganizer })) {
 		return { isOrganizer, tournaments: [], accessDenied: true };
 	}
 

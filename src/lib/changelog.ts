@@ -38,6 +38,22 @@ export const changelog: ChangelogEntry[] = [
 		items: [
 			{
 				tag: 'New',
+				text: 'You get an email when an organizer application is approved or declined, including any note left on a declined application.'
+			},
+			{
+				tag: 'New',
+				text: 'You get a notification in the header when an organizer application is approved or declined, and when organizer access is removed.'
+			},
+			{
+				tag: 'New',
+				text: 'Apply from Settings to organize tournaments. Once approved, you can publish an event right away, and your application status stays on Settings.'
+			},
+			{
+				tag: 'Improved',
+				text: 'A tournament can be taken off the public list without deleting its results.'
+			},
+			{
+				tag: 'New',
 				text: 'Create a tournament and register a team. Organizers can rank the field, generate a bracket, and record results, including a quick result for a series.'
 			},
 			{

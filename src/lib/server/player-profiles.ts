@@ -31,6 +31,7 @@ interface TournamentRef {
 	logo_url: string | null;
 	starts_at: string;
 	status: TournamentStatus;
+	unlisted_at?: string | null;
 }
 
 interface MembershipRow {
@@ -248,7 +249,7 @@ export async function getPlayerCompetitionProfile(userId: string) {
 		admin
 			.from('tournament_roster_members')
 			.select(
-				'tournament_id, team_id, source, joined_at, tournament:tournaments(id, slug, name, logo_url, starts_at, status), team:teams(id, slug, name, logo_url, is_disabled)'
+				'tournament_id, team_id, source, joined_at, tournament:tournaments(id, slug, name, logo_url, starts_at, status, unlisted_at), team:teams(id, slug, name, logo_url, is_disabled)'
 			)
 			.eq('user_id', userId)
 			.order('joined_at', { ascending: false })
@@ -257,7 +258,20 @@ export async function getPlayerCompetitionProfile(userId: string) {
 	if (profileResult.error) throw new TournamentError('Could not load player profile.', 500);
 	if (!profileResult.data) return null;
 	if (membershipResult.error) throw new TournamentError('Could not load player teams.', 500);
-	if (rosterResult.error) throw new TournamentError('Could not load player tournament history.', 500);
+	let rosterRows = (rosterResult.data as RosterRow[] | null) ?? [];
+	if (rosterResult.error?.message?.includes('unlisted_at')) {
+		const fallbackRoster = await admin
+			.from('tournament_roster_members')
+			.select(
+				'tournament_id, team_id, source, joined_at, tournament:tournaments(id, slug, name, logo_url, starts_at, status), team:teams(id, slug, name, logo_url, is_disabled)'
+			)
+			.eq('user_id', userId)
+			.order('joined_at', { ascending: false });
+		if (fallbackRoster.error) throw new TournamentError('Could not load player tournament history.', 500);
+		rosterRows = (fallbackRoster.data as RosterRow[] | null) ?? [];
+	} else if (rosterResult.error) {
+		throw new TournamentError('Could not load player tournament history.', 500);
+	}
 
 	const currentTeams = ((membershipResult.data as MembershipRow[] | null) ?? [])
 		.map((membership) => {
@@ -275,9 +289,10 @@ export async function getPlayerCompetitionProfile(userId: string) {
 		})
 		.filter((team): team is NonNullable<typeof team> => team !== null);
 
-	const publicRoster = ((rosterResult.data as RosterRow[] | null) ?? []).filter(
-		(row) => one(row.tournament)?.status !== 'draft'
-	);
+	const publicRoster = rosterRows.filter((row) => {
+		const tournament = one(row.tournament);
+		return Boolean(tournament && tournament.status !== 'draft' && !tournament.unlisted_at);
+	});
 	const tournamentIds = [...new Set(publicRoster.map((row) => row.tournament_id))];
 	let registrations: RegistrationRow[] = [];
 	let matches: PlayerCompetitionMatch[] = [];

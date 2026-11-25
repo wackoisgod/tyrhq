@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import { getSnakeFirstRoundSeeds } from '$lib/tournaments/bracket';
+import { canManageTournaments } from '$lib/tournament-access';
 
 import {
 	assertTeamNameAllowed,
@@ -197,6 +198,7 @@ interface TournamentRow {
 	prize_info: string | null;
 	rules_url: string | null;
 	discord_url: string | null;
+	unlisted_at?: string | null;
 	created_at: string;
 	updated_at: string;
 	organizer?: ProfileRef | ProfileRef[] | null;
@@ -444,7 +446,7 @@ function requireAdminClient() {
 }
 
 function requireOrganizer(actor: { role: string; isOrganizer?: boolean | null }) {
-	if (actor.role !== 'admin' && !actor.isOrganizer) {
+	if (!canManageTournaments(actor)) {
 		throw new TournamentError('Tournament organizer access required.', 403);
 	}
 }
@@ -493,9 +495,21 @@ function toTournament(row: TournamentRow) {
 		maxTeamMembers: row.team_size + row.substitute_count,
 		rulesUrl: row.rules_url,
 		discordUrl: row.discord_url,
+		unlistedAt: row.unlisted_at ?? null,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at
 	};
+}
+
+/** Drafts and unlisted events stay off the public site. The organizer and admins can still open them. */
+export function canViewTournament(
+	tournament: { status: string; unlistedAt?: string | null; organizerId: string },
+	viewerId: string | null | undefined,
+	role: string
+) {
+	const hidden = tournament.status === 'draft' || Boolean(tournament.unlistedAt);
+	if (!hidden) return true;
+	return Boolean(viewerId && (viewerId === tournament.organizerId || role === 'admin'));
 }
 
 export async function loadOrganizerFlag(locals: App.Locals, userId: string) {
@@ -815,15 +829,29 @@ export async function leaveTeam(teamId: string, actorId: string) {
 
 export async function listTournaments() {
 	const admin = requireAdminClient();
-	const { data, error } = await admin
+	const select = '*, organizer:profiles!tournaments_organizer_id_fkey(id, display_name)';
+	const listed = await admin
 		.from('tournaments')
-		.select('*, organizer:profiles!tournaments_organizer_id_fkey(id, display_name)')
+		.select(select)
 		.neq('status', 'draft')
 		.neq('status', 'cancelled')
+		.is('unlisted_at', null)
 		.order('starts_at', { ascending: true });
+	let data = listed.data;
+	let error = listed.error;
+	if (error?.message?.includes('unlisted_at')) {
+		const fallback = await admin
+			.from('tournaments')
+			.select(select)
+			.neq('status', 'draft')
+			.neq('status', 'cancelled')
+			.order('starts_at', { ascending: true });
+		data = fallback.data;
+		error = fallback.error;
+	}
 	if (error) throw new TournamentError('Could not load tournaments.', 500);
 	const now = Date.now();
-	const rows = ((data as TournamentRow[]) ?? []).map(toTournament);
+	const rows = ((data as TournamentRow[]) ?? []).filter((row) => !row.unlisted_at).map(toTournament);
 	const liveStatuses = new Set(['open', 'in_progress']);
 	return {
 		upcoming: rows.filter((t) => t.status !== 'completed' && (new Date(t.startsAt).getTime() >= now || liveStatuses.has(t.status))),
@@ -854,7 +882,19 @@ export async function getTournamentBySlug(slug: string, viewerId?: string | null
 	if (error) throw new TournamentError('Could not load tournament.', 500);
 	if (!tournament) return null;
 	const canManage = Boolean(viewerId && (viewerId === tournament.organizer_id || role === 'admin'));
-	if (tournament.status === 'draft' && !canManage) return null;
+	if (
+		!canViewTournament(
+			{
+				status: tournament.status,
+				unlistedAt: tournament.unlisted_at,
+				organizerId: tournament.organizer_id
+			},
+			viewerId,
+			role
+		)
+	) {
+		return null;
+	}
 
 	const [{ data: registrations }, { data: matches }] = await Promise.all([
 		admin
