@@ -10,6 +10,7 @@
 	import EventsPanel from '$lib/components/settings/EventsPanel.svelte';
 	import OrganizerApplicationPanel from '$lib/components/settings/OrganizerApplicationPanel.svelte';
 	import { linkEmailThenPassword } from '$lib/auth/link-email';
+	import { canManageTournaments } from '$lib/tournament-access';
 
 	let { data, form } = $props();
 
@@ -1021,7 +1022,7 @@
 						Create a team, join a roster, and track tournament records.
 					</p>
 				</a>
-				{#if data.role === 'admin' || data.profile?.is_tournament_organizer}
+				{#if canManageTournaments({ role: data.role, isOrganizer: data.profile?.is_tournament_organizer })}
 					<a
 						href="/tournaments/manage"
 						class="rounded-sm bg-[var(--hud-panel-mid)] p-4 transition hover:shadow-[inset_2px_0_0_0_var(--hud-teal)]"

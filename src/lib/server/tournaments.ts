@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import { getSnakeFirstRoundSeeds } from '$lib/tournaments/bracket';
+import { canManageTournaments } from '$lib/tournament-access';
 
 import {
 	assertTeamNameAllowed,
@@ -445,7 +446,7 @@ function requireAdminClient() {
 }
 
 function requireOrganizer(actor: { role: string; isOrganizer?: boolean | null }) {
-	if (actor.role !== 'admin' && !actor.isOrganizer) {
+	if (!canManageTournaments(actor)) {
 		throw new TournamentError('Tournament organizer access required.', 403);
 	}
 }
