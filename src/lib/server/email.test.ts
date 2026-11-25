@@ -142,6 +142,7 @@ describe('sendEmail', () => {
 		fetchMock.mockReset();
 		vi.stubGlobal('fetch', fetchMock);
 		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
 	});
 
 	afterEach(() => {
@@ -173,6 +174,48 @@ describe('sendEmail', () => {
 			text: 'You can publish a tournament now.'
 		});
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('warns once with the missing setting name and never logs the key', async () => {
+		const message = {
+			to: applicantEmail,
+			subject: 'Organizer application approved',
+			text: 'You can publish a tournament now.'
+		};
+		const warn = vi.mocked(console.warn);
+
+		await expect(sendEmail(message)).resolves.toEqual({ delivered: false, reason: 'not_configured' });
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith('[email] not configured; skipping send', {
+			missing: ['RESEND_API_KEY', 'EMAIL_FROM']
+		});
+
+		warn.mockClear();
+		privateEnv.RESEND_API_KEY = apiKey;
+		privateEnv.EMAIL_FROM = '   ';
+		await expect(sendEmail(message)).resolves.toEqual({ delivered: false, reason: 'not_configured' });
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith('[email] not configured; skipping send', {
+			missing: ['EMAIL_FROM']
+		});
+		expect(JSON.stringify(warn.mock.calls)).not.toContain(apiKey);
+
+		warn.mockClear();
+		privateEnv.RESEND_API_KEY = '  ';
+		privateEnv.EMAIL_FROM = fromAddress;
+		await expect(sendEmail(message)).resolves.toEqual({ delivered: false, reason: 'not_configured' });
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith('[email] not configured; skipping send', {
+			missing: ['RESEND_API_KEY']
+		});
+		expect(JSON.stringify(warn.mock.calls)).not.toContain(apiKey);
+
+		warn.mockClear();
+		privateEnv.RESEND_API_KEY = apiKey;
+		privateEnv.EMAIL_FROM = fromAddress;
+		fetchMock.mockResolvedValue({ ok: true, status: 200, text: async () => '{"id":"email_123"}' });
+		await expect(sendEmail(message)).resolves.toEqual({ delivered: true });
+		expect(warn).not.toHaveBeenCalled();
 	});
 
 	it('posts a short message when mail is configured', async () => {
@@ -245,6 +288,7 @@ describe('sendEmail', () => {
 	it('refuses an empty message', async () => {
 		await expect(sendEmail({ to: '', subject: 'Hi', text: 'Hello' })).rejects.toThrow(/recipient/);
 		expect(fetchMock).not.toHaveBeenCalled();
+		expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
 	});
 });
 
